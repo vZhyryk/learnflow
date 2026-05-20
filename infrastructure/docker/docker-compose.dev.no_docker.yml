@@ -1,0 +1,92 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: learnflow_postgres_local_deps
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${DB_NAME:-learnflow}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-learnflow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: learnflow_redis_local_deps
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: learnflow_minio_local_deps
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+
+# НАВЧАЛЬНИЙ БЛОК
+#
+# ДЖЕРЕЛО ПРАВДИ: docker-compose.dev.yml
+# Цей файл — для режиму "backend локально, інфра в Docker".
+# Запускає тільки залежності (postgres, redis, minio) без самого бекенду.
+#
+# БУЛО (3 проблеми):
+#   1. ENV VAR NAMES: postgres сервіс читав ${POSTGRES_DB}, ${POSTGRES_USER}, ${POSTGRES_PASSWORD}.
+#      Але .env файл і весь Go-код використовують DB_NAME, DB_USER, DB_PASSWORD.
+#      Якщо задати DB_NAME=mydb у .env — no_docker.yml його не бачив, бо шукав POSTGRES_DB.
+#      Резумат: різні env файли бачили різні бази даних.
+#
+#   2. HEALTHCHECK: test використовував ${POSTGRES_USER} і ${POSTGRES_DB} —
+#      ті самі неправильні імена змінних.
+#
+#   3. ВІДСУТНІЙ MINIO: dev.yml має minio (object storage для файлів).
+#      no_docker.yml не мав — backend локально не міг завантажувати/читати файли.
+#
+# СТАЛО:
+#   1. Значення env vars синхронізовані з dev.yml:
+#      ${POSTGRES_DB:-learnflow}  →  ${DB_NAME:-learnflow}
+#      ${POSTGRES_USER:-postgres} →  ${DB_USER:-postgres}
+#      ${POSTGRES_PASSWORD:-...}  →  ${DB_PASSWORD:-...}
+#      Примітка: КЛЮЧІ (POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD) лишились — це
+#      офіційні env vars Docker-образу postgres, вони вбудовані в образ і незмінні.
+#      Змінились тільки ЗНАЧЕННЯ (звідки читати) — тепер з тих самих змінних що й dev.yml.
+#
+#   2. Healthcheck виправлено аналогічно.
+#
+#   3. Minio додано — backend локально тепер має доступ до об'єктного сховища.
+#      Networks не додаємо — backend підключається до сервісів через exposed ports (localhost).

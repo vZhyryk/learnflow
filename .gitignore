@@ -1,0 +1,36 @@
+prompt*.md
+.env
+.env.*
+!.env.example
+
+.study_notes
+.claude
+
+.code-review-graph
+.planning
+.vscode
+docs
+.mcp.json
+.agents
+node_modules
+
+# Coverage
+coverage.out
+tests/coverage.out
+
+# OS files
+.DS_Store
+
+# Guides
+*_guide.md
+*_guide
+r_questions
+
+# MemPalace per-project files (issue #185)
+mempalace.yaml
+entities.json
+
+backend/todo.md
+frontend/coverage/
+backend/tmp/
+design/

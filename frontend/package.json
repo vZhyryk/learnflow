@@ -1,0 +1,62 @@
+{
+  "name": "frontend",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "type-check": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@nuxt/a11y": "^1.0.0-alpha.1",
+    "@nuxt/eslint": "^1.15.2",
+    "@nuxt/image": "^2.0.0",
+    "@nuxt/kit": "^4.4.4",
+    "@nuxt/scripts": "^1.0.5",
+    "@nuxt/ui": "^4.7.1",
+    "@nuxtjs/i18n": "^10.3.0",
+    "@nuxtjs/seo": "^5.1.3",
+    "@pinia/nuxt": "^0.11.3",
+    "@unhead/vue": "^2.1.13",
+    "@valibot/to-json-schema": "^1.6.0",
+    "@vee-validate/nuxt": "^4.15.1",
+    "@vueuse/nuxt": "^14.3.0",
+    "dayjs-nuxt": "^2.1.11",
+    "eslint": "^10.2.1",
+    "izitoast": "^1.4.0",
+    "nuxt": "^4.4.4",
+    "nuxt-capo": "^0.2.0",
+    "nuxt-charts": "^2.1.4",
+    "nuxt-delay-hydration": "^1.3.8",
+    "nuxt-gtag": "^4.1.0",
+    "nuxt-payload-analyzer": "^0.1.4",
+    "nuxt-posthog": "^1.6.3",
+    "nuxt-safe-runtime-config": "^0.1.3",
+    "nuxt-security": "^2.5.1",
+    "nuxt-toast": "^1.4.0",
+    "nuxt-typed-router": "^4.0.7",
+    "pinia": "^3.0.4",
+    "playwright-core": "^1.59.1",
+    "prettier": "^3.8.3",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3",
+    "valibot": "^1.3.1",
+    "vue": "^3.5.33",
+    "vue-router": "^5.0.6",
+    "vue3-carousel-nuxt": "^1.1.6"
+  },
+  "devDependencies": {
+    "@nuxt/test-utils": "^4.0.3",
+    "@vue/test-utils": "^2.4.10",
+    "happy-dom": "^20.9.0",
+    "vitest": "^4.1.5"
+  }
+}
