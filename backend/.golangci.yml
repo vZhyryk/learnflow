@@ -1,0 +1,99 @@
+version: "2"
+
+run:
+    timeout: 5m
+    tests: true
+    concurrency: 4
+
+linters:
+    default: none
+
+    enable:
+        - govet
+        - staticcheck
+        - unused
+        - errcheck
+        - revive
+        - ineffassign
+        - nilerr
+        - errorlint
+        - wrapcheck
+        - gocyclo
+        - funlen
+        - prealloc
+        - gosec
+        - unconvert
+        - unparam
+        - whitespace
+        - misspell
+        - sqlclosecheck
+        - rowserrcheck
+        - bodyclose
+        - noctx
+        - gocritic
+        - durationcheck
+        - wastedassign
+
+    settings:
+        gocyclo:
+            min-complexity: 10
+
+        funlen:
+            lines: 80
+            statements: 40
+
+        revive:
+            rules:
+                - name: var-naming
+                - name: indent-error-flow
+                - name: early-return
+                - name: unused-parameter
+                - name: error-return
+                - name: cognitive-complexity
+                  arguments: [15]
+                - name: exported
+                - name: context-as-argument
+
+        errcheck:
+            check-type-assertions: true
+            check-blank: true
+
+        govet:
+            enable:
+                - shadow
+
+        gosec:
+            severity: medium
+            confidence: medium
+
+        wrapcheck:
+            ignore-package-globs:
+                - learnflow_backend/internal/*
+                - learnflow_backend/internal/**
+            extra-ignore-sigs:
+                - .Write(
+
+        gocritic:
+            enabled-tags:
+                - diagnostic
+                - performance
+                - style
+            disabled-checks:
+                - hugeParam
+                - rangeValCopy
+
+formatters:
+    enable:
+        - gofmt
+        - goimports
+        - gofumpt
+
+    settings:
+        gofumpt:
+            extra-rules: true
+
+issues:
+    max-same-issues: 50
+
+severity:
+    default: error

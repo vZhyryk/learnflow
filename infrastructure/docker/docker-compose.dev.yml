@@ -1,0 +1,256 @@
+services:
+    api:
+        build:
+            context: ../../backend
+            dockerfile: Dockerfile.dev
+        container_name: learnflow_api_dev
+        ports:
+            - "${PORT:-8080}:8080"
+        env_file:
+            - ../../.env
+        environment:
+            ENV: docker
+            ENVIRONMENT: ${ENVIRONMENT:-dev}
+            PORT: ${BACK_PORT:-8080}
+            DB_HOST: ${DB_HOST:-postgres}
+            DB_PORT: ${DB_PORT:-5432}
+            DB_NAME: ${DB_NAME:-learnflow}
+            DB_USER: ${DB_USER:-postgres}
+            DB_PASSWORD: ${DB_PASSWORD:-postgres}
+            REDIS_ADDR: redis:6379
+            SSLMODE: ${SSLMODE:-disable}
+            JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+            SERVER_TIMEOUT: ${SERVER_TIMEOUT:-30}
+            # Storage (MinIO for local dev)
+            STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
+            STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
+            STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
+            STORAGE_BUCKET: ${STORAGE_BUCKET:-learnflow}
+            STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+            # Email
+            EMAIL_PROVIDER: ${EMAIL_PROVIDER:-stub}
+            EMAIL_FROM: ${EMAIL_FROM:-noreply@learnflow.local}
+            RESEND_API_KEY: ${RESEND_API_KEY:-}
+            # Payments
+            STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+            STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+            P24_MERCHANT_ID: ${P24_MERCHANT_ID:-}
+            P24_API_KEY: ${P24_API_KEY:-}
+            P24_WEBHOOK_SECRET: ${P24_WEBHOOK_SECRET:-}
+        volumes:
+            - ../../backend:/app
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        restart: unless-stopped
+        init: true
+        networks:
+            - app-network
+
+    worker:
+        build:
+            context: ../../backend
+            dockerfile: Dockerfile.dev
+        container_name: learnflow_worker_dev
+        env_file:
+            - ../../.env
+        environment:
+            ENV: docker
+            ENVIRONMENT: ${ENVIRONMENT:-dev}
+            DB_HOST: ${DB_HOST:-postgres}
+            DB_PORT: ${DB_PORT:-5432}
+            DB_NAME: ${DB_NAME:-learnflow}
+            DB_USER: ${DB_USER:-postgres}
+            DB_PASSWORD: ${DB_PASSWORD:-postgres}
+            SSLMODE: ${SSLMODE:-disable}
+            REDIS_ADDR: redis:6379
+            JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+            SERVER_TIMEOUT: ${SERVER_TIMEOUT:-30}
+            # Storage (MinIO for local dev)
+            STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
+            STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
+            STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
+            STORAGE_BUCKET: ${STORAGE_BUCKET:-learnflow}
+            STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+            # Email
+            EMAIL_PROVIDER: ${EMAIL_PROVIDER:-stub}
+            EMAIL_FROM: ${EMAIL_FROM:-noreply@learnflow.local}
+            RESEND_API_KEY: ${RESEND_API_KEY:-}
+            # Payments
+            STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+            STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+            P24_MERCHANT_ID: ${P24_MERCHANT_ID:-}
+            P24_API_KEY: ${P24_API_KEY:-}
+            P24_WEBHOOK_SECRET: ${P24_WEBHOOK_SECRET:-}
+        command: ["air", "-c", ".air.worker.toml"]
+        volumes:
+            - ../../backend:/app
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        restart: unless-stopped
+        init: true
+        networks:
+            - app-network
+
+    migrate:
+        build:
+            context: ../../backend
+            dockerfile: Dockerfile.dev
+            # target: migrate
+        container_name: learnflow_migrate_dev
+        env_file:
+            - ../../.env
+        environment:
+            ENVIRONMENT: ${ENVIRONMENT:-dev}
+            DB_HOST: ${DB_HOST:-postgres}
+            DB_PORT: ${DB_PORT:-5432}
+            DB_NAME: ${DB_NAME:-learnflow}
+            DB_USER: ${DB_USER:-postgres}
+            DB_PASSWORD: ${DB_PASSWORD:-postgres}
+            SSLMODE: ${SSLMODE:-disable}
+            STEPS: ${MIGRATION_STEPS:-0}
+            DIRECTION: ${MIGRATION_DIRECTION:-up}
+        depends_on:
+            postgres:
+                condition: service_healthy
+        networks:
+            - app-network
+        command: ["air", "-c", ".air.migrate.toml"]
+        volumes:
+            - ../../backend:/app # - must be added to work with air
+        # command:
+        #   - /bin/sh
+        #   - -c
+        #   - /app/migrate -dsn "postgres://$$DB_USER:$$DB_PASSWORD@$$DB_HOST:$$DB_PORT/$$DB_NAME?sslmode=disable" -direction up
+        profiles:
+            - manual
+
+    frontend:
+        build:
+            context: ../../frontend
+            dockerfile: Dockerfile.dev
+        container_name: learnflow_frontend_dev
+        ports:
+            - "${FRONTEND_PORT:-3000}:3000"
+        env_file:
+            - ../../.env
+        environment:
+            ENVIRONMENT: ${ENVIRONMENT:-dev}
+            NUXT_PUBLIC_API_BASE_URL: ${NUXT_PUBLIC_API_BASE_URL:-http://localhost:8080}
+            NUXT_PUBLIC_SITE_URL: ${NUXT_PUBLIC_SITE_URL:-http://localhost:3000}
+            NUXT_PUBLIC_GA_ID: ${NUXT_PUBLIC_GA_ID:-}
+            NUXT_PUBLIC_GOOGLE_ADS_ID: ${NUXT_PUBLIC_GOOGLE_ADS_ID:-}
+            NUXT_PUBLIC_COOKIEBOT_ID: ${NUXT_PUBLIC_COOKIEBOT_ID:-}
+            CHOKIDAR_USEPOLLING: "true"
+        volumes:
+            - ../../frontend:/app
+            - frontend_node_modules:/app/node_modules
+        depends_on:
+            - api
+        restart: unless-stopped
+        networks:
+            - app-network
+
+    minio:
+        image: minio/minio:latest
+        container_name: learnflow_minio
+        ports:
+            - "${MINIO_PORT:-9000}:9000"
+            - "${MINIO_CONSOLE_PORT:-9001}:9001"
+        environment:
+            MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-minioadmin}
+            MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-minioadmin}
+        volumes:
+            - minio_data:/data
+        command: server /data --console-address ":9001"
+        healthcheck:
+            test: ["CMD", "mc", "ready", "local"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        restart: unless-stopped
+        networks:
+            - app-network
+
+    postgres:
+        image: postgres:17
+        container_name: learnflow_postgres
+        ports:
+            - "${POSTGRES_PORT:-5432}:5432"
+        environment:
+            POSTGRES_DB: ${DB_NAME:-learnflow}
+            POSTGRES_USER: ${DB_USER:-postgres}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-learnflow}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        restart: unless-stopped
+        networks:
+            - app-network
+
+    backup:
+        build:
+            context: ../backup
+            dockerfile: Dockerfile
+        container_name: learnflow_backup
+        environment:
+            ENVIRONMENT: ${ENVIRONMENT:-dev}
+            POSTGRES_HOST: ${DB_HOST:-postgres}
+            POSTGRES_PORT: ${DB_PORT:-5432}
+            POSTGRES_DB: ${DB_NAME:-learnflow}
+            POSTGRES_USER: ${DB_USER:-postgres}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+            SSLMODE: ${SSLMODE:-disable}
+            MINIO_ENDPOINT: http://minio:9000
+            MINIO_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
+            MINIO_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
+            BACKUP_BUCKET: ${BACKUP_BUCKET:-learnflow-backups}
+            BACKUP_SCHEDULE: ${BACKUP_SCHEDULE:-0 */6 * * *}
+        depends_on:
+            postgres:
+                condition: service_healthy
+            minio:
+                condition: service_healthy
+        restart: unless-stopped
+        networks:
+            - app-network
+
+    redis:
+        image: redis:7-alpine
+        container_name: learnflow_redis
+        ports:
+            - "${REDIS_PORT:-6379}:6379"
+        volumes:
+            - redis_data:/data
+        command: ["redis-server", "--appendonly", "yes"]
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 5s
+        restart: unless-stopped
+        networks:
+            - app-network
+
+volumes:
+    postgres_data:
+    redis_data:
+    minio_data:
+    frontend_node_modules:
+
+networks:
+    app-network:
+        name: learnflow_app-network
+        driver: bridge

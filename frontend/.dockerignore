@@ -1,0 +1,11 @@
+.git
+.gitignore
+.nuxt
+.output
+node_modules
+coverage
+dist
+test-results
+playwright-report
+*.log
+.DS_Store

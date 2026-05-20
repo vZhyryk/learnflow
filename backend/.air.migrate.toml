@@ -1,0 +1,41 @@
+root = "."
+testdata_dir = "testdata"
+tmp_dir = "tmp"
+
+[build]
+  args_bin = []
+  bin = "./tmp/develop/migrate"
+  # Migration entrypoint
+  cmd = "go build -buildvcs=false -o ./tmp/develop/migrate ./cmd/migrate"
+  delay = 1000
+  exclude_dir = ["assets", "tmp"]
+  exclude_file = []
+  exclude_regex = ["_test.go"]
+  exclude_unchanged = false
+  follow_symlink = true
+  full_bin = ""
+  include_dir = []
+  include_ext = ["go", "tpl", "tmpl", "html"]
+  kill_delay = "5s"
+  log = "build-errors.log"
+  send_interrupt = true
+  stop_on_error = true
+  auto_reload = true
+  args = []
+  poll = true
+
+[color]
+  app = ""
+  build = "blue"
+  main = "red"
+  runner = "white"
+  watcher = "green"
+
+[log]
+  time = false
+
+[misc]
+  clean_on_exit = false
+
+[screen]
+  clear_on_rebuild = false
