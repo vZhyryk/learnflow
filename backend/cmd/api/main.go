@@ -2,12 +2,13 @@
 package main
 
 import (
+	"expvar"
 	"flag"
 	"fmt"
 	"learnflow_backend/cmd/api/app"
 	"learnflow_backend/cmd/api/router"
 	"learnflow_backend/cmd/api/server"
-	"learnflow_backend/internal/infrastructure/config"
+	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
 	"os"
@@ -17,23 +18,33 @@ import (
 func main() {
 	traceLevel := logger.LevelFatal
 
-	ENV := env.GetStringEnv("ENVIRONMENT", "production")
-	if ENV == "dev" {
+	environment := env.GetStringEnv("ENVIRONMENT", "production")
+	if environment == "dev" {
 		traceLevel = logger.LevelError
 	}
 
 	jsonLogger := logger.New(os.Stdout, nil, traceLevel)
 
-	appCfg, err := getAppConfig()
+	appCfg, err := getAppConfig(environment)
 	if err != nil {
 		jsonLogger.Fatal(err, nil)
 	}
 
-	appCfg.Env = ENV
+	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxOpenConns, appCfg.Database.MaxIdleConns)
+	if err != nil {
+		jsonLogger.Fatal(err, nil)
+	}
+
+	if expvar.Get("database") == nil {
+		expvar.Publish("database", expvar.Func(func() any {
+			return dbInstance.Stats()
+		}))
+	}
 
 	application := &app.App{
 		Config: appCfg,
 		Logger: jsonLogger,
+		DB:     dbInstance,
 	}
 
 	r := router.NewRouter(application)
@@ -44,37 +55,58 @@ func main() {
 	}
 }
 
-func getAppConfig() (app.Config, error) {
+func getAppConfig(environment string) (app.Config, error) {
 	cfg := app.Config{}
+	cfg.Env = environment
+
 	flag.Float64Var(&cfg.Limiter.Rps, "limiter-rps", -1, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.Limiter.Burst, "limiter-burst", -1, "Rate limiter maximum burst")
 	flag.BoolVar(&cfg.Limiter.Enabled, "limiter-enabled", true, "Enable rate limiter")
 	flag.Parse()
 
-	dbConfig, err := config.ResolveConfig(cfg.Config, "api")
-	if err != nil {
-		return cfg, fmt.Errorf("failed to resolve config: %w", err)
+	visited := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { visited[f.Name] = true })
+
+	if !visited["limiter-rps"] {
+		cfg.Limiter.Rps = env.GetFloat64Env("LIMITER_RPS", 5)
 	}
 
-	origins := env.GetStringEnv("CORS_TRUSTED_ORIGINS", "http://localhost:8080")
-	cfg.Cors.TrustedOrigins = strings.Split(origins, ",")
+	if !visited["limiter-burst"] {
+		cfg.Limiter.Burst = env.GetIntEnv("LIMITER_BURST", 10)
+	}
 
-	cfg.Config = dbConfig
+	dsn, err := db.BuildDSNFromEnv()
+	if err != nil {
+		return cfg, fmt.Errorf("failed to resolve database DSN: %w", err)
+	}
+
+	cfg.Cors.TrustedOrigins = getCorsTrustedOrigins()
+
+	maxOpenConns, maxIdleConns, maxIdleTime := getDatabaseConfig()
+
+	cfg.Database.DSN = dsn
+	cfg.Database.MaxIdleTime = maxIdleTime
+	cfg.Database.MaxOpenConns = maxOpenConns
+	cfg.Database.MaxIdleConns = maxIdleConns
 
 	cfg.Port = env.GetIntEnv("PORT", 8080)
-
-	cfg = handleAPIServiceConfig(cfg)
 
 	return cfg, nil
 }
 
-func handleAPIServiceConfig(cfg app.Config) app.Config {
-	if cfg.Limiter.Burst == -1 {
-		cfg.Limiter.Burst = env.GetIntEnv("LIMITER_BURST", 10)
+func getCorsTrustedOrigins() []string {
+	origins := env.GetStringEnv("CORS_TRUSTED_ORIGINS", "http://localhost:3000")
+	parts := strings.Split(origins, ",")
+	for i, p := range parts {
+		parts[i] = strings.TrimSpace(p)
 	}
-	if cfg.Limiter.Rps == -1 {
-		cfg.Limiter.Rps = env.GetFloat64Env("LIMITER_RPS", 5)
-	}
+	return parts
+}
 
-	return cfg
+func getDatabaseConfig() (int, int, string) {
+	maxOpenConns := env.GetIntEnv("DB_OPEN_CONNECTION_LIMIT", 25)
+	maxIdleConns := env.GetIntEnv("DB_IDLE_CONNECTION_LIMIT", 25)
+	maxIdleTime := env.GetStringEnv("DB_MAX_IDLE_TIME", "15m")
+
+	return maxOpenConns, maxIdleConns, maxIdleTime
 }

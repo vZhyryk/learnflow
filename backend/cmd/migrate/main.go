@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"learnflow_backend/internal/infrastructure/config"
+	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
 	"os"
@@ -24,7 +24,7 @@ func main() {
 	jsonLogger := logger.New(os.Stdout, nil, traceLevel)
 
 	cfg := parseFlags()
-	cfg, err := config.ResolveConfig(cfg, "migration")
+	cfg, err := resolveConfig(cfg)
 	if err != nil {
 		jsonLogger.Fatal(err, nil)
 	}
@@ -60,8 +60,8 @@ func main() {
 	}
 }
 
-func parseFlags() config.Config {
-	cfg := config.Config{}
+func parseFlags() migrationConfig {
+	cfg := migrationConfig{}
 	flag.StringVar(&cfg.DSN, "dsn", "", "PostgreSQL DSN (required)")
 	flag.StringVar(&cfg.Direction, "direction", "", "Migration direction: up or down")
 	flag.IntVar(&cfg.Steps, "steps", 0, "Number of migrations to apply (0 = all)")
@@ -96,4 +96,37 @@ func run(m *migrate.Migrate, direction string, steps int) error {
 	default:
 		return fmt.Errorf("invalid direction: %s", direction)
 	}
+}
+
+type migrationConfig struct {
+	DSN       string
+	Direction string
+	Steps     int
+}
+
+func resolveConfig(cfg migrationConfig) (migrationConfig, error) {
+	out := cfg
+
+	var err error
+	if out.DSN == "" {
+		out.DSN, err = db.BuildDSNFromEnv()
+		if err != nil {
+			return out, err
+		}
+	}
+
+	return handleMigrationServiceConfig(out)
+}
+
+func handleMigrationServiceConfig(cfg migrationConfig) (migrationConfig, error) {
+	if cfg.Direction == "" {
+		cfg.Direction = env.GetStringEnv("DIRECTION", "up")
+	}
+	if cfg.Steps <= 0 {
+		cfg.Steps = env.GetIntEnv("STEPS", 0)
+	}
+	if cfg.Direction != "up" && cfg.Direction != "down" {
+		return cfg, fmt.Errorf("invalid direction: %s", cfg.Direction)
+	}
+	return cfg, nil
 }

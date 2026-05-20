@@ -3,17 +3,20 @@ package app
 
 import (
 	"database/sql"
-	"learnflow_backend/internal/infrastructure/config"
 	"learnflow_backend/internal/infrastructure/logger"
 	"sync"
 )
 
 // Config holds all runtime configuration for the API server.
 type Config struct {
-	Port   int
-	Env    string
-	DB     *sql.DB
-	Config config.Config
+	Port     int
+	Env      string
+	Database struct {
+		DSN          string
+		MaxIdleTime  string
+		MaxOpenConns int
+		MaxIdleConns int
+	}
 
 	Cors struct {
 		TrustedOrigins []string
@@ -27,8 +30,18 @@ type Config struct {
 }
 
 // App is the shared application container injected into every handler and worker.
+// App must not be copied after first use — always pass as *App.
 type App struct {
+	_      noCopy
 	Config Config
 	Logger *logger.Logger
 	Wg     sync.WaitGroup
+	DB     *sql.DB
 }
+
+// noCopy prevents App from being copied after first use.
+// go vet detects accidental copies of types that embed noCopy.
+type noCopy struct{}
+
+func (*noCopy) Lock()   {}
+func (*noCopy) Unlock() {}
