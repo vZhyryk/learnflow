@@ -26,19 +26,13 @@ jobs:
               working-directory: backend
               run: go vet ./...
 
-            # - name: Lint
-            #   working-directory: backend
-            #   run: |
-            #       go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-            #       golangci-lint run
-
             - name: golangci-lint
               uses: golangci/golangci-lint-action@v9
               with:
                 version: v2.12
                 working-directory: backend
 
-            - name: Test
+            - name: Test race conditions
               working-directory: backend
               run: go test ./... -race -count=1
 
