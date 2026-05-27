@@ -2,6 +2,7 @@
 package app
 
 import (
+	"context"
 	"database/sql"
 	"learnflow_backend/internal/infrastructure/logger"
 	"sync"
@@ -16,6 +17,7 @@ type Config struct {
 		MaxIdleTime  string
 		MaxOpenConns int
 		MaxIdleConns int
+		MaxLifetime  string
 	}
 
 	Cors struct {
@@ -37,6 +39,8 @@ type App struct {
 	Logger *logger.Logger
 	Wg     sync.WaitGroup
 	DB     *sql.DB
+	Ctx    context.Context
+	Cancel context.CancelFunc
 }
 
 // noCopy prevents App from being copied after first use.

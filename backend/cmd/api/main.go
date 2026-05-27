@@ -2,7 +2,7 @@
 package main
 
 import (
-	"expvar"
+	"context"
 	"flag"
 	"fmt"
 	"learnflow_backend/cmd/api/app"
@@ -30,21 +30,20 @@ func main() {
 		jsonLogger.Fatal(err, nil)
 	}
 
-	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxOpenConns, appCfg.Database.MaxIdleConns)
+	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, appCfg.Database.MaxOpenConns, appCfg.Database.MaxIdleConns)
 	if err != nil {
 		jsonLogger.Fatal(err, nil)
 	}
 
-	if expvar.Get("database") == nil {
-		expvar.Publish("database", expvar.Func(func() any {
-			return dbInstance.Stats()
-		}))
-	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	application := &app.App{
 		Config: appCfg,
 		Logger: jsonLogger,
 		DB:     dbInstance,
+		Ctx:    ctx,
+		Cancel: cancel,
 	}
 
 	r := router.NewRouter(application)
@@ -82,12 +81,13 @@ func getAppConfig(environment string) (app.Config, error) {
 
 	cfg.Cors.TrustedOrigins = getCorsTrustedOrigins()
 
-	maxOpenConns, maxIdleConns, maxIdleTime := getDatabaseConfig()
+	maxOpenConns, maxIdleConns, maxIdleTime, maxLifetime := getDatabaseConfig()
 
 	cfg.Database.DSN = dsn
 	cfg.Database.MaxIdleTime = maxIdleTime
 	cfg.Database.MaxOpenConns = maxOpenConns
 	cfg.Database.MaxIdleConns = maxIdleConns
+	cfg.Database.MaxLifetime = maxLifetime
 
 	cfg.Port = env.GetIntEnv("PORT", 8080)
 
@@ -103,10 +103,10 @@ func getCorsTrustedOrigins() []string {
 	return parts
 }
 
-func getDatabaseConfig() (int, int, string) {
-	maxOpenConns := env.GetIntEnv("DB_OPEN_CONNECTION_LIMIT", 25)
-	maxIdleConns := env.GetIntEnv("DB_IDLE_CONNECTION_LIMIT", 25)
-	maxIdleTime := env.GetStringEnv("DB_MAX_IDLE_TIME", "15m")
-
-	return maxOpenConns, maxIdleConns, maxIdleTime
+func getDatabaseConfig() (maxOpenConns, maxIdleConns int, maxIdleTime, maxLifetime string) {
+	maxOpenConns = env.GetIntEnv("DB_OPEN_CONNECTION_LIMIT", 25)
+	maxIdleConns = env.GetIntEnv("DB_IDLE_CONNECTION_LIMIT", 15)
+	maxIdleTime = env.GetStringEnv("DB_MAX_IDLE_TIME", "15m")
+	maxLifetime = env.GetStringEnv("DB_MAX_LIFETIME", "30m")
+	return maxOpenConns, maxIdleConns, maxIdleTime, maxLifetime
 }

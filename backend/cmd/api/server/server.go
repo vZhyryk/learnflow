@@ -35,8 +35,9 @@ func (server *Server) Serve() error {
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
-		// http.Server.ErrorLog вимагає *log.Logger; використовуємо кастомний logger як Writer
-		ErrorLog: log.New(server.App.Logger, "", 0),
+		// http.Server.ErrorLog requires *log.Logger; use the custom logger as its Writer
+		ErrorLog:       log.New(server.App.Logger, "", 0),
+		MaxHeaderBytes: 1 << 20, // 1MB
 	}
 
 	shutdownError := make(chan error)
@@ -45,6 +46,7 @@ func (server *Server) Serve() error {
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		s := <-quit
+		server.App.Cancel()
 
 		server.App.Logger.Info("caught signal", map[string]any{
 			"signal": s.String(),

@@ -19,10 +19,11 @@ services:
             DB_USER: ${DB_USER:-postgres}
             DB_PASSWORD: ${DB_PASSWORD:-postgres}
             REDIS_ADDR: redis:6379
-            SSLMODE: ${SSLMODE:-disable}
+            DB_SSLMODE: ${DB_SSLMODE:-disable}
             DB_OPEN_CONNECTION_LIMIT: ${DB_OPEN_CONNECTION_LIMIT:-25}
             DB_IDLE_CONNECTION_LIMIT: ${DB_IDLE_CONNECTION_LIMIT:-25}
             DB_MAX_IDLE_TIME: ${DB_MAX_IDLE_TIME:-15m}
+            DB_MAX_LIFETIME: ${DB_MAX_LIFETIME:-30m}
             JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
             SERVER_TIMEOUT: ${SERVER_TIMEOUT:-30}
             # Storage (MinIO for local dev)
@@ -74,7 +75,7 @@ services:
             DB_NAME: ${DB_NAME:-learnflow}
             DB_USER: ${DB_USER:-postgres}
             DB_PASSWORD: ${DB_PASSWORD:-postgres}
-            SSLMODE: ${SSLMODE:-disable}
+            DB_SSLMODE: ${DB_SSLMODE:-disable}
             REDIS_ADDR: redis:6379
             JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
             SERVER_TIMEOUT: ${SERVER_TIMEOUT:-30}
@@ -127,7 +128,7 @@ services:
             DB_NAME: ${DB_NAME:-learnflow}
             DB_USER: ${DB_USER:-postgres}
             DB_PASSWORD: ${DB_PASSWORD:-postgres}
-            SSLMODE: ${SSLMODE:-disable}
+            DB_SSLMODE: ${DB_SSLMODE:-disable}
             STEPS: ${MIGRATION_STEPS:-0}
             DIRECTION: ${MIGRATION_DIRECTION:-up}
         depends_on:
@@ -226,7 +227,7 @@ services:
             POSTGRES_DB: ${DB_NAME:-learnflow}
             POSTGRES_USER: ${DB_USER:-postgres}
             POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-            SSLMODE: ${SSLMODE:-disable}
+            DB_SSLMODE: ${DB_SSLMODE:-disable}
             MINIO_ENDPOINT: http://minio:9000
             MINIO_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
             MINIO_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
