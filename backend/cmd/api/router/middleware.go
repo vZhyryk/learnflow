@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"learnflow_backend/internal/infrastructure/helpers"
 	"net/http"
-	"sync"
+	"runtime/debug"
 	"time"
 
 	"github.com/tomasen/realip"
@@ -20,6 +20,7 @@ func (routes *RouteHandler) RecoverPanic(next http.Handler) http.Handler {
 				routes.App.Logger.Error(fmt.Errorf("panic: %v", err), map[string]any{
 					"method": r.Method,
 					"url":    r.URL.String(),
+					"stack":  string(debug.Stack()),
 				})
 
 				err = helpers.WriteJSON(w, http.StatusInternalServerError, helpers.Envelope{"error": "internal server error"}, nil)
@@ -49,8 +50,8 @@ func (routes *RouteHandler) EnableCORS(next http.Handler) http.Handler {
 					w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 					if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
-						w.Header().Set("Access-Control-Allow-Methods", "*")
-						w.Header().Set("Access-Control-Allow-Headers", "*")
+						w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+						w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 						w.Header().Set("Access-Control-Max-Age", "86400")
 						w.WriteHeader(http.StatusOK)
 						return
@@ -63,55 +64,35 @@ func (routes *RouteHandler) EnableCORS(next http.Handler) http.Handler {
 	})
 }
 
-type rateLimitClient struct {
-	limiter  *rate.Limiter
-	lastSeen time.Time
-}
-
-func (route *RouteHandler) startRateLimitCleanup(mu *sync.Mutex, clients map[string]*rateLimitClient) {
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-route.App.Ctx.Done():
-			return
-		case <-ticker.C:
-			mu.Lock()
-			for ip, c := range clients {
-				if time.Since(c.lastSeen) > 3*time.Minute {
-					delete(clients, ip)
-				}
-			}
-			mu.Unlock()
-		}
-	}
+// SetSecurityHeaders sets basic HTTP security headers on every response.
+func (routes *RouteHandler) SetSecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		next.ServeHTTP(w, r)
+	})
 }
 
 // RateLimit enforces per-IP request rate limiting using a token bucket algorithm.
 func (route *RouteHandler) RateLimit(next http.Handler) http.Handler {
-	var (
-		mu      sync.Mutex
-		clients = make(map[string]*rateLimitClient)
-	)
-
-	go route.startRateLimitCleanup(&mu, clients)
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !route.App.Config.Limiter.Enabled {
 			next.ServeHTTP(w, r)
 			return
 		}
+
 		ip := realip.FromRequest(r)
-		mu.Lock()
-		if _, found := clients[ip]; !found {
-			clients[ip] = &rateLimitClient{
+		route.rateLimitMu.Lock()
+		if _, found := route.rateLimitClients[ip]; !found {
+			route.rateLimitClients[ip] = &rateLimitClient{
 				limiter: rate.NewLimiter(rate.Limit(route.App.Config.Limiter.Rps), route.App.Config.Limiter.Burst),
 			}
 		}
-		clients[ip].lastSeen = time.Now()
-		c := clients[ip]
+		route.rateLimitClients[ip].lastSeen = time.Now()
+		c := route.rateLimitClients[ip]
+		route.rateLimitMu.Unlock()
 		allowed := c.limiter.Allow()
-		mu.Unlock()
 		if !allowed {
 			route.RateLimitExceededResponse(w, r, c.limiter)
 			return

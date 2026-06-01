@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 CREATE TABLE users (
     id                  uuid            PRIMARY KEY DEFAULT gen_random_uuid(),
     email               varchar(254)    NOT NULL,
-    password_hash       text            NOT NULL,
+    password_hash       varchar(60)     NOT NULL,
     role                text            NOT NULL CONSTRAINT users_role_check   CHECK (role IN ('user', 'subadmin', 'admin')),
     status              text            NOT NULL CONSTRAINT users_status_check CHECK (status IN ('active', 'blocked')),
     email_verified_at   timestamptz,
@@ -61,8 +61,8 @@ CREATE TABLE user_profiles (
 CREATE TABLE email_verification_tokens (
     id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    token_hash  text        NOT NULL CONSTRAINT email_verification_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
-    expires_at  timestamptz NOT NULL,
+    token_hash  varchar(64)        NOT NULL CONSTRAINT email_verification_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
+    expires_at  timestamptz        NOT NULL,
     used_at     timestamptz,
     created_at  timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT email_verification_tokens_token_hash_unique    UNIQUE (token_hash),
@@ -76,10 +76,10 @@ CREATE INDEX idx_email_verification_tokens_user_id_unused
 CREATE TABLE password_reset_tokens (
     id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    token_hash  text        NOT NULL CONSTRAINT password_reset_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
-    expires_at  timestamptz NOT NULL,
+    token_hash  varchar(64)        NOT NULL CONSTRAINT password_reset_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
+    expires_at  timestamptz        NOT NULL,
     used_at     timestamptz,
-    created_at  timestamptz NOT NULL DEFAULT now(),
+    created_at  timestamptz        NOT NULL DEFAULT now(),
     CONSTRAINT password_reset_tokens_token_hash_unique    UNIQUE (token_hash),
     CONSTRAINT password_reset_tokens_expires_after_created CHECK (expires_at > created_at),
     CONSTRAINT password_reset_tokens_used_after_created   CHECK (used_at IS NULL OR used_at >= created_at)
@@ -92,7 +92,7 @@ CREATE TABLE email_change_tokens (
     id          uuid            PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     uuid            NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     new_email   varchar(254)    NOT NULL,
-    token_hash  text            NOT NULL CONSTRAINT email_change_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
+    token_hash  varchar(64)     NOT NULL CONSTRAINT email_change_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
     expires_at  timestamptz     NOT NULL,
     used_at     timestamptz,
     created_at  timestamptz     NOT NULL DEFAULT now(),
@@ -790,7 +790,7 @@ FULL OUTER JOIN expense_totals exp ON exp.period = rev.period AND exp.currency =
 CREATE TABLE account_recovery_tokens (
     id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash  text        NOT NULL,
+    token_hash  varchar(64)        NOT NULL,
     expires_at  timestamptz NOT NULL,
     used_at     timestamptz,
     created_at  timestamptz NOT NULL DEFAULT now(),

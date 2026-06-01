@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"learnflow_backend/internal/infrastructure/logger"
 	"sync"
+	"time"
 )
 
 // Config holds all runtime configuration for the API server.
@@ -28,6 +29,14 @@ type Config struct {
 		Rps     float64
 		Burst   int
 		Enabled bool
+	}
+
+	Auth struct {
+		JWTSecret                 string
+		AccessTokenTTL            time.Duration
+		RefreshTokenTTL           time.Duration
+		EmailVerificationTokenTTL time.Duration
+		PasswordResetTokenTTL     time.Duration
 	}
 }
 

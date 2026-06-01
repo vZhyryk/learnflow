@@ -25,6 +25,10 @@ services:
             DB_MAX_IDLE_TIME: ${DB_MAX_IDLE_TIME:-15m}
             DB_MAX_LIFETIME: ${DB_MAX_LIFETIME:-30m}
             JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
+            ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-5m}
+            REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-30d}
+            EMAIL_VERIFICATION_TOKEN_TTL: ${EMAIL_VERIFICATION_TOKEN_TTL:-1h}
+            PASSWORD_RESET_TOKEN_TTL: ${PASSWORD_RESET_TOKEN_TTL:-1h}
             SERVER_TIMEOUT: ${SERVER_TIMEOUT:-30}
             # Storage (MinIO for local dev)
             STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}

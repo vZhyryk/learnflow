@@ -76,5 +76,8 @@ func DefaultSensitiveKeys() map[string]struct{} {
 
 		// Common combined forms from Go struct fields.
 		"authorization_basic": {},
+
+		"dsn":          {},
+		"database_url": {},
 	}
 }

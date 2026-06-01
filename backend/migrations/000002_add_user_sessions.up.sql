@@ -3,10 +3,10 @@
 CREATE TABLE user_sessions (
     id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    refresh_hash    text        NOT NULL,
-    user_agent      text,
+    refresh_hash    varchar(64)        NOT NULL,
+    user_agent      varchar(255),
     ip              varchar(45),
-    expires_at      timestamptz NOT NULL,
+    expires_at      timestamptz        NOT NULL,
     revoked_at      timestamptz,
     created_at      timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT user_sessions_refresh_hash_unique        UNIQUE (refresh_hash),

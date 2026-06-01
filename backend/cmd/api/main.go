@@ -11,8 +11,10 @@ import (
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
+	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 func main() {
@@ -30,10 +32,21 @@ func main() {
 		jsonLogger.Fatal(err, nil)
 	}
 
+	if appCfg.Auth.JWTSecret == "" {
+		jsonLogger.Fatal(fmt.Errorf("JWT_SECRET required"), nil)
+	}
+
 	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, appCfg.Database.MaxOpenConns, appCfg.Database.MaxIdleConns)
 	if err != nil {
 		jsonLogger.Fatal(err, nil)
 	}
+
+	defer func() {
+		err := dbInstance.Close()
+		if err != nil {
+			jsonLogger.Error(err, nil)
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -79,7 +92,10 @@ func getAppConfig(environment string) (app.Config, error) {
 		return cfg, fmt.Errorf("failed to resolve database DSN: %w", err)
 	}
 
-	cfg.Cors.TrustedOrigins = getCorsTrustedOrigins()
+	cfg.Cors.TrustedOrigins, err = getCorsTrustedOrigins()
+	if err != nil {
+		return cfg, fmt.Errorf("CORS config: %w", err)
+	}
 
 	maxOpenConns, maxIdleConns, maxIdleTime, maxLifetime := getDatabaseConfig()
 
@@ -91,16 +107,29 @@ func getAppConfig(environment string) (app.Config, error) {
 
 	cfg.Port = env.GetIntEnv("PORT", 8080)
 
+	cfg.Auth.JWTSecret, cfg.Auth.AccessTokenTTL, cfg.Auth.RefreshTokenTTL, cfg.Auth.EmailVerificationTokenTTL, cfg.Auth.PasswordResetTokenTTL = getTokensData()
 	return cfg, nil
 }
 
-func getCorsTrustedOrigins() []string {
+func getCorsTrustedOrigins() ([]string, error) {
 	origins := env.GetStringEnv("CORS_TRUSTED_ORIGINS", "http://localhost:3000")
 	parts := strings.Split(origins, ",")
-	for i, p := range parts {
-		parts[i] = strings.TrimSpace(p)
+	var valid []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		u, err := url.Parse(p)
+		if err != nil || u.Host == "" {
+			return nil, fmt.Errorf("invalid CORS origin: %q (expected https://host)", p)
+		}
+		valid = append(valid, p)
 	}
-	return parts
+	if len(valid) == 0 {
+		return nil, fmt.Errorf("CORS_TRUSTED_ORIGINS is empty — at least one origin is required")
+	}
+	return valid, nil
 }
 
 func getDatabaseConfig() (maxOpenConns, maxIdleConns int, maxIdleTime, maxLifetime string) {
@@ -109,4 +138,15 @@ func getDatabaseConfig() (maxOpenConns, maxIdleConns int, maxIdleTime, maxLifeti
 	maxIdleTime = env.GetStringEnv("DB_MAX_IDLE_TIME", "15m")
 	maxLifetime = env.GetStringEnv("DB_MAX_LIFETIME", "30m")
 	return maxOpenConns, maxIdleConns, maxIdleTime, maxLifetime
+}
+
+func getTokensData() (jwtSecret string, accessTokenTTL, refreshTokenTTL, emailVerificationTokenTTL, passwordResetTokenTTL time.Duration) {
+	jwtSecret = env.GetStringEnv("JWT_SECRET", "")
+
+	accessTokenTTL = env.GetDurationEnv("ACCESS_TOKEN_TTL", 5*time.Minute)
+	refreshTokenTTL = env.GetDurationEnv("REFRESH_TOKEN_TTL", 30*24*time.Hour)
+	emailVerificationTokenTTL = env.GetDurationEnv("EMAIL_VERIFICATION_TOKEN_TTL", time.Hour)
+	passwordResetTokenTTL = env.GetDurationEnv("PASSWORD_RESET_TOKEN_TTL", time.Hour)
+
+	return jwtSecret, accessTokenTTL, refreshTokenTTL, emailVerificationTokenTTL, passwordResetTokenTTL
 }

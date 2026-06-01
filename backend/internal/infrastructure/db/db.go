@@ -28,7 +28,6 @@ func InitDatabase(dsn, maxIdleTime, maxLifetime string, maxOpenConns, maxIdleCon
 	db.SetConnMaxLifetime(lifetime)
 	db.SetMaxOpenConns(maxOpenConns)
 	db.SetMaxIdleConns(maxIdleConns)
-	db.SetConnMaxLifetime(lifetime)
 
 	return db, nil
 }

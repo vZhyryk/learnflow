@@ -5,28 +5,39 @@ import (
 	"learnflow_backend/cmd/api/app"
 	"learnflow_backend/internal/infrastructure/helpers"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/justinas/alice"
+	"golang.org/x/time/rate"
 )
 
 // RouteHandler holds the compiled ServeMux and a reference to the shared App container.
 type RouteHandler struct {
-	Router http.Handler
-	App    *app.App
+	Router           http.Handler
+	App              *app.App
+	rateLimitMu      *sync.Mutex
+	rateLimitClients map[string]*rateLimitClient
 }
 
 // NewRouter registers all routes and returns a RouteHandler ready to serve.
 func NewRouter(a *app.App) *RouteHandler {
 	router := http.NewServeMux()
 	route := &RouteHandler{
-		Router: router,
-		App:    a,
+		Router:           router,
+		App:              a,
+		rateLimitMu:      &sync.Mutex{},
+		rateLimitClients: make(map[string]*rateLimitClient),
 	}
 
 	router.Handle("/", http.HandlerFunc(route.NotFoundResponse))
 
-	static := alice.New(route.RecoverPanic, route.RateLimit, route.EnableCORS)
+	static := alice.New(route.RecoverPanic, route.SetSecurityHeaders, route.RateLimit, route.EnableCORS)
 	staticWithAuth := static.Append(route.AuthenticateUser)
+
+	if a.Config.Limiter.Enabled {
+		go route.startRateLimitCleanup()
+	}
 
 	// Authentication
 	router.Handle("POST /api/v1/auth/login", static.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
@@ -41,25 +52,24 @@ func NewRouter(a *app.App) *RouteHandler {
 		// logout logic
 	}))
 
+	router.Handle("POST /api/v1/users/auth/password/reset", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		// request password reset logic
+	}))
+
+	router.Handle("PUT /api/v1/users/auth/password", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		// set new password logic
+	}))
+
+	router.Handle("GET /api/v1/users/auth/email/verify", static.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		// verify email logic
+	}))
+
 	// Profile
 	router.Handle("GET /api/v1/users/profile", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		// get user profile logic
 	}))
 	router.Handle("PATCH /api/v1/users/profile", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		// update user profile logic
-	}))
-
-	// Password
-	router.Handle("POST /api/v1/users/profile/password/reset", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// request password reset logic
-	}))
-	router.Handle("PUT /api/v1/users/profile/password", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// set new password logic
-	}))
-
-	// Email
-	router.Handle("GET /api/v1/users/profile/email/verify", static.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// verify email logic
 	}))
 
 	// Monitoring
@@ -75,4 +85,28 @@ func NewRouter(a *app.App) *RouteHandler {
 	}))
 
 	return route
+}
+
+type rateLimitClient struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
+func (route *RouteHandler) startRateLimitCleanup() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-route.App.Ctx.Done():
+			return
+		case <-ticker.C:
+			route.rateLimitMu.Lock()
+			for ip, c := range route.rateLimitClients {
+				if time.Since(c.lastSeen) > 3*time.Minute {
+					delete(route.rateLimitClients, ip)
+				}
+			}
+			route.rateLimitMu.Unlock()
+		}
+	}
 }

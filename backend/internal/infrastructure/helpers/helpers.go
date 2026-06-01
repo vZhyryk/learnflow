@@ -14,8 +14,8 @@ import (
 type Envelope map[string]any
 
 // NewEnvelope wraps a map into an Envelope response.
-func NewEnvelope(uEnvelopData map[string]any) Envelope {
-	return uEnvelopData
+func NewEnvelope(uEnvelopeData map[string]any) Envelope {
+	return uEnvelopeData
 }
 
 // WriteJSON marshals data to JSON and writes it to the response with the given status and headers.

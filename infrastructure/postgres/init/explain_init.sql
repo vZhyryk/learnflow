@@ -47,17 +47,19 @@ CREATE TABLE users (
 
     -- [password_hash]: CLAUDE.md rule: "Passwords — bcrypt only." Raw passwords are
     -- never stored. The app hashes with bcrypt before INSERT/UPDATE.
-    password_hash   text        NOT NULL,
+    password_hash   varchar(60)        NOT NULL,
 
     -- [role CHECK]: Only 'user', 'subadmin', and 'admin' exist in this platform. DB-level
     -- CHECK prevents a bug in the auth service from inserting an invalid role that would
     -- bypass the permission system silently.
     role                text        NOT NULL CONSTRAINT users_role_check   CHECK (role IN ('user', 'subadmin', 'admin')),
 
-    -- [status vs deleted_at]: status = business state (active/blocked).
+    -- [status vs deleted_at]: status = business state (active/blocked/pending_verification).
     -- deleted_at = logical deletion. A blocked user still exists and can log in
     -- to see an "account blocked" message. A deleted user is invisible to queries.
-    status              text        NOT NULL CONSTRAINT users_status_check CHECK (status IN ('active', 'blocked')),
+    -- 'pending_verification' — registered but email not yet confirmed; access restricted
+    -- until the user completes the email_verification_tokens flow.
+    status              text        NOT NULL CONSTRAINT users_status_check CHECK (status IN ('active', 'blocked', 'pending_verification')),
 
     -- [nullable email_verified_at]: NULL = not verified; non-NULL = verified at
     -- that exact timestamp. More informative than a boolean is_verified flag:
@@ -70,7 +72,14 @@ CREATE TABLE users (
     deleted_at          timestamptz,
 
     created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now()
+    updated_at          timestamptz NOT NULL DEFAULT now(),
+
+    -- [password_changed_at / email_changed_at]: Track the last credential change.
+    -- Used to invalidate sessions issued before the change — any session with
+    -- created_at < password_changed_at is considered stale and should be revoked.
+    -- NULL = credential never changed since account creation.
+    password_changed_at timestamptz,
+    email_changed_at    timestamptz
 );
 
 -- [LOWER(email) partial unique]: Two protections in one index:
@@ -155,17 +164,19 @@ CREATE TABLE user_profiles (
 -- creates coupling and complicates the partial indexes (every index would need
 -- WHERE type = '...').
 CREATE TABLE email_verification_tokens (
-    id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    token_hash  text        NOT NULL CONSTRAINT email_verification_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
-    expires_at  timestamptz NOT NULL,
+    id          uuid               PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     uuid               NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    token_hash  varchar(64)        NOT NULL CONSTRAINT email_verification_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
+    expires_at  timestamptz        NOT NULL,
 
     -- [used_at timestamp over is_used boolean]: Records when the token was consumed.
     -- Useful for support: "when did the user verify their email?".
     -- NULL = unused; non-NULL = used at that time.
     used_at     timestamptz,
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT email_verification_tokens_token_hash_unique UNIQUE (token_hash)
+    created_at  timestamptz        NOT NULL DEFAULT now(),
+    CONSTRAINT email_verification_tokens_token_hash_unique    UNIQUE (token_hash),
+    CONSTRAINT email_verification_tokens_expires_after_created CHECK (expires_at > created_at),
+    CONSTRAINT email_verification_tokens_used_after_created   CHECK (used_at IS NULL OR used_at >= created_at)
 );
 
 -- [Partial index WHERE used_at IS NULL]: The only query by user_id is
@@ -175,13 +186,15 @@ CREATE INDEX idx_email_verification_tokens_user_id_unused
     ON email_verification_tokens(user_id) WHERE used_at IS NULL;
 
 CREATE TABLE password_reset_tokens (
-    id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    token_hash  text        NOT NULL CONSTRAINT password_reset_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
-    expires_at  timestamptz NOT NULL,
+    id          uuid               PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id     uuid               NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    token_hash  varchar(64)        NOT NULL CONSTRAINT password_reset_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
+    expires_at  timestamptz        NOT NULL,
     used_at     timestamptz,
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT password_reset_tokens_token_hash_unique UNIQUE (token_hash)
+    created_at  timestamptz        NOT NULL DEFAULT now(),
+    CONSTRAINT password_reset_tokens_token_hash_unique    UNIQUE (token_hash),
+    CONSTRAINT password_reset_tokens_expires_after_created CHECK (expires_at > created_at),
+    CONSTRAINT password_reset_tokens_used_after_created   CHECK (used_at IS NULL OR used_at >= created_at)
 );
 
 CREATE INDEX idx_password_reset_tokens_user_id_unused
@@ -201,11 +214,13 @@ CREATE TABLE email_change_tokens (
     -- users. This avoids partial state: users.email is authoritative and only
     -- updated atomically when the token is consumed.
     new_email   varchar(254)    NOT NULL,
-    token_hash  text        NOT NULL,
-    expires_at  timestamptz NOT NULL,
+    token_hash  varchar(64)     NOT NULL CONSTRAINT email_change_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
+    expires_at  timestamptz        NOT NULL,
     used_at     timestamptz,
-    created_at  timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT email_change_tokens_token_hash_unique UNIQUE (token_hash)
+    created_at  timestamptz        NOT NULL DEFAULT now(),
+    CONSTRAINT email_change_tokens_token_hash_unique    UNIQUE (token_hash),
+    CONSTRAINT email_change_tokens_expires_after_created CHECK (expires_at > created_at),
+    CONSTRAINT email_change_tokens_used_after_created   CHECK (used_at IS NULL OR used_at >= created_at)
 );
 
 -- [Partial index WHERE used_at IS NULL]: Same rationale as other auth token tables —
@@ -566,7 +581,9 @@ CREATE TABLE user_course_access (
     granted_at  timestamptz NOT NULL,
     expires_at  timestamptz,
     created_at  timestamptz NOT NULL DEFAULT now(),
-    updated_at  timestamptz NOT NULL DEFAULT now()
+    updated_at  timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT user_course_access_granted_at_after_created CHECK (granted_at >= created_at),
+    CONSTRAINT user_course_access_expires_after_granted   CHECK (expires_at IS NULL OR expires_at > granted_at)
 );
 
 -- [Partial unique, NOT table-level UNIQUE]: A table-level UNIQUE (user_id, course_id)
@@ -599,7 +616,12 @@ CREATE TABLE user_course_progress (
     -- [UNIQUE (user_id, course_id)]: One progress row per user per course.
     -- UPSERT pattern: INSERT ... ON CONFLICT (user_id, course_id) DO UPDATE SET ...
     -- The UNIQUE constraint also creates the index needed for those UPSERTs.
-    CONSTRAINT user_course_progress_unique UNIQUE (user_id, course_id)
+    CONSTRAINT user_course_progress_unique                       UNIQUE (user_id, course_id),
+    CONSTRAINT user_course_progress_started_at_after_created     CHECK (started_at IS NULL OR started_at >= created_at),
+    CONSTRAINT user_course_progress_last_interacted_after_created CHECK (last_interacted_at IS NULL OR last_interacted_at >= created_at),
+    CONSTRAINT user_course_progress_completed_at_after_created   CHECK (completed_at IS NULL OR completed_at >= created_at),
+    CONSTRAINT user_course_progress_started_when_active          CHECK (status = 'not_started' OR started_at IS NOT NULL),
+    CONSTRAINT user_course_progress_completed_at_100             CHECK (status != 'completed' OR progress_percent = 100)
 );
 
 CREATE TABLE user_content_progress (
@@ -614,7 +636,13 @@ CREATE TABLE user_content_progress (
     completed_at        timestamptz,
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT user_content_progress_unique UNIQUE (user_id, content_item_id)
+    CONSTRAINT user_content_progress_unique                       UNIQUE (user_id, content_item_id),
+    CONSTRAINT user_content_progress_time_spent_non_negative      CHECK (time_spent_minutes IS NULL OR time_spent_minutes >= 0),
+    CONSTRAINT user_content_progress_started_at_after_created     CHECK (started_at IS NULL OR started_at >= created_at),
+    CONSTRAINT user_content_progress_last_interacted_after_created CHECK (last_interacted_at IS NULL OR last_interacted_at >= created_at),
+    CONSTRAINT user_content_progress_completed_at_after_created   CHECK (completed_at IS NULL OR completed_at >= created_at),
+    CONSTRAINT user_content_progress_started_when_active          CHECK (status = 'not_started' OR started_at IS NOT NULL),
+    CONSTRAINT user_content_progress_completed_at_100             CHECK (status != 'completed' OR progress_percent = 100)
 );
 
 -- [Separate video/document engagement tables]: Video and document engagement have
@@ -681,13 +709,10 @@ CREATE TABLE user_content_access (
     granted_at      timestamptz NOT NULL,
 
     -- [expires_at nullable]: Content access can be time-limited (e.g., promotional coupon).
-    -- NULL = permanent. Constraint validates chronological ordering.
+    -- NULL = permanent.
     expires_at      timestamptz,
     created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now(),
-
-    CONSTRAINT user_content_access_expires_after_granted
-        CHECK (expires_at IS NULL OR expires_at > granted_at)
+    updated_at      timestamptz NOT NULL DEFAULT now()
 );
 
 -- [Partial unique WHERE status='active']: Same pattern as user_course_access.
@@ -1474,8 +1499,8 @@ CREATE TABLE account_recovery_tokens (
 
     -- [ON DELETE CASCADE]: See design note above. Recovery tokens are only meaningful
     -- if the user record still exists. Physical user deletion invalidates them.
-    user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash  text        NOT NULL,
+    user_id     uuid            NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash  varchar(64)        NOT NULL,
     expires_at  timestamptz NOT NULL,
     used_at     timestamptz,
     created_at  timestamptz NOT NULL DEFAULT now(),
@@ -1646,7 +1671,7 @@ CREATE INDEX idx_gift_coupons_course_id
     ON gift_coupons(course_id) WHERE course_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
--- 28. USER SESSIONS  (migration 000002_add_user_sessions)
+-- 28. USER SESSIONS  (migrations 000002_add_user_sessions, 000003_add_user_sessions)
 -- ---------------------------------------------------------------------------
 
 -- [user_sessions — refresh token storage for JWT authentication]:
@@ -1685,14 +1710,14 @@ CREATE TABLE user_sessions (
     --   WHERE refresh_hash = hash(token) AND revoked_at IS NULL.
     -- text instead of varchar — hash length depends on the algorithm; text is flexible.
     -- Covered by UNIQUE constraint below — O(log n) lookup, no full scan.
-    refresh_hash    text        NOT NULL,
+    refresh_hash    varchar(64)        NOT NULL,
 
     -- [HTTP User-Agent string]:
     -- Examples: "Mozilla/5.0 (Macintosh; ...)", "Dart/3.0 (dart:io)", "curl/8.1"
     -- Nullable — some clients (curl, API integrations) omit this header.
     -- Used only for the "active sessions" UI display — not for security decisions.
     -- (Easily spoofed by the client, so not a reliable identifier.)
-    user_agent      text,
+    user_agent      varchar(255),
 
     -- [Client IP address, varchar(45)]:
     -- Length 45 = maximum possible IP address representation:
@@ -1746,7 +1771,38 @@ CREATE TABLE user_sessions (
     -- A session cannot be revoked before it was created.
     -- OR revoked_at IS NULL — constraint allows NULL (not yet revoked).
     -- Catches: clock skew bugs, incorrect field assignment in the service layer.
-    CONSTRAINT user_sessions_revoked_after_created      CHECK (revoked_at IS NULL OR revoked_at >= created_at)
+    CONSTRAINT user_sessions_revoked_after_created      CHECK (revoked_at IS NULL OR revoked_at >= created_at),
+
+    -- [token_version]: Rotated on every successful refresh. The client's stored version
+    -- is compared on the next refresh — mismatch indicates a stale or replayed token.
+    -- NOT NULL DEFAULT 1 — every session starts at version 1.
+    token_version          integer     NOT NULL DEFAULT 1,
+
+    -- [previous_refresh_hash]: Hash of the immediately preceding refresh token.
+    -- If the incoming token hash matches previous_refresh_hash (not current refresh_hash),
+    -- the token was already rotated — indicates a possible replay attack; session should
+    -- be revoked immediately.
+    previous_refresh_hash  varchar(64),
+
+    -- [failed_attempt_count / locked_until]: Brute-force protection for the refresh endpoint.
+    -- After N consecutive failures, locked_until is set. Requests are rejected until
+    -- locked_until < now(). Resets to 0 on a successful refresh.
+    failed_attempt_count   integer     NOT NULL DEFAULT 0,
+    locked_until           timestamptz,
+
+    -- [last_attempt_at]: Timestamp of the most recent refresh attempt (success or failure).
+    -- Enables sliding-window rate limiting and activity audit.
+    last_attempt_at        timestamptz,
+
+    -- [revoke_reason]: Typed cause of revocation. NULL = session still active.
+    -- Enables targeted session management — e.g., password_changed → revoke all other
+    -- sessions while preserving the current one.
+    revoke_reason          varchar(30),
+
+    CONSTRAINT user_sessions_revoke_reason_check
+        CHECK (revoke_reason IN ('logout', 'password_changed', 'admin', 'suspicious_activity', 'token_expired')),
+    CONSTRAINT user_sessions_token_version_positive CHECK (token_version > 0),
+    CONSTRAINT user_sessions_failed_attempts_non_negative CHECK (failed_attempt_count >= 0)
 );
 
 -- ---------------------------------------------------------------------------
