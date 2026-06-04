@@ -21,7 +21,6 @@ services:
             REDIS_ADDR: redis:6379
             DB_SSLMODE: ${DB_SSLMODE:-disable}
             DB_OPEN_CONNECTION_LIMIT: ${DB_OPEN_CONNECTION_LIMIT:-25}
-            DB_IDLE_CONNECTION_LIMIT: ${DB_IDLE_CONNECTION_LIMIT:-25}
             DB_MAX_IDLE_TIME: ${DB_MAX_IDLE_TIME:-15m}
             DB_MAX_LIFETIME: ${DB_MAX_LIFETIME:-30m}
             JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}

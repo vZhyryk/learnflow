@@ -25,6 +25,7 @@ const (
 const (
 	StatusActive              UserStatus = "active"
 	StatusBlocked             UserStatus = "blocked"
+	StatusDeleted             UserStatus = "deleted"
 	StatusPendingVerification UserStatus = "pending_verification"
 )
 
@@ -51,6 +52,9 @@ type User struct {
 	UpdatedAt         time.Time
 	PasswordChangedAt sql.NullTime
 	EmailChangedAt    sql.NullTime
+	FailedLoginCount  int
+	LastFailedLoginAt sql.NullTime
+	LoginLockedUntil  sql.NullTime
 }
 
 // UserSession represents an active refresh-token session.
@@ -63,22 +67,27 @@ type UserSession struct {
 	ExpiresAt           time.Time
 	RevokedAt           sql.NullTime
 	RevokeReason        sql.NullString
+	RevokedByUserID     sql.NullString
 	CreatedAt           time.Time
 	FailedAttemptCount  int
 	LastAttemptAt       sql.NullTime
 	LockedUntil         sql.NullTime
 	TokenVersion        int
 	PreviousRefreshHash string
+	LastSeenAt          sql.NullTime
+	LastSeenIP          sql.NullString
 }
 
 // TokenBase holds fields common to all single-use auth tokens.
 type TokenBase struct {
-	ID        string
-	UserID    string
-	TokenHash string
-	ExpiresAt time.Time
-	CreatedAt time.Time
-	UsedAt    sql.NullTime
+	ID                  string
+	UserID              string
+	TokenHash           string
+	ExpiresAt           time.Time
+	CreatedAt           time.Time
+	UsedAt              sql.NullTime
+	InvalidatedAt       sql.NullTime
+	InvalidatedByUserID sql.NullString
 }
 
 // EmailVerificationToken is a single-use token for confirming a user's email address.

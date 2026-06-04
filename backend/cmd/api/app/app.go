@@ -3,10 +3,11 @@ package app
 
 import (
 	"context"
-	"database/sql"
 	"learnflow_backend/internal/infrastructure/logger"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Config holds all runtime configuration for the API server.
@@ -17,7 +18,6 @@ type Config struct {
 		DSN          string
 		MaxIdleTime  string
 		MaxOpenConns int
-		MaxIdleConns int
 		MaxLifetime  string
 	}
 
@@ -47,7 +47,7 @@ type App struct {
 	Config Config
 	Logger *logger.Logger
 	Wg     sync.WaitGroup
-	DB     *sql.DB
+	DB     *pgxpool.Pool
 	Ctx    context.Context
 	Cancel context.CancelFunc
 }

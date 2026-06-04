@@ -2,48 +2,64 @@ package db
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // InitDatabase opens a PostgreSQL connection and configures pool settings.
-func InitDatabase(dsn, maxIdleTime, maxLifetime string, maxOpenConns, maxIdleConns int) (*sql.DB, error) {
-	db, err := openDB(dsn, "postgres")
+func InitDatabase(dsn, maxIdleTime, maxLifetime string, maxOpenConns int32) (*pgxpool.Pool, error) {
+	config, err := parseConfigs(dsn, maxIdleTime, maxLifetime, maxOpenConns)
 	if err != nil {
-		return nil, fmt.Errorf("db: failed to open database: %w", err)
+		return nil, err
 	}
 
-	duration, er := time.ParseDuration(maxIdleTime)
-	if er != nil {
-		return nil, fmt.Errorf("db: failed to parse max idle time: %w", er)
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		return nil, fmt.Errorf("db: failed to create pool: %w", err)
 	}
-	db.SetConnMaxIdleTime(duration)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err = pool.Ping(ctx); err != nil {
+		return nil, fmt.Errorf("db: failed to ping: %w", err)
+	}
+
+	return pool, nil
+}
+
+func parseConfigs(dsn, maxIdleTime, maxLifetime string, maxOpenConns int32) (*pgxpool.Config, error) {
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("db: failed to parse config: %w", err)
+	}
+
+	if maxOpenConns <= 0 || maxOpenConns > 100 {
+		return nil, fmt.Errorf("db: maxOpenConns must be between 1 and 100, got %d", maxOpenConns)
+	}
+
+	idleDuration, err := time.ParseDuration(maxIdleTime)
+	if err != nil {
+		return nil, fmt.Errorf("db: failed to parse max idle time: %w", err)
+	}
+	if idleDuration <= 0 {
+		return nil, fmt.Errorf("db: max idle time must be positive, got %s", maxIdleTime)
+	}
 
 	lifetime, err := time.ParseDuration(maxLifetime)
 	if err != nil {
 		return nil, fmt.Errorf("db: failed to parse max lifetime: %w", err)
 	}
 
-	db.SetConnMaxLifetime(lifetime)
-	db.SetMaxOpenConns(maxOpenConns)
-	db.SetMaxIdleConns(maxIdleConns)
-
-	return db, nil
-}
-
-func openDB(dsn, dbType string) (*sql.DB, error) {
-	db, err := sql.Open(dbType, dsn)
-	if err != nil {
-		return nil, fmt.Errorf("db: failed to open database: %w", err)
+	if lifetime <= 0 {
+		return nil, fmt.Errorf("db: max life time must be positive, got %s", maxIdleTime)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	config.MaxConnLifetime = lifetime
+	config.MaxConns = maxOpenConns
+	config.MinConns = 2
+	config.HealthCheckPeriod = 1 * time.Minute
 
-	if err = db.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("db: failed to ping database: %w", err)
-	}
-
-	return db, nil
+	return config, nil
 }

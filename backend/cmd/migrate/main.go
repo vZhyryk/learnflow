@@ -9,9 +9,10 @@ import (
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
 	"os"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
@@ -33,7 +34,8 @@ func main() {
 		jsonLogger.Fatal(errors.New("dsn is required"), nil)
 	}
 
-	m, err := migrate.New("file://migrations", cfg.DSN)
+	dsn := strings.Replace(cfg.DSN, "postgres://", "pgx5://", 1)
+	m, err := migrate.New("file://migrations", dsn)
 	if err != nil {
 		jsonLogger.Fatal(fmt.Errorf("migrate init failed: %w", err), nil)
 	}

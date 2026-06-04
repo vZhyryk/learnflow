@@ -1,4 +1,4 @@
--- 000003: add user_sessions table for JWT refresh token storage.
+-- 000003: extend user_sessions table for enhanced security
 
 ALTER TABLE user_sessions
     ADD COLUMN token_version          integer NOT NULL DEFAULT 1,
@@ -17,5 +17,4 @@ ALTER TABLE users
     DROP CONSTRAINT users_status_check,
     ADD CONSTRAINT users_status_check CHECK (status IN ('active', 'blocked', 'pending_verification')),
     ADD COLUMN password_changed_at timestamptz,
-    ADD COLUMN email_changed_at timestamptz
-
+    ADD COLUMN email_changed_at timestamptz;

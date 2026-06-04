@@ -32,37 +32,20 @@ func NewRouter(a *app.App) *RouteHandler {
 
 	router.Handle("/", http.HandlerFunc(route.NotFoundResponse))
 
-	static := alice.New(route.RecoverPanic, route.SetSecurityHeaders, route.RateLimit, route.EnableCORS)
+	static := alice.New(route.RecoverPanic, route.RateLimit, route.EnableCORS, route.SetSecurityHeaders)
 	staticWithAuth := static.Append(route.AuthenticateUser)
 
 	if a.Config.Limiter.Enabled {
 		go route.startRateLimitCleanup()
 	}
 
-	// Authentication
-	router.Handle("POST /api/v1/auth/login", static.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// user login logic
-	}))
-
-	router.Handle("POST /api/v1/auth/register", static.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// register a new user logic
-	}))
-
-	router.Handle("POST /api/v1/auth/logout", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// logout logic
-	}))
-
-	router.Handle("POST /api/v1/users/auth/password/reset", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// request password reset logic
-	}))
-
-	router.Handle("PUT /api/v1/users/auth/password", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// set new password logic
-	}))
-
-	router.Handle("GET /api/v1/users/auth/email/verify", static.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// verify email logic
-	}))
+	// authRepo := authrepository.NewRepository(a.DB)
+	// authSvc := authservice.New(authservice.Dependencies{
+	// 	Users:    authRepo,
+	// 	Tokens:   authRepo,
+	// 	Sessions: authRepo,
+	// })
+	// auth.RegisterAuthRoutes(router, authSvc)
 
 	// Profile
 	router.Handle("GET /api/v1/users/profile", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {

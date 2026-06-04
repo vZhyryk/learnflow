@@ -36,17 +36,16 @@ func main() {
 		jsonLogger.Fatal(fmt.Errorf("JWT_SECRET required"), nil)
 	}
 
-	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, appCfg.Database.MaxOpenConns, appCfg.Database.MaxIdleConns)
+	if len(appCfg.Auth.JWTSecret) < 32 {
+		jsonLogger.Fatal(fmt.Errorf("JWT_SECRET must be at least 32 bytes, got %d", len(appCfg.Auth.JWTSecret)), nil)
+	}
+
+	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, int32(appCfg.Database.MaxOpenConns))
 	if err != nil {
 		jsonLogger.Fatal(err, nil)
 	}
 
-	defer func() {
-		err := dbInstance.Close()
-		if err != nil {
-			jsonLogger.Error(err, nil)
-		}
-	}()
+	defer dbInstance.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -97,12 +96,11 @@ func getAppConfig(environment string) (app.Config, error) {
 		return cfg, fmt.Errorf("CORS config: %w", err)
 	}
 
-	maxOpenConns, maxIdleConns, maxIdleTime, maxLifetime := getDatabaseConfig()
+	maxOpenConns, maxIdleTime, maxLifetime := getDatabaseConfig()
 
 	cfg.Database.DSN = dsn
 	cfg.Database.MaxIdleTime = maxIdleTime
 	cfg.Database.MaxOpenConns = maxOpenConns
-	cfg.Database.MaxIdleConns = maxIdleConns
 	cfg.Database.MaxLifetime = maxLifetime
 
 	cfg.Port = env.GetIntEnv("PORT", 8080)
@@ -132,12 +130,11 @@ func getCorsTrustedOrigins() ([]string, error) {
 	return valid, nil
 }
 
-func getDatabaseConfig() (maxOpenConns, maxIdleConns int, maxIdleTime, maxLifetime string) {
+func getDatabaseConfig() (maxOpenConns int, maxIdleTime, maxLifetime string) {
 	maxOpenConns = env.GetIntEnv("DB_OPEN_CONNECTION_LIMIT", 25)
-	maxIdleConns = env.GetIntEnv("DB_IDLE_CONNECTION_LIMIT", 15)
 	maxIdleTime = env.GetStringEnv("DB_MAX_IDLE_TIME", "15m")
 	maxLifetime = env.GetStringEnv("DB_MAX_LIFETIME", "30m")
-	return maxOpenConns, maxIdleConns, maxIdleTime, maxLifetime
+	return maxOpenConns, maxIdleTime, maxLifetime
 }
 
 func getTokensData() (jwtSecret string, accessTokenTTL, refreshTokenTTL, emailVerificationTokenTTL, passwordResetTokenTTL time.Duration) {
