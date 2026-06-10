@@ -13,8 +13,8 @@ import (
 	"learnflow_backend/internal/infrastructure/logger"
 	"net/url"
 	"os"
+	"runtime"
 	"strings"
-	"time"
 )
 
 func main() {
@@ -32,12 +32,12 @@ func main() {
 		jsonLogger.Fatal(err, nil)
 	}
 
-	if appCfg.Auth.JWTSecret == "" {
+	if appCfg.JWTSecret == "" {
 		jsonLogger.Fatal(fmt.Errorf("JWT_SECRET required"), nil)
 	}
 
-	if len(appCfg.Auth.JWTSecret) < 32 {
-		jsonLogger.Fatal(fmt.Errorf("JWT_SECRET must be at least 32 bytes, got %d", len(appCfg.Auth.JWTSecret)), nil)
+	if len(appCfg.JWTSecret) < 32 {
+		jsonLogger.Fatal(fmt.Errorf("JWT_SECRET must be at least 32 bytes, got %d", len(appCfg.JWTSecret)), nil)
 	}
 
 	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, int32(appCfg.Database.MaxOpenConns))
@@ -105,24 +105,27 @@ func getAppConfig(environment string) (app.Config, error) {
 
 	cfg.Port = env.GetIntEnv("PORT", 8080)
 
-	cfg.Auth.JWTSecret, cfg.Auth.AccessTokenTTL, cfg.Auth.RefreshTokenTTL, cfg.Auth.EmailVerificationTokenTTL, cfg.Auth.PasswordResetTokenTTL = getTokensData()
+	cfg.JWTSecret = env.GetStringEnv("JWT_SECRET", "")
+
 	return cfg, nil
 }
 
-func getCorsTrustedOrigins() ([]string, error) {
+func getCorsTrustedOrigins() (map[string]struct{}, error) {
 	origins := env.GetStringEnv("CORS_TRUSTED_ORIGINS", "http://localhost:3000")
 	parts := strings.Split(origins, ",")
-	var valid []string
+	valid := make(map[string]struct{})
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
 		if p == "" {
 			continue
 		}
+
 		u, err := url.Parse(p)
 		if err != nil || u.Host == "" {
 			return nil, fmt.Errorf("invalid CORS origin: %q (expected https://host)", p)
 		}
-		valid = append(valid, p)
+
+		valid[p] = struct{}{}
 	}
 	if len(valid) == 0 {
 		return nil, fmt.Errorf("CORS_TRUSTED_ORIGINS is empty — at least one origin is required")
@@ -131,19 +134,8 @@ func getCorsTrustedOrigins() ([]string, error) {
 }
 
 func getDatabaseConfig() (maxOpenConns int, maxIdleTime, maxLifetime string) {
-	maxOpenConns = env.GetIntEnv("DB_OPEN_CONNECTION_LIMIT", 25)
-	maxIdleTime = env.GetStringEnv("DB_MAX_IDLE_TIME", "15m")
-	maxLifetime = env.GetStringEnv("DB_MAX_LIFETIME", "30m")
+	maxOpenConns = max(env.GetIntEnv("DB_OPEN_CONNECTION_LIMIT", 25), runtime.NumCPU()*4)
+	maxIdleTime = env.GetStringEnv("DB_MAX_IDLE_TIME", "30m")
+	maxLifetime = env.GetStringEnv("DB_MAX_LIFETIME", "1h")
 	return maxOpenConns, maxIdleTime, maxLifetime
-}
-
-func getTokensData() (jwtSecret string, accessTokenTTL, refreshTokenTTL, emailVerificationTokenTTL, passwordResetTokenTTL time.Duration) {
-	jwtSecret = env.GetStringEnv("JWT_SECRET", "")
-
-	accessTokenTTL = env.GetDurationEnv("ACCESS_TOKEN_TTL", 5*time.Minute)
-	refreshTokenTTL = env.GetDurationEnv("REFRESH_TOKEN_TTL", 30*24*time.Hour)
-	emailVerificationTokenTTL = env.GetDurationEnv("EMAIL_VERIFICATION_TOKEN_TTL", time.Hour)
-	passwordResetTokenTTL = env.GetDurationEnv("PASSWORD_RESET_TOKEN_TTL", time.Hour)
-
-	return jwtSecret, accessTokenTTL, refreshTokenTTL, emailVerificationTokenTTL, passwordResetTokenTTL
 }

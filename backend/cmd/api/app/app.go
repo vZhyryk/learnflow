@@ -5,7 +5,6 @@ import (
 	"context"
 	"learnflow_backend/internal/infrastructure/logger"
 	"sync"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -22,7 +21,7 @@ type Config struct {
 	}
 
 	Cors struct {
-		TrustedOrigins []string
+		TrustedOrigins map[string]struct{}
 	}
 
 	Limiter struct {
@@ -31,13 +30,7 @@ type Config struct {
 		Enabled bool
 	}
 
-	Auth struct {
-		JWTSecret                 string
-		AccessTokenTTL            time.Duration
-		RefreshTokenTTL           time.Duration
-		EmailVerificationTokenTTL time.Duration
-		PasswordResetTokenTTL     time.Duration
-	}
+	JWTSecret string
 }
 
 // App is the shared application container injected into every handler and worker.

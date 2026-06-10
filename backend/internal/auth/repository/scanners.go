@@ -57,3 +57,40 @@ func scanUserSession(row rowScanner) (*authdomain.UserSession, error) {
 	}
 	return session, nil
 }
+
+func scanToken(row rowScanner) (*authdomain.TokenBase, error) {
+	token := &authdomain.TokenBase{}
+	err := row.Scan(
+		&token.ID,
+		&token.UserID,
+		&token.TokenHash,
+		&token.ExpiresAt,
+		&token.CreatedAt,
+		&token.UsedAt,
+		&token.InvalidatedAt,
+		&token.InvalidatedByUserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}
+
+func scanEmailChangeToken(row rowScanner) (*authdomain.EmailChangeToken, error) {
+	token := &authdomain.EmailChangeToken{}
+	err := row.Scan(
+		&token.ID,
+		&token.UserID,
+		&token.NewEmail,
+		&token.TokenHash,
+		&token.ExpiresAt,
+		&token.CreatedAt,
+		&token.UsedAt,
+		&token.InvalidatedAt,
+		&token.InvalidatedByUserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return token, nil
+}

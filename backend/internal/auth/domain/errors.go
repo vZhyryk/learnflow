@@ -9,9 +9,12 @@ var (
 	ErrUserAlreadyExists = errors.New("user already exists")
 	// ErrAccountBlocked is returned when the account has been suspended.
 	ErrAccountBlocked = errors.New("account is blocked")
+
 	// ErrAccountDeleted is returned when the account has been soft-deleted.
 	ErrAccountDeleted = errors.New("account is deleted")
 
+	// ErrAccountLocked is returned when the account has exceeded login attempt limits.
+	ErrAccountLocked = errors.New("account is temporarily locked")
 	// ErrInvalidCredentials is returned on wrong email or password.
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	// ErrEmailNotVerified is returned when the account email has not been confirmed.
@@ -38,4 +41,7 @@ var (
 
 	// ErrEmailAlreadyInUse is returned when the requested new email is taken by another account.
 	ErrEmailAlreadyInUse = errors.New("email is already in use")
+
+	// ErrConflict is returned when a database constraint violation occurs.
+	ErrConflict = errors.New("db conflict")
 )

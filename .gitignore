@@ -24,6 +24,7 @@ tests/coverage.out
 # Guides
 *_guide.md
 *_guide
+guide
 r_questions
 
 # MemPalace per-project files (issue #185)

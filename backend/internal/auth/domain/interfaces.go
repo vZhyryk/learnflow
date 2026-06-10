@@ -1,6 +1,8 @@
 package authdomain
 
-import "context"
+import (
+	"context"
+)
 
 // Service defines all authentication use cases.
 type Service interface {
@@ -19,29 +21,29 @@ type Service interface {
 
 // SessionRepository defines persistence operations for user sessions.
 type SessionRepository interface {
-	CreateUserSession(ctx context.Context, session *UserSession) error
+	CreateUserSession(ctx context.Context, session *UserSession) (*UserSession, error)
 	GetUserSessionByRefreshToken(ctx context.Context, refreshToken string) (*UserSession, error)
-	RevokeUserSession(ctx context.Context, sessionID string, revokeReason RevokeReason) error
-	RevokeAllUserSessions(ctx context.Context, userID string, revokeReason RevokeReason) error
+	RevokeUserSession(ctx context.Context, sessionID, revokedByUserID string, revokeReason RevokeReason) error
+	RevokeAllUserSessions(ctx context.Context, userID, revokedByUserID string, revokeReason RevokeReason) error
 	GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*UserSession, error)
-	UpdateSessionToken(ctx context.Context, sessionID, tokenHash string) error
-	UpdateFailedLoginAttempts(ctx context.Context, sessionID string) error
-	LockUserSession(ctx context.Context, sessionID string) error
+	UpdateSessionToken(ctx context.Context, sessionID, tokenHash, IPAddress string) error
+	UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error
+	GetSessionByPrevHash(ctx context.Context, prevRefreshToken string) (*UserSession, error)
 }
 
 // TokenRepository defines persistence operations for single-use auth tokens.
 type TokenRepository interface {
 	DeleteExpiredTokens(ctx context.Context) (int, error)
-	CreateEmailVerificationToken(ctx context.Context, token *EmailVerificationToken) error
+	CreateEmailVerificationToken(ctx context.Context, token *EmailVerificationToken) (*EmailVerificationToken, error)
 	GetEmailVerificationToken(ctx context.Context, token string) (*EmailVerificationToken, error)
 	MarkEmailVerificationTokenUsed(ctx context.Context, tokenHash string) error
-	CreatePasswordResetToken(ctx context.Context, token *PasswordResetToken) error
+	CreatePasswordResetToken(ctx context.Context, token *PasswordResetToken) (*PasswordResetToken, error)
 	GetPasswordResetToken(ctx context.Context, token string) (*PasswordResetToken, error)
 	MarkPasswordResetTokenUsed(ctx context.Context, tokenHash string) error
-	CreateEmailChangeToken(ctx context.Context, token *EmailChangeToken) error
+	CreateEmailChangeToken(ctx context.Context, token *EmailChangeToken) (*EmailChangeToken, error)
 	GetEmailChangeToken(ctx context.Context, token string) (*EmailChangeToken, error)
 	MarkEmailChangeTokenUsed(ctx context.Context, tokenHash string) error
-	CreateAccountRecoveryToken(ctx context.Context, token *AccountRecoveryToken) error
+	CreateAccountRecoveryToken(ctx context.Context, token *AccountRecoveryToken) (*AccountRecoveryToken, error)
 	GetAccountRecoveryToken(ctx context.Context, token string) (*AccountRecoveryToken, error)
 	MarkAccountRecoveryTokenUsed(ctx context.Context, tokenHash string) error
 }
@@ -58,4 +60,6 @@ type UserRepository interface {
 	UpdateEmail(ctx context.Context, userID, newEmail string) error
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) error
 	DeleteUser(ctx context.Context, userID string) error
+	IncrementFailedLogin(ctx context.Context, userID, lockInterval string, loginCountLimit int) error
+	ResetFailedLogin(ctx context.Context, userID string) error
 }

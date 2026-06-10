@@ -1,7 +1,8 @@
 package authdomain
 
 import (
-	"database/sql"
+	"fmt"
+	"regexp"
 	"time"
 )
 
@@ -38,6 +39,10 @@ const (
 	RevokeReasonTokenExpired       RevokeReason = "token_expired"
 )
 
+var (
+	emailRE = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+)
+
 // User represents an authenticated account.
 type User struct {
 	ID                string
@@ -45,16 +50,16 @@ type User struct {
 	PasswordHash      string
 	Role              UserRole
 	Status            UserStatus
-	EmailVerifiedAt   sql.NullTime
-	LastLoginAt       sql.NullTime
-	DeletedAt         sql.NullTime
+	EmailVerifiedAt   *time.Time
+	LastLoginAt       *time.Time
+	DeletedAt         *time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
-	PasswordChangedAt sql.NullTime
-	EmailChangedAt    sql.NullTime
+	PasswordChangedAt *time.Time
+	EmailChangedAt    *time.Time
 	FailedLoginCount  int
-	LastFailedLoginAt sql.NullTime
-	LoginLockedUntil  sql.NullTime
+	LastFailedLoginAt *time.Time
+	LoginLockedUntil  *time.Time
 }
 
 // UserSession represents an active refresh-token session.
@@ -62,20 +67,20 @@ type UserSession struct {
 	ID                  string
 	UserID              string
 	RefreshHash         string
-	UserAgent           string
-	IPAddress           string
+	UserAgent           *string
+	IPAddress           *string
 	ExpiresAt           time.Time
-	RevokedAt           sql.NullTime
-	RevokeReason        sql.NullString
-	RevokedByUserID     sql.NullString
+	RevokedAt           *time.Time
+	RevokeReason        *string
+	RevokedByUserID     *string
 	CreatedAt           time.Time
 	FailedAttemptCount  int
-	LastAttemptAt       sql.NullTime
-	LockedUntil         sql.NullTime
+	LastAttemptAt       *time.Time
+	LockedUntil         *time.Time
 	TokenVersion        int
-	PreviousRefreshHash string
-	LastSeenAt          sql.NullTime
-	LastSeenIP          sql.NullString
+	PreviousRefreshHash *string
+	LastSeenAt          *time.Time
+	LastSeenIP          *string
 }
 
 // TokenBase holds fields common to all single-use auth tokens.
@@ -85,9 +90,9 @@ type TokenBase struct {
 	TokenHash           string
 	ExpiresAt           time.Time
 	CreatedAt           time.Time
-	UsedAt              sql.NullTime
-	InvalidatedAt       sql.NullTime
-	InvalidatedByUserID sql.NullString
+	UsedAt              *time.Time
+	InvalidatedAt       *time.Time
+	InvalidatedByUserID *string
 }
 
 // EmailVerificationToken is a single-use token for confirming a user's email address.
@@ -128,8 +133,23 @@ type RegisterRequest struct {
 type LoginRequest struct {
 	Email     string
 	Password  string
-	UserAgent string
-	IPAddress string
+	UserAgent string `json:"-"`
+	IPAddress string `json:"-"`
+}
+
+// Validate checks that LoginRequest fields meet required criteria.
+func (r *LoginRequest) Validate() error {
+	if len(r.Email) < 3 || !emailRE.MatchString(r.Email) {
+		return fmt.Errorf("invalid credentials format")
+	}
+	if len(r.Password) < 8 {
+		return fmt.Errorf("invalid credentials format")
+	}
+	if r.UserAgent == "" || len(r.UserAgent) > 2000 {
+		return fmt.Errorf("invalid user-agent")
+	}
+
+	return nil
 }
 
 // RefreshRequest carries a refresh token and client metadata for token rotation.

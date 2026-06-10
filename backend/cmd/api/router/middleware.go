@@ -1,13 +1,16 @@
 package router
 
 import (
+	"context"
 	"fmt"
 	"learnflow_backend/internal/infrastructure/helpers"
+	appcontext "learnflow_backend/internal/shared/context"
+	"net"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 
-	"github.com/tomasen/realip"
 	"golang.org/x/time/rate"
 )
 
@@ -37,6 +40,7 @@ func (routes *RouteHandler) RecoverPanic(next http.Handler) http.Handler {
 func (routes *RouteHandler) EnableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Origin")
+		w.Header().Add("Vary", "Cookie")
 		w.Header().Add("Vary", "Access-Control-Request-Method")
 		w.Header().Add("Vary", "Access-Control-Request-Headers")
 		w.Header().Add("Vary", "Accept-Encoding")
@@ -44,19 +48,16 @@ func (routes *RouteHandler) EnableCORS(next http.Handler) http.Handler {
 		origin := r.Header.Get("Origin")
 
 		if origin != "" {
-			for i := range routes.App.Config.Cors.TrustedOrigins {
-				if origin == routes.App.Config.Cors.TrustedOrigins[i] {
-					w.Header().Set("Access-Control-Allow-Origin", origin)
-					w.Header().Set("Access-Control-Allow-Credentials", "true")
+			if _, ok := routes.App.Config.Cors.TrustedOrigins[origin]; ok {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
 
-					if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
-						w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-						w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-						w.Header().Set("Access-Control-Max-Age", "86400")
-						w.WriteHeader(http.StatusOK)
-						return
-					}
-					break
+				if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+					w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+					w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+					w.Header().Set("Access-Control-Max-Age", "86400")
+					w.WriteHeader(http.StatusOK)
+					return
 				}
 			}
 		}
@@ -69,35 +70,51 @@ func (routes *RouteHandler) SetSecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; object-src 'none'; script-src 'self' 'wasm-unsafe-eval'")
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-store")
 		next.ServeHTTP(w, r)
 	})
 }
 
-// RateLimit enforces per-IP request rate limiting using a token bucket algorithm.
-func (route *RouteHandler) RateLimit(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !route.App.Config.Limiter.Enabled {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		ip := realip.FromRequest(r)
-		route.rateLimitMu.Lock()
-		if _, found := route.rateLimitClients[ip]; !found {
-			route.rateLimitClients[ip] = &rateLimitClient{
-				limiter: rate.NewLimiter(rate.Limit(route.App.Config.Limiter.Rps), route.App.Config.Limiter.Burst),
+// NewRouteRateLimiter creates a rate limiter middleware using the provided key function and request/time budget.
+func (route *RouteHandler) NewRouteRateLimiter(reqCount float64, duration time.Duration, burst int, getKeyFunc func(*http.Request) string) func(next http.Handler) http.Handler {
+	rps := reqCount / duration.Seconds()
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !route.App.Config.Limiter.Enabled {
+				next.ServeHTTP(w, r)
+				return
 			}
-		}
-		route.rateLimitClients[ip].lastSeen = time.Now()
-		c := route.rateLimitClients[ip]
-		route.rateLimitMu.Unlock()
-		allowed := c.limiter.Allow()
-		if !allowed {
-			route.RateLimitExceededResponse(w, r, c.limiter)
-			return
-		}
-		next.ServeHTTP(w, r)
+
+			key := getKeyFunc(r)
+
+			route.rateLimitMu.Lock()
+			if _, found := route.rateLimitClients[key]; !found {
+				route.rateLimitClients[key] = &rateLimitClient{
+					limiter: rate.NewLimiter(rate.Limit(rps), burst),
+				}
+			}
+			route.rateLimitClients[key].lastSeen = time.Now()
+			c := route.rateLimitClients[key]
+			route.rateLimitMu.Unlock()
+			allowed := c.limiter.Allow()
+			if !allowed {
+				route.RateLimitExceededResponse(w, c.limiter)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// Timeout enforces a 10-second request timeout by wrapping the context.
+func (route *RouteHandler) Timeout(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
@@ -106,5 +123,68 @@ func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// code will be added in the future when we implement authentication
 		next.ServeHTTP(w, r)
+	})
+}
+
+func realClientIP(r *http.Request, trustedProxies []net.IPNet) string {
+	remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	ip := net.ParseIP(remoteIP)
+
+	for _, cidr := range trustedProxies {
+		if cidr.Contains(ip) {
+			if client := ipFromProxyHeaders(r); client != "" {
+				return client
+			}
+			break
+		}
+	}
+	return remoteIP
+}
+
+func ipFromProxyHeaders(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		if ip := parseIP(strings.Split(xff, ",")[0]); ip != "" {
+			return ip
+		}
+	}
+	if xri := r.Header.Get("X-Real-Ip"); xri != "" {
+		return parseIP(xri)
+	}
+	return ""
+}
+
+func parseIP(s string) string {
+	if parsed := net.ParseIP(strings.TrimSpace(s)); parsed != nil {
+		return parsed.String()
+	}
+	return ""
+}
+
+// SetIPAddress extracts the client IP from headers and stores it in context.
+func (routes *RouteHandler) SetIPAddress(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := realClientIP(r, nil)
+		ctx := context.WithValue(r.Context(), appcontext.IPAddressContextKey, ip)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+const requestIDHeader = "X-Request-ID"
+
+// SetRequestID generates or retrieves a request ID and stores it in context and response headers.
+func (routes *RouteHandler) SetRequestID(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestID := r.Header.Get(requestIDHeader)
+		if requestID == "" {
+			requestID = appcontext.NewRequestID()
+		}
+
+		w.Header().Set(requestIDHeader, requestID)
+		ctx := context.WithValue(r.Context(), appcontext.RequestIDContextKey, requestID)
+
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
