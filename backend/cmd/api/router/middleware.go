@@ -167,7 +167,7 @@ func parseIP(s string) string {
 func (routes *RouteHandler) SetIPAddress(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := realClientIP(r, nil)
-		ctx := context.WithValue(r.Context(), appcontext.IPAddressContextKey, ip)
+		ctx := appcontext.WithIPAddress(r.Context(), ip)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -183,8 +183,7 @@ func (routes *RouteHandler) SetRequestID(next http.Handler) http.Handler {
 		}
 
 		w.Header().Set(requestIDHeader, requestID)
-		ctx := context.WithValue(r.Context(), appcontext.RequestIDContextKey, requestID)
-
+		ctx := appcontext.WithRequestID(r.Context(), requestID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

@@ -7,13 +7,8 @@ import (
 	"fmt"
 )
 
-type contextKey string
-
-// Context keys used throughout the application.
-const (
-	RequestIDContextKey contextKey = "request_id"
-	IPAddressContextKey contextKey = "ip_address"
-)
+type requestIDKey struct{}
+type ipAddressKey struct{}
 
 // NewRequestID generates a random RFC 4122 v4 UUID.
 func NewRequestID() string {
@@ -32,22 +27,27 @@ func NewRequestID() string {
 	)
 }
 
+func WithRequestID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, requestIDKey{}, id)
+}
+
+func WithIPAddress(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, ipAddressKey{}, ip)
+}
+
 // RequestIDFromContext extracts the request ID from the given context.
 func RequestIDFromContext(ctx context.Context) string {
-	if v := ctx.Value(RequestIDContextKey); v != nil {
-		if id, ok := v.(string); ok {
-			return id
-		}
+	if id, ok := ctx.Value(requestIDKey{}).(string); ok {
+		return id
 	}
 	return ""
 }
 
 // IPAddressFromContext extracts the client IP address from the given context.
 func IPAddressFromContext(ctx context.Context) string {
-	if v := ctx.Value(IPAddressContextKey); v != nil {
-		if id, ok := v.(string); ok {
-			return id
-		}
+	if id, ok := ctx.Value(ipAddressKey{}).(string); ok {
+		return id
 	}
+
 	return ""
 }

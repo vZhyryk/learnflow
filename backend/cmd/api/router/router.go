@@ -7,6 +7,7 @@ import (
 	authrepository "learnflow_backend/internal/auth/repository"
 	authservice "learnflow_backend/internal/auth/service"
 	authhttp "learnflow_backend/internal/auth/transport/http"
+	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
 	"net/http"
@@ -76,7 +77,8 @@ func NewRouter(a *app.App) *RouteHandler {
 	}
 
 	authRepo := authrepository.NewRepository(a.DB)
-	authSvc := authservice.New(authRepo, authRepo, authRepo, a.Config.JWTSecret, a.Logger)
+	transactor := db.NewTransactor(a.DB)
+	authSvc := authservice.New(authRepo, authRepo, authRepo, transactor, a.Config.JWTSecret, a.Logger)
 	auth.RegisterAuthRoutes(router, authSvc, authhttp.AuthRouteChains{
 		Static:         staticChain,
 		Login:          loginChain,

@@ -17,7 +17,7 @@ const (
 
 // Login authenticates a user and returns access/refresh tokens.
 func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*authdomain.AuthTokens, error) {
-	user, err := s.LoginGetUser(ctx, req)
+	user, err := s.loginGetUser(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -44,19 +44,17 @@ func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*auth
 		return nil, authdomain.ErrAccountLocked
 	}
 
-	return s.LoginHandleSession(ctx, req, user)
+	return s.loginHandleSession(ctx, req, user)
 }
 
-// LoginGetUser retrieves the user by email or returns ErrInvalidCredentials if not found.
-func (s *Service) LoginGetUser(ctx context.Context, req authdomain.LoginRequest) (*authdomain.User, error) {
+func (s *Service) loginGetUser(ctx context.Context, req authdomain.LoginRequest) (*authdomain.User, error) {
 	user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
-
 	if err == nil {
 		return user, nil
 	}
 
 	if !errors.Is(err, authdomain.ErrUserNotFound) {
-		return nil, fmt.Errorf("service.LoginGetUser: %w", err)
+		return nil, fmt.Errorf("service.loginGetUser: %w", err)
 	}
 
 	err = bcrypt.CompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password))
@@ -67,8 +65,7 @@ func (s *Service) LoginGetUser(ctx context.Context, req authdomain.LoginRequest)
 	return nil, authdomain.ErrInvalidCredentials
 }
 
-// LoginHandleSession creates a session and issues JWT tokens for the user.
-func (s *Service) LoginHandleSession(ctx context.Context, req authdomain.LoginRequest, user *authdomain.User) (*authdomain.AuthTokens, error) {
+func (s *Service) loginHandleSession(ctx context.Context, req authdomain.LoginRequest, user *authdomain.User) (*authdomain.AuthTokens, error) {
 	rawToken, tokenHash, err := generateSecureToken()
 	if err != nil {
 		return nil, fmt.Errorf("login: generate token: %w", err)
@@ -79,31 +76,38 @@ func (s *Service) LoginHandleSession(ctx context.Context, req authdomain.LoginRe
 		return nil, fmt.Errorf("login: generate access token: %w", err)
 	}
 
-	session, err := s.sessionRepo.CreateUserSession(ctx, &authdomain.UserSession{
+	sessionInput := &authdomain.UserSession{
 		UserID:      user.ID,
 		RefreshHash: tokenHash,
 		UserAgent:   &req.UserAgent,
 		IPAddress:   &req.IPAddress,
 		ExpiresAt:   time.Now().Add(refreshTokenTTL),
+	}
+
+	var createdSession *authdomain.UserSession
+	err = s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		createdSession, err = s.sessionRepo.CreateUserSession(ctx, sessionInput)
+		if err != nil {
+			return fmt.Errorf("login: create session: %w", err)
+		}
+		if err = s.userRepo.ResetFailedLogin(ctx, user.ID); err != nil {
+			return fmt.Errorf("login: reset failed login: %w", err)
+		}
+		if err = s.userRepo.UpdateLastLoginAt(ctx, user.ID); err != nil {
+			return fmt.Errorf("login: update last login: %w", err)
+		}
+		return nil
 	})
-
 	if err != nil {
-		return nil, fmt.Errorf("login: create session: %w", err)
-	}
-
-	if err = s.userRepo.ResetFailedLogin(ctx, user.ID); err != nil {
-		return nil, fmt.Errorf("login: reset failed login: %w", err)
-	}
-
-	if err = s.userRepo.UpdateLastLoginAt(ctx, user.ID); err != nil {
-		return nil, fmt.Errorf("login: update last login: %w", err)
+		return nil, fmt.Errorf("login: transaction: %w", err)
 	}
 
 	return &authdomain.AuthTokens{
 		AccessToken:  accessToken,
 		RefreshToken: rawToken,
-		ExpiresAt:    session.ExpiresAt,
+		ExpiresAt:    createdSession.ExpiresAt,
 	}, nil
+
 }
 
 // Logout revokes the user's current session.

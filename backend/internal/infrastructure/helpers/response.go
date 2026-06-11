@@ -6,7 +6,7 @@ import (
 
 // InvalidCredentialsResponse writes a 401 Unauthorized response.
 func InvalidCredentialsResponse(w http.ResponseWriter) error {
-	return WriteJSON(w, http.StatusUnauthorized, nil, nil)
+	return WriteJSON(w, http.StatusUnauthorized, Envelope{"error": "unauthorized", "code": "unauthorized"}, nil)
 }
 
 // ForbiddenResponse writes a 403 Forbidden response with the given envelope message.

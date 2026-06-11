@@ -11,7 +11,7 @@ import (
 
 // CreateUserSession persists a new user session and returns it with DB-generated fields.
 func (rep *Repository) CreateUserSession(ctx context.Context, session *authdomain.UserSession) (*authdomain.UserSession, error) {
-	session, err := scanUserSession(rep.db.QueryRow(ctx, createUserSessionSQL, session.UserID, session.RefreshHash, session.UserAgent, session.IPAddress, session.ExpiresAt))
+	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, createUserSessionSQL, session.UserID, session.RefreshHash, session.UserAgent, session.IPAddress, session.ExpiresAt))
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateUserSession: %w", err)
 	}

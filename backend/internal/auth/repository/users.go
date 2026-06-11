@@ -80,7 +80,7 @@ func (rep *Repository) UpdateRole(ctx context.Context, userID string, role authd
 
 // UpdateLastLoginAt records the current time as last_login_at for the given user.
 func (rep *Repository) UpdateLastLoginAt(ctx context.Context, userID string) error {
-	tag, err := rep.db.Exec(ctx, updateLastLoginSQL, userID)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, updateLastLoginSQL, userID)
 	if err != nil {
 		return fmt.Errorf("repository.UpdateLastLoginAt: %w", err)
 	}
@@ -160,7 +160,7 @@ func (rep *Repository) IncrementFailedLogin(ctx context.Context, userID, lockInt
 
 // ResetFailedLogin clears the failed login counter and lock for the given user.
 func (rep *Repository) ResetFailedLogin(ctx context.Context, userID string) error {
-	tag, err := rep.db.Exec(ctx, resetFailedLoginSQL, userID)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, resetFailedLoginSQL, userID)
 	if err != nil {
 		return fmt.Errorf("repository.ResetFailedLogin: %w", err)
 	}
