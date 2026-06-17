@@ -9,6 +9,7 @@ ALTER TABLE users
     ADD COLUMN failed_login_count integer NOT NULL DEFAULT 0,
     ADD COLUMN last_failed_login_at timestamptz,
     ADD COLUMN login_locked_until timestamptz,
+    ALTER COLUMN status SET DEFAULT 'pending_verification',
     DROP CONSTRAINT users_status_check,
     ADD CONSTRAINT users_status_check CHECK (status IN ('active', 'blocked', 'pending_verification', 'deleted')),
     ADD CONSTRAINT users_failed_login_count_non_negative CHECK (failed_login_count >= 0);
@@ -56,5 +57,11 @@ CREATE INDEX idx_consultation_briefs_status  ON consultation_briefs(status) WHER
 ALTER TABLE gift_coupons
     DROP CONSTRAINT gift_coupons_code_unique;
 
-CREATE UNIQUE INDEX gift_coupons_code_lower_unique
+CREATE UNIQUE INDEX IF NOT EXISTS gift_coupons_code_lower_unique
     ON gift_coupons (LOWER(code));
+
+
+ALTER TABLE event_outbox
+    ALTER COLUMN status SET DEFAULT 'pending',
+    DROP CONSTRAINT event_outbox_status_check,
+    ADD CONSTRAINT event_outbox_status_check CHECK (status IN ('pending', 'processing', 'published', 'failed', 'dead_letter'));

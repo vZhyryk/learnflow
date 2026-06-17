@@ -36,9 +36,7 @@ func NewHTTPHandler(svc authdomain.Service, jsonLogger *logger.Logger) *Handler 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, chains AuthRouteChains) {
 	mux.Handle("POST /api/v1/auth/login", chains.Login.ThenFunc(h.login))
 
-	mux.Handle("POST /api/v1/auth/register", chains.Register.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// register a new user logic
-	}))
+	mux.Handle("POST /api/v1/auth/register", chains.Register.ThenFunc(h.register))
 
 	mux.Handle("POST /api/v1/auth/logout", chains.StaticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		// logout logic

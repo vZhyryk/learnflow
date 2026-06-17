@@ -96,12 +96,12 @@ func (route *RouteHandler) NewRouteRateLimiter(reqCount float64, duration time.D
 					limiter: rate.NewLimiter(rate.Limit(rps), burst),
 				}
 			}
+
 			route.rateLimitClients[key].lastSeen = time.Now()
-			c := route.rateLimitClients[key]
+			allowed := route.rateLimitClients[key].limiter.Allow()
 			route.rateLimitMu.Unlock()
-			allowed := c.limiter.Allow()
 			if !allowed {
-				route.RateLimitExceededResponse(w, c.limiter)
+				route.RateLimitExceededResponse(w, route.rateLimitClients[key].limiter)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -166,7 +166,7 @@ func parseIP(s string) string {
 // SetIPAddress extracts the client IP from headers and stores it in context.
 func (routes *RouteHandler) SetIPAddress(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := realClientIP(r, nil)
+		ip := realClientIP(r, routes.App.Config.TrustedProxies)
 		ctx := appcontext.WithIPAddress(r.Context(), ip)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

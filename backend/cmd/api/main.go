@@ -11,10 +11,13 @@ import (
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
+	lredis "learnflow_backend/internal/infrastructure/redis"
 	"net/url"
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -40,12 +43,23 @@ func main() {
 		jsonLogger.Fatal(fmt.Errorf("JWT_SECRET must be at least 32 bytes, got %d", len(appCfg.JWTSecret)), nil)
 	}
 
-	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, int32(appCfg.Database.MaxOpenConns))
+	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, int32(appCfg.Database.MaxOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
 	if err != nil {
 		jsonLogger.Fatal(err, nil)
 	}
 
 	defer dbInstance.Close()
+
+	redisClient, err := getRedis()
+	if err != nil {
+		jsonLogger.Fatal(err, nil)
+	}
+
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			jsonLogger.Fatal(err, nil)
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -56,6 +70,7 @@ func main() {
 		DB:     dbInstance,
 		Ctx:    ctx,
 		Cancel: cancel,
+		Redis:  redisClient,
 	}
 
 	r := router.NewRouter(application)
@@ -138,4 +153,8 @@ func getDatabaseConfig() (maxOpenConns int, maxIdleTime, maxLifetime string) {
 	maxIdleTime = env.GetStringEnv("DB_MAX_IDLE_TIME", "30m")
 	maxLifetime = env.GetStringEnv("DB_MAX_LIFETIME", "1h")
 	return maxOpenConns, maxIdleTime, maxLifetime
+}
+
+func getRedis() (*redis.Client, error) {
+	return lredis.InitRedis(env.GetStringEnv("REDIS_ADDR", "redis:6379"), env.GetStringEnv("REDIS_PASSWORD", ""))
 }

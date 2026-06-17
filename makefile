@@ -94,7 +94,7 @@ migrate_down:
 	cd $(BACKEND_DIR) && go run ./cmd/migrate -steps=0 -direction=down
 
 migrate_docker:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up --build 'migrate'
+	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up 'migrate'
 
 run_no_docker:
 	$(DOCKER_COMPOSE) -f '$(NO_DOCKER_COMPOSE_FILE)' up --build -d

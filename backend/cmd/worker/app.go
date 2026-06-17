@@ -1,19 +1,15 @@
-// Package app defines the shared application container passed across HTTP layers.
-package app
+package main
 
 import (
 	"context"
+	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/logger"
-	"net"
+	"learnflow_backend/internal/shared/mailer"
 	"sync"
-
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 )
 
 // Config holds all runtime configuration for the API server.
 type Config struct {
-	Port     int
 	Env      string
 	Database struct {
 		DSN          string
@@ -21,33 +17,20 @@ type Config struct {
 		MaxOpenConns int
 		MaxLifetime  string
 	}
-
-	Cors struct {
-		TrustedOrigins map[string]struct{}
-	}
-
-	TrustedProxies []net.IPNet
-
-	Limiter struct {
-		Rps     float64
-		Burst   int
-		Enabled bool
-	}
-
-	JWTSecret string
 }
 
 // App is the shared application container injected into every handler and worker.
 // App must not be copied after first use — always pass as *App.
 type App struct {
-	_      noCopy
-	Config Config
-	Logger *logger.Logger
-	Wg     sync.WaitGroup
-	DB     *pgxpool.Pool
-	Ctx    context.Context
-	Cancel context.CancelFunc
-	Redis  *redis.Client
+	_         noCopy
+	Config    Config
+	Logger    *logger.Logger
+	Wg        sync.WaitGroup
+	Outbox    *events.OutboxWriter
+	Ctx       context.Context
+	Cancel    context.CancelFunc
+	Publisher *events.RedisPublisher
+	Mailer    *mailer.Mailer
 }
 
 // noCopy prevents App from being copied after first use.

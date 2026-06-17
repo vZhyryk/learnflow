@@ -2,11 +2,16 @@
 package router
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"learnflow_backend/cmd/api/app"
 	"learnflow_backend/internal/auth"
+	authdomain "learnflow_backend/internal/auth/domain"
 	authrepository "learnflow_backend/internal/auth/repository"
 	authservice "learnflow_backend/internal/auth/service"
 	authhttp "learnflow_backend/internal/auth/transport/http"
+	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
@@ -42,57 +47,24 @@ func NewRouter(a *app.App) *RouteHandler {
 		}
 	}))
 
-	staticLimiter := route.NewRouteRateLimiter(a.Config.Limiter.Rps, time.Second, a.Config.Limiter.Burst, func(r *http.Request) string {
-		return appcontext.IPAddressFromContext(r.Context())
-	})
-
-	staticChain := alice.New(route.RecoverPanic, route.SetIPAddress, staticLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
-
-	loginLimiter := route.NewRouteRateLimiter(5, time.Minute, 1, func(r *http.Request) string {
-		return appcontext.IPAddressFromContext(r.Context()) + ":" + r.FormValue("email")
-	})
-
-	loginChain := alice.New(route.RecoverPanic, route.SetIPAddress, loginLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
-
-	registerLimiter := route.NewRouteRateLimiter(3, time.Hour, 1, func(r *http.Request) string {
-		return appcontext.IPAddressFromContext(r.Context())
-	})
-	registerChain := alice.New(route.RecoverPanic, route.SetIPAddress, registerLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
-
-	passResetLimiter := route.NewRouteRateLimiter(2, time.Hour, 1, func(r *http.Request) string {
-		return r.FormValue("email")
-	})
-	passResetChain := alice.New(route.RecoverPanic, route.SetIPAddress, passResetLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
-
-	emailVerifyLimiter := route.NewRouteRateLimiter(3, time.Hour, 1, func(r *http.Request) string {
-		return r.FormValue("email")
-	})
-	emailVerifyChain := alice.New(route.RecoverPanic, route.SetIPAddress, emailVerifyLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
-
-	staticWithAuth := staticChain.Append(route.AuthenticateUser)
-
 	if a.Config.Limiter.Enabled {
 		a.Wg.Add(1)
 		go route.startRateLimitCleanup()
 	}
 
+	chains := route.buildChains()
 	authRepo := authrepository.NewRepository(a.DB)
 	transactor := db.NewTransactor(a.DB)
-	authSvc := authservice.New(authRepo, authRepo, authRepo, transactor, a.Config.JWTSecret, a.Logger)
-	auth.RegisterAuthRoutes(router, authSvc, authhttp.AuthRouteChains{
-		Static:         staticChain,
-		Login:          loginChain,
-		Register:       registerChain,
-		PassReset:      passResetChain,
-		EmailVerify:    emailVerifyChain,
-		StaticWithAuth: staticWithAuth,
-	}, a.Logger)
+	outbox := events.NewOutboxWriter(a.DB)
+	authSvc := authservice.New(authRepo, authRepo, authRepo, transactor, outbox, a.Config.JWTSecret, a.Logger, a.Redis)
+
+	auth.RegisterAuthRoutes(router, authSvc, chains, a.Logger)
 
 	// Profile
-	router.Handle("GET /api/v1/users/profile", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
+	router.Handle("GET /api/v1/users/profile", chains.StaticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		// get user profile logic
 	}))
-	router.Handle("PATCH /api/v1/users/profile", staticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
+	router.Handle("PATCH /api/v1/users/profile", chains.StaticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		// update user profile logic
 	}))
 
@@ -137,5 +109,78 @@ func (route *RouteHandler) startRateLimitCleanup() {
 			}
 			route.rateLimitMu.Unlock()
 		}
+	}
+}
+
+// getEmailFromBody reads the request body to extract an email for rate-limit keying,
+// then resets r.Body so downstream handlers (ReadJSON) receive the full body.
+// Do NOT add any body-reading middleware between this call and the handler.
+func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
+	var req authdomain.RequestPasswordResetRequest
+	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 1_048_576))
+	if err != nil {
+		return ""
+	}
+
+	if err := r.Body.Close(); err != nil {
+		route.App.Logger.Error(err, nil)
+	}
+
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		return appcontext.IPAddressFromContext(r.Context())
+	}
+
+	if req.Email == "" {
+		return appcontext.IPAddressFromContext(r.Context())
+	}
+
+	return req.Email
+}
+
+func (route *RouteHandler) buildChains() authhttp.AuthRouteChains {
+	staticLimiter := route.NewRouteRateLimiter(route.App.Config.Limiter.Rps, time.Second, route.App.Config.Limiter.Burst, func(r *http.Request) string {
+		return appcontext.IPAddressFromContext(r.Context())
+	})
+
+	staticChain := alice.New(route.RecoverPanic, route.SetIPAddress, staticLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
+
+	loginLimiter := route.NewRouteRateLimiter(5, time.Minute, 1, func(r *http.Request) string {
+		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getEmailFromBody(r)
+	})
+
+	loginChain := alice.New(route.RecoverPanic, route.SetIPAddress, loginLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
+
+	registerLimiter := route.NewRouteRateLimiter(3, time.Hour, 1, func(r *http.Request) string {
+		return appcontext.IPAddressFromContext(r.Context())
+	})
+
+	registerChain := alice.New(route.RecoverPanic, route.SetIPAddress, registerLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
+
+	passResetLimiter := route.NewRouteRateLimiter(2, time.Hour, 1, func(r *http.Request) string {
+		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getEmailFromBody(r)
+	})
+	passResetChain := alice.New(route.RecoverPanic, route.SetIPAddress, passResetLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
+
+	emailVerifyLimiter := route.NewRouteRateLimiter(3, time.Hour, 1, func(r *http.Request) string {
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			return appcontext.IPAddressFromContext(r.Context())
+		}
+		return appcontext.IPAddressFromContext(r.Context()) + ":" + token
+	})
+
+	emailVerifyChain := alice.New(route.RecoverPanic, route.SetIPAddress, emailVerifyLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
+
+	staticWithAuth := staticChain.Append(route.AuthenticateUser)
+
+	return authhttp.AuthRouteChains{
+		Static:         staticChain,
+		Login:          loginChain,
+		Register:       registerChain,
+		PassReset:      passResetChain,
+		EmailVerify:    emailVerifyChain,
+		StaticWithAuth: staticWithAuth,
 	}
 }

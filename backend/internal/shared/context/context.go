@@ -7,8 +7,10 @@ import (
 	"fmt"
 )
 
-type requestIDKey struct{}
-type ipAddressKey struct{}
+type (
+	requestIDKey struct{}
+	ipAddressKey struct{}
+)
 
 // NewRequestID generates a random RFC 4122 v4 UUID.
 func NewRequestID() string {
@@ -18,7 +20,8 @@ func NewRequestID() string {
 	}
 	b[6] = (b[6] & 0x0f) | 0x40 // version 4
 	b[8] = (b[8] & 0x3f) | 0x80 // variant is 10
-	return fmt.Sprintf("%s-%s-%s-%s-%s",
+	return fmt.Sprintf(
+		"%s-%s-%s-%s-%s",
 		hex.EncodeToString(b[0:4]),
 		hex.EncodeToString(b[4:6]),
 		hex.EncodeToString(b[6:8]),
@@ -27,10 +30,12 @@ func NewRequestID() string {
 	)
 }
 
+// WithRequestID stores a request ID in the context.
 func WithRequestID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, requestIDKey{}, id)
 }
 
+// WithIPAddress stores the client IP address in the context.
 func WithIPAddress(ctx context.Context, ip string) context.Context {
 	return context.WithValue(ctx, ipAddressKey{}, ip)
 }
@@ -48,6 +53,5 @@ func IPAddressFromContext(ctx context.Context) string {
 	if id, ok := ctx.Value(ipAddressKey{}).(string); ok {
 		return id
 	}
-
 	return ""
 }

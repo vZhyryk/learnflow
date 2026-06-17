@@ -7,9 +7,10 @@ ALTER TABLE users
     DROP COLUMN failed_login_count,
     DROP COLUMN last_failed_login_at,
     DROP COLUMN login_locked_until,
+    ALTER COLUMN status DROP DEFAULT,
     DROP CONSTRAINT users_status_check,
     ADD CONSTRAINT users_status_check CHECK (status IN ('active', 'blocked', 'pending_verification')),
-    DROP CONSTRAINT users_failed_login_count_non_negative;
+    DROP CONSTRAINT IF EXISTS users_failed_login_count_non_negative;
 
 ALTER TABLE account_recovery_tokens
     DROP COLUMN invalidated_at,
@@ -51,3 +52,9 @@ ALTER TABLE gift_coupons
     ADD CONSTRAINT gift_coupons_code_unique UNIQUE (code);
 
 DROP INDEX IF EXISTS gift_coupons_code_lower_unique;
+
+
+ALTER TABLE event_outbox
+    ALTER COLUMN status DROP DEFAULT,
+    DROP CONSTRAINT event_outbox_status_check,
+    ADD CONSTRAINT event_outbox_status_check CHECK (status IN ('pending', 'published', 'failed'))

@@ -19,7 +19,7 @@ func (rep *Repository) DeleteExpiredTokens(ctx context.Context) (int, error) {
 	}
 	total := 0
 	for _, q := range queries {
-		tag, err := rep.db.Exec(ctx, q)
+		tag, err := rep.queryRunner(ctx).Exec(ctx, q)
 		if err != nil {
 			return total, fmt.Errorf("repository.DeleteExpiredTokens: %w", err)
 		}
@@ -30,7 +30,7 @@ func (rep *Repository) DeleteExpiredTokens(ctx context.Context) (int, error) {
 
 // CreateEmailVerificationToken persists a new email verification token and returns it with DB-generated fields.
 func (rep *Repository) CreateEmailVerificationToken(ctx context.Context, token *authdomain.EmailVerificationToken) (*authdomain.EmailVerificationToken, error) {
-	base, err := scanToken(rep.db.QueryRow(ctx, createEmailVerificationTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt))
+	base, err := scanToken(rep.queryRunner(ctx).QueryRow(ctx, createEmailVerificationTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt))
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateEmailVerificationToken: %w", err)
 	}
@@ -40,7 +40,7 @@ func (rep *Repository) CreateEmailVerificationToken(ctx context.Context, token *
 
 // GetEmailVerificationToken retrieves an email verification token by its hash.
 func (rep *Repository) GetEmailVerificationToken(ctx context.Context, tokenHash string) (*authdomain.EmailVerificationToken, error) {
-	token, err := scanToken(rep.db.QueryRow(ctx, getEmailVerificationTokenByHashSQL, tokenHash))
+	token, err := scanToken(rep.queryRunner(ctx).QueryRow(ctx, getEmailVerificationTokenByHashSQL, tokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrInvalidToken
 	}
@@ -53,7 +53,7 @@ func (rep *Repository) GetEmailVerificationToken(ctx context.Context, tokenHash 
 
 // MarkEmailVerificationTokenUsed marks the token as used so it cannot be reused.
 func (rep *Repository) MarkEmailVerificationTokenUsed(ctx context.Context, tokenHash string) error {
-	tag, err := rep.db.Exec(ctx, markEmailVerificationTokenUsedSQL, tokenHash)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, markEmailVerificationTokenUsedSQL, tokenHash)
 	if err != nil {
 		return fmt.Errorf("repository.MarkEmailVerificationTokenUsed: %w", err)
 	}
@@ -67,7 +67,7 @@ func (rep *Repository) MarkEmailVerificationTokenUsed(ctx context.Context, token
 
 // CreatePasswordResetToken persists a new password reset token and returns it with DB-generated fields.
 func (rep *Repository) CreatePasswordResetToken(ctx context.Context, token *authdomain.PasswordResetToken) (*authdomain.PasswordResetToken, error) {
-	base, err := scanToken(rep.db.QueryRow(ctx, createPasswordResetTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt))
+	base, err := scanToken(rep.queryRunner(ctx).QueryRow(ctx, createPasswordResetTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt))
 	if err != nil {
 		return token, fmt.Errorf("repository.CreatePasswordResetToken: %w", err)
 	}
@@ -77,7 +77,7 @@ func (rep *Repository) CreatePasswordResetToken(ctx context.Context, token *auth
 
 // GetPasswordResetToken retrieves a password reset token by its hash.
 func (rep *Repository) GetPasswordResetToken(ctx context.Context, tokenHash string) (*authdomain.PasswordResetToken, error) {
-	token, err := scanToken(rep.db.QueryRow(ctx, getPasswordResetTokenByHashSQL, tokenHash))
+	token, err := scanToken(rep.queryRunner(ctx).QueryRow(ctx, getPasswordResetTokenByHashSQL, tokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrInvalidToken
 	}
@@ -90,7 +90,7 @@ func (rep *Repository) GetPasswordResetToken(ctx context.Context, tokenHash stri
 
 // MarkPasswordResetTokenUsed marks the token as used so it cannot be reused.
 func (rep *Repository) MarkPasswordResetTokenUsed(ctx context.Context, tokenHash string) error {
-	tag, err := rep.db.Exec(ctx, markPasswordResetTokenUsedSQL, tokenHash)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, markPasswordResetTokenUsedSQL, tokenHash)
 	if err != nil {
 		return fmt.Errorf("repository.MarkPasswordResetTokenUsed: %w", err)
 	}
@@ -104,7 +104,7 @@ func (rep *Repository) MarkPasswordResetTokenUsed(ctx context.Context, tokenHash
 
 // CreateEmailChangeToken persists a new email change token and returns it with DB-generated fields.
 func (rep *Repository) CreateEmailChangeToken(ctx context.Context, token *authdomain.EmailChangeToken) (*authdomain.EmailChangeToken, error) {
-	token, err := scanEmailChangeToken(rep.db.QueryRow(ctx, createEmailChangeTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt, token.NewEmail))
+	token, err := scanEmailChangeToken(rep.queryRunner(ctx).QueryRow(ctx, createEmailChangeTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt, token.NewEmail))
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateEmailChangeToken: %w", err)
 	}
@@ -114,7 +114,7 @@ func (rep *Repository) CreateEmailChangeToken(ctx context.Context, token *authdo
 
 // GetEmailChangeToken retrieves an email change token by its hash.
 func (rep *Repository) GetEmailChangeToken(ctx context.Context, tokenHash string) (*authdomain.EmailChangeToken, error) {
-	token, err := scanEmailChangeToken(rep.db.QueryRow(ctx, getEmailChangeTokenByHashSQL, tokenHash))
+	token, err := scanEmailChangeToken(rep.queryRunner(ctx).QueryRow(ctx, getEmailChangeTokenByHashSQL, tokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrInvalidToken
 	}
@@ -127,7 +127,7 @@ func (rep *Repository) GetEmailChangeToken(ctx context.Context, tokenHash string
 
 // MarkEmailChangeTokenUsed marks the token as used so it cannot be reused.
 func (rep *Repository) MarkEmailChangeTokenUsed(ctx context.Context, tokenHash string) error {
-	tag, err := rep.db.Exec(ctx, markEmailChangeTokenUsedSQL, tokenHash)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, markEmailChangeTokenUsedSQL, tokenHash)
 	if err != nil {
 		return fmt.Errorf("repository.MarkEmailChangeTokenUsed: %w", err)
 	}
@@ -140,7 +140,7 @@ func (rep *Repository) MarkEmailChangeTokenUsed(ctx context.Context, tokenHash s
 
 // CreateAccountRecoveryToken persists a new account recovery token and returns it with DB-generated fields.
 func (rep *Repository) CreateAccountRecoveryToken(ctx context.Context, token *authdomain.AccountRecoveryToken) (*authdomain.AccountRecoveryToken, error) {
-	base, err := scanToken(rep.db.QueryRow(ctx, createAccountRecoveryTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt))
+	base, err := scanToken(rep.queryRunner(ctx).QueryRow(ctx, createAccountRecoveryTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt))
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateAccountRecoveryToken: %w", err)
 	}
@@ -150,7 +150,7 @@ func (rep *Repository) CreateAccountRecoveryToken(ctx context.Context, token *au
 
 // GetAccountRecoveryToken retrieves an account recovery token by its hash.
 func (rep *Repository) GetAccountRecoveryToken(ctx context.Context, tokenHash string) (*authdomain.AccountRecoveryToken, error) {
-	token, err := scanToken(rep.db.QueryRow(ctx, getAccountRecoveryTokenByHashSQL, tokenHash))
+	token, err := scanToken(rep.queryRunner(ctx).QueryRow(ctx, getAccountRecoveryTokenByHashSQL, tokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrInvalidToken
 	}
@@ -163,7 +163,7 @@ func (rep *Repository) GetAccountRecoveryToken(ctx context.Context, tokenHash st
 
 // MarkAccountRecoveryTokenUsed marks the token as used so it cannot be reused.
 func (rep *Repository) MarkAccountRecoveryTokenUsed(ctx context.Context, tokenHash string) error {
-	tag, err := rep.db.Exec(ctx, markAccountRecoveryTokenUsedSQL, tokenHash)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, markAccountRecoveryTokenUsedSQL, tokenHash)
 	if err != nil {
 		return fmt.Errorf("repository.MarkAccountRecoveryTokenUsed: %w", err)
 	}

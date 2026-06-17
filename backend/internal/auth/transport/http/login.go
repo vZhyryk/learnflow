@@ -17,9 +17,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
-
 	ua := r.UserAgent()
-
 	req.IPAddress = appcontext.IPAddressFromContext(r.Context())
 	req.UserAgent = ua
 

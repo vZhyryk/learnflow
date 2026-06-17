@@ -5,9 +5,9 @@ ALTER TABLE user_sessions
     DROP COLUMN locked_until,
     DROP COLUMN last_attempt_at,
     DROP COLUMN revoke_reason,
-    DROP CONSTRAINT user_sessions_token_version_positive,
-    DROP CONSTRAINT user_sessions_failed_attempts_non_negative,
-    DROP CONSTRAINT user_sessions_revoke_reason_check;
+    DROP CONSTRAINT IF EXISTS user_sessions_token_version_positive,
+    DROP CONSTRAINT IF EXISTS user_sessions_failed_attempts_non_negative,
+    DROP CONSTRAINT IF EXISTS user_sessions_revoke_reason_check;
 
 ALTER TABLE users
     DROP CONSTRAINT users_status_check,

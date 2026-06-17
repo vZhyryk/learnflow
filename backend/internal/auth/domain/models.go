@@ -2,7 +2,7 @@ package authdomain
 
 import (
 	"fmt"
-	"regexp"
+	"learnflow_backend/internal/infrastructure/validator"
 	"time"
 )
 
@@ -37,10 +37,6 @@ const (
 	RevokeReasonAdmin              RevokeReason = "admin"
 	RevokeReasonSuspiciousActivity RevokeReason = "suspicious_activity"
 	RevokeReasonTokenExpired       RevokeReason = "token_expired"
-)
-
-var (
-	emailRE = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 )
 
 // User represents an authenticated account.
@@ -129,6 +125,18 @@ type RegisterRequest struct {
 	Password string
 }
 
+// Validate checks that email and password meet format requirements.
+func (r *RegisterRequest) Validate() error {
+	if len(r.Email) < 3 || !validator.MatchesEmail(r.Email) {
+		return ErrInvalidCredentialFormat
+	}
+	if len(r.Password) < 8 || len(r.Password) > 72 {
+		return ErrInvalidCredentialFormat
+	}
+
+	return nil
+}
+
 // LoginRequest carries credentials and client metadata for session creation.
 type LoginRequest struct {
 	Email     string
@@ -139,11 +147,11 @@ type LoginRequest struct {
 
 // Validate checks that LoginRequest fields meet required criteria.
 func (r *LoginRequest) Validate() error {
-	if len(r.Email) < 3 || !emailRE.MatchString(r.Email) {
-		return fmt.Errorf("invalid credentials format")
+	if len(r.Email) < 3 || !validator.MatchesEmail(r.Email) {
+		return ErrInvalidCredentialFormat
 	}
-	if len(r.Password) < 8 {
-		return fmt.Errorf("invalid credentials format")
+	if len(r.Password) < 8 || len(r.Password) > 72 {
+		return ErrInvalidCredentialFormat
 	}
 	if r.UserAgent == "" || len(r.UserAgent) > 2000 {
 		return fmt.Errorf("invalid user-agent")

@@ -4,6 +4,7 @@ import (
 	"context"
 )
 
+// Transactor executes a function within a database transaction.
 type Transactor interface {
 	InTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }

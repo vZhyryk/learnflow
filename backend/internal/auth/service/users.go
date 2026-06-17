@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/events"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -107,7 +108,6 @@ func (s *Service) loginHandleSession(ctx context.Context, req authdomain.LoginRe
 		RefreshToken: rawToken,
 		ExpiresAt:    createdSession.ExpiresAt,
 	}, nil
-
 }
 
 // Logout revokes the user's current session.
@@ -116,8 +116,63 @@ func (s *Service) Logout(_ context.Context, _ authdomain.LogoutRequest) error {
 }
 
 // Register creates a new user account and sends an email verification token.
-func (s *Service) Register(_ context.Context, _ authdomain.RegisterRequest) error {
-	return nil
+func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) error {
+	user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
+	if err != nil && !errors.Is(err, authdomain.ErrUserNotFound) {
+		return err
+	}
+
+	if user != nil {
+		return authdomain.ErrUserAlreadyExists
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), hashDefaultCost)
+	if err != nil {
+		return fmt.Errorf("register: hash password: %w", err)
+	}
+
+	user = &authdomain.User{
+		Email:        req.Email,
+		PasswordHash: string(hash),
+		Role:         authdomain.RoleUser,
+		Status:       authdomain.StatusPendingVerification,
+	}
+
+	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		id, err := s.userRepo.CreateUser(ctx, user)
+		if err != nil {
+			return err
+		}
+
+		rawToken, hashToken, err := generateSecureToken()
+		if err != nil {
+			return fmt.Errorf("register: generate token: %w", err)
+		}
+
+		token := &authdomain.EmailVerificationToken{
+			TokenBase: authdomain.TokenBase{
+				UserID:    id,
+				TokenHash: hashToken,
+				ExpiresAt: time.Now().Add(emailVerificationTokenTTL),
+			},
+		}
+
+		if _, err = s.tokenRepo.CreateEmailVerificationToken(ctx, token); err != nil {
+			return fmt.Errorf("register: create verification token: %w", err)
+		}
+
+		payload := events.UserRegisteredPayload{
+			UserID: id,
+			Email:  user.Email,
+			URL:    fmt.Sprintf("/api/v1/users/auth/email/verify/%s", rawToken),
+		}
+		err = s.outbox.Emit(ctx, events.AggregationTypeUser, id, events.EventUserRegistered, payload)
+		if err != nil {
+			return fmt.Errorf("register: emit event: %w", err)
+		}
+
+		return nil
+	})
 }
 
 // Refresh rotates the refresh token and returns new access/refresh tokens.

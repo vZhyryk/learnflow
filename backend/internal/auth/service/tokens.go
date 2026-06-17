@@ -12,8 +12,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+const (
+	tokenByteLength = 32
+	jtibyteLength   = 16
+)
+
 func generateSecureToken() (raw, hash string, err error) {
-	b := make([]byte, 32)
+	b := make([]byte, tokenByteLength)
 	if _, err = rand.Read(b); err != nil {
 		return "", "", fmt.Errorf("generateSecureToken: %w", err)
 	}
@@ -24,8 +29,8 @@ func generateSecureToken() (raw, hash string, err error) {
 }
 
 type jwtClaims struct {
-	Role                 string `json:"role"`
-	jwt.RegisteredClaims `json:"jwtClaims"`
+	Role string `json:"role"`
+	jwt.RegisteredClaims
 }
 
 func (s *Service) generateAccessToken(user *authdomain.User) (string, error) {
@@ -47,7 +52,7 @@ func (s *Service) generateAccessToken(user *authdomain.User) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signed, err := token.SignedString([]byte(s.JWTSecret))
+	signed, err := token.SignedString([]byte(s.jwtSecret))
 	if err != nil {
 		return "", fmt.Errorf("generateAccessToken: %w", err)
 	}
@@ -56,7 +61,7 @@ func (s *Service) generateAccessToken(user *authdomain.User) (string, error) {
 }
 
 func generateJTI() (string, error) {
-	b := make([]byte, 16)
+	b := make([]byte, jtibyteLength)
 	if _, err := rand.Read(b); err != nil {
 		return "", fmt.Errorf("generateJTI: %w", err)
 	}

@@ -18,7 +18,8 @@ services:
             DB_NAME: ${DB_NAME:-learnflow}
             DB_USER: ${DB_USER:-postgres}
             DB_PASSWORD: ${DB_PASSWORD:-postgres}
-            REDIS_ADDR: redis:6379
+            REDIS_ADDR: ${REDIS_ADDR:-}
+            REDIS_PASSWORD: ${REDIS_PASSWORD:-}
             DB_SSLMODE: ${DB_SSLMODE:-disable}
             DB_OPEN_CONNECTION_LIMIT: ${DB_OPEN_CONNECTION_LIMIT:-25}
             DB_MAX_IDLE_TIME: ${DB_MAX_IDLE_TIME:-15m}
@@ -32,9 +33,11 @@ services:
             STORAGE_BUCKET: ${STORAGE_BUCKET:-learnflow}
             STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
             # Email
-            EMAIL_PROVIDER: ${EMAIL_PROVIDER:-stub}
-            EMAIL_FROM: ${EMAIL_FROM:-noreply@learnflow.local}
-            RESEND_API_KEY: ${RESEND_API_KEY:-}
+            SMTP_HOST: ${SMTP_HOST:-stub}
+            SMTP_PORT: ${SMTP_PORT:-587}
+            SMTP_USERNAME: ${SMTP_USERNAME:-learnflow}
+            SMTP_PASSWORD: ${SMTP_PASSWORD:-password}
+
             # Payments
             STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
             STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
@@ -75,7 +78,8 @@ services:
             DB_USER: ${DB_USER:-postgres}
             DB_PASSWORD: ${DB_PASSWORD:-postgres}
             DB_SSLMODE: ${DB_SSLMODE:-disable}
-            REDIS_ADDR: redis:6379
+            REDIS_ADDR: ${REDIS_ADDR:-}
+            REDIS_PASSWORD: ${REDIS_PASSWORD:-}
             JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
             SERVER_TIMEOUT: ${SERVER_TIMEOUT:-30}
             # Storage (MinIO for local dev)
@@ -85,9 +89,11 @@ services:
             STORAGE_BUCKET: ${STORAGE_BUCKET:-learnflow}
             STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
             # Email
-            EMAIL_PROVIDER: ${EMAIL_PROVIDER:-stub}
-            EMAIL_FROM: ${EMAIL_FROM:-noreply@learnflow.local}
-            RESEND_API_KEY: ${RESEND_API_KEY:-}
+            SMTP_HOST: ${SMTP_HOST:-stub}
+            SMTP_PORT: ${SMTP_PORT:-587}
+            SMTP_USERNAME: ${SMTP_USERNAME:-learnflow}
+            SMTP_PASSWORD: ${SMTP_PASSWORD:-password}
+
             # Payments
             STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
             STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
@@ -248,9 +254,9 @@ services:
             - "${REDIS_PORT:-6379}:6379"
         volumes:
             - redis_data:/data
-        command: ["redis-server", "--appendonly", "yes"]
+        command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-}"]
         healthcheck:
-            test: ["CMD", "redis-cli", "ping"]
+            test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-}", "ping"]
             interval: 10s
             timeout: 5s
             retries: 5

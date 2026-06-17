@@ -27,6 +27,9 @@ var (
 	// ErrTokenUsed is returned when a single-use token has already been consumed.
 	ErrTokenUsed = errors.New("token already used")
 
+	// ErrInvalidCredentialFormat is returned when email or password does not meet format requirements.
+	ErrInvalidCredentialFormat = errors.New("invalid credential format")
+
 	// ErrSessionNotFound is returned when no session matches the lookup criteria.
 	ErrSessionNotFound = errors.New("session not found")
 	// ErrSessionRevoked is returned when the session was explicitly revoked.
@@ -41,7 +44,4 @@ var (
 
 	// ErrEmailAlreadyInUse is returned when the requested new email is taken by another account.
 	ErrEmailAlreadyInUse = errors.New("email is already in use")
-
-	// ErrConflict is returned when a database constraint violation occurs.
-	ErrConflict = errors.New("db conflict")
 )

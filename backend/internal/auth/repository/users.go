@@ -12,7 +12,7 @@ import (
 
 // CreateUser inserts a new user and returns the generated ID.
 func (rep *Repository) CreateUser(ctx context.Context, user *authdomain.User) (string, error) {
-	err := rep.db.QueryRow(ctx, createUserSQL, user.Email, user.PasswordHash, user.Role, user.Status).Scan(&user.ID)
+	err := rep.queryRunner(ctx).QueryRow(ctx, createUserSQL, user.Email, user.PasswordHash, user.Role).Scan(&user.ID)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
@@ -26,7 +26,7 @@ func (rep *Repository) CreateUser(ctx context.Context, user *authdomain.User) (s
 
 // GetUserByID returns a user by primary key.
 func (rep *Repository) GetUserByID(ctx context.Context, userID string) (*authdomain.User, error) {
-	user, err := scanUser(rep.db.QueryRow(ctx, getUserByIDSQL, userID))
+	user, err := scanUser(rep.queryRunner(ctx).QueryRow(ctx, getUserByIDSQL, userID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrUserNotFound
 	}
@@ -39,7 +39,7 @@ func (rep *Repository) GetUserByID(ctx context.Context, userID string) (*authdom
 
 // GetUserByEmail returns a user by email address.
 func (rep *Repository) GetUserByEmail(ctx context.Context, email string) (*authdomain.User, error) {
-	user, err := scanUser(rep.db.QueryRow(ctx, getUserByEmailSQL, email))
+	user, err := scanUser(rep.queryRunner(ctx).QueryRow(ctx, getUserByEmailSQL, email))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrUserNotFound
 	}
@@ -52,7 +52,7 @@ func (rep *Repository) GetUserByEmail(ctx context.Context, email string) (*authd
 
 // UpdateStatus sets the account status for the given user.
 func (rep *Repository) UpdateStatus(ctx context.Context, userID string, status authdomain.UserStatus) error {
-	tag, err := rep.db.Exec(ctx, updateUserStatusSQL, status, userID)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, updateUserStatusSQL, status, userID)
 	if err != nil {
 		return fmt.Errorf("repository.UpdateStatus: %w", err)
 	}
@@ -66,7 +66,7 @@ func (rep *Repository) UpdateStatus(ctx context.Context, userID string, status a
 
 // UpdateRole sets the role for the given user.
 func (rep *Repository) UpdateRole(ctx context.Context, userID string, role authdomain.UserRole) error {
-	tag, err := rep.db.Exec(ctx, updateUserRoleSQL, role, userID)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, updateUserRoleSQL, role, userID)
 	if err != nil {
 		return fmt.Errorf("repository.UpdateRole: %w", err)
 	}
@@ -93,7 +93,7 @@ func (rep *Repository) UpdateLastLoginAt(ctx context.Context, userID string) err
 
 // UpdatePasswordHash replaces the stored password hash for the given user.
 func (rep *Repository) UpdatePasswordHash(ctx context.Context, userID, passwordHash string) error {
-	tag, err := rep.db.Exec(ctx, updatePasswordSQL, passwordHash, userID)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, updatePasswordSQL, passwordHash, userID)
 	if err != nil {
 		return fmt.Errorf("repository.UpdatePasswordHash: %w", err)
 	}
@@ -106,7 +106,7 @@ func (rep *Repository) UpdatePasswordHash(ctx context.Context, userID, passwordH
 
 // UpdateEmail changes the email address for the given user.
 func (rep *Repository) UpdateEmail(ctx context.Context, userID, newEmail string) error {
-	tag, err := rep.db.Exec(ctx, updateEmailSQL, newEmail, userID)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, updateEmailSQL, newEmail, userID)
 	if err != nil {
 		return fmt.Errorf("repository.UpdateEmail: %w", err)
 	}
@@ -119,7 +119,7 @@ func (rep *Repository) UpdateEmail(ctx context.Context, userID, newEmail string)
 
 // UpdateEmailVerifiedAt marks the user's email as verified.
 func (rep *Repository) UpdateEmailVerifiedAt(ctx context.Context, userID string) error {
-	tag, err := rep.db.Exec(ctx, updateEmailVerifiedAtSQL, userID)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, updateEmailVerifiedAtSQL, userID)
 	if err != nil {
 		return fmt.Errorf("repository.UpdateEmailVerifiedAt: %w", err)
 	}
@@ -133,7 +133,7 @@ func (rep *Repository) UpdateEmailVerifiedAt(ctx context.Context, userID string)
 
 // DeleteUser soft-deletes the user with the given ID.
 func (rep *Repository) DeleteUser(ctx context.Context, userID string) error {
-	tag, err := rep.db.Exec(ctx, deleteUserSQL, userID)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, deleteUserSQL, userID)
 	if err != nil {
 		return fmt.Errorf("repository.DeleteUser: %w", err)
 	}
@@ -146,7 +146,7 @@ func (rep *Repository) DeleteUser(ctx context.Context, userID string) error {
 
 // IncrementFailedLogin increments the failed login counter and locks the user after reaching the limit.
 func (rep *Repository) IncrementFailedLogin(ctx context.Context, userID, lockInterval string, loginCountLimit int) error {
-	tag, err := rep.db.Exec(ctx, incrementFailedLoginSQL, userID, loginCountLimit, lockInterval)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, incrementFailedLoginSQL, userID, loginCountLimit, lockInterval)
 	if err != nil {
 		return fmt.Errorf("repository.IncrementFailedLogin: %w", err)
 	}

@@ -2,6 +2,7 @@ package authrepository
 
 import (
 	"context"
+
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/infrastructure/db"
 
@@ -14,8 +15,8 @@ type Repository struct {
 }
 
 // NewRepository returns a new auth Repository backed by the given connection pool.
-func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db}
+func NewRepository(pool *pgxpool.Pool) *Repository {
+	return &Repository{db: pool}
 }
 
 func (rep *Repository) queryRunner(ctx context.Context) db.QueryRunner {
@@ -25,6 +26,8 @@ func (rep *Repository) queryRunner(ctx context.Context) db.QueryRunner {
 	return rep.db
 }
 
-var _ authdomain.SessionRepository = (*Repository)(nil)
-var _ authdomain.TokenRepository = (*Repository)(nil)
-var _ authdomain.UserRepository = (*Repository)(nil)
+var (
+	_ authdomain.SessionRepository = (*Repository)(nil)
+	_ authdomain.TokenRepository   = (*Repository)(nil)
+	_ authdomain.UserRepository    = (*Repository)(nil)
+)

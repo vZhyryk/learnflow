@@ -1,10 +1,13 @@
 package authservice
 
 import (
-	authdomain "learnflow_backend/internal/auth/domain"
-	"learnflow_backend/internal/infrastructure/logger"
 	"time"
 
+	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/events"
+	"learnflow_backend/internal/infrastructure/logger"
+
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -13,6 +16,8 @@ const (
 	refreshTokenTTL           = 7 * 24 * time.Hour
 	emailVerificationTokenTTL = 24 * time.Hour
 	passwordResetTokenTTL     = 1 * time.Hour
+
+	hashDefaultCost = 12
 )
 
 // Service implements the auth domain Service interface.
@@ -20,10 +25,12 @@ type Service struct {
 	userRepo          authdomain.UserRepository
 	sessionRepo       authdomain.SessionRepository
 	tokenRepo         authdomain.TokenRepository
-	dummyPasswordHash []byte
 	transactor        authdomain.Transactor
-	JWTSecret         string
+	outbox            *events.OutboxWriter
 	jsonLogger        *logger.Logger
+	publisher         events.Publisher
+	dummyPasswordHash []byte
+	jwtSecret         string
 }
 
 // New returns a new auth Service with the given repositories and configuration.
@@ -32,10 +39,12 @@ func New(
 	sessionRepo authdomain.SessionRepository,
 	tokenRepo authdomain.TokenRepository,
 	transactor authdomain.Transactor,
+	outbox *events.OutboxWriter,
 	jwtSecret string,
 	jsonLogger *logger.Logger,
+	redisClient *redis.Client,
 ) *Service {
-	var dummyPasswordHash, err = bcrypt.GenerateFromPassword([]byte("dummy"), bcrypt.DefaultCost)
+	dummyPasswordHash, err := bcrypt.GenerateFromPassword([]byte("dummy"), hashDefaultCost)
 	if err != nil {
 		jsonLogger.Fatal(err, map[string]any{"message": "dummyPasswordHash was not generated"})
 	}
@@ -45,8 +54,10 @@ func New(
 		sessionRepo:       sessionRepo,
 		tokenRepo:         tokenRepo,
 		transactor:        transactor,
-		JWTSecret:         jwtSecret,
+		outbox:            outbox,
+		jwtSecret:         jwtSecret,
 		dummyPasswordHash: dummyPasswordHash,
 		jsonLogger:        jsonLogger,
+		publisher:         events.NewRedisPublisher(redisClient),
 	}
 }

@@ -21,7 +21,7 @@ func (rep *Repository) CreateUserSession(ctx context.Context, session *authdomai
 
 // GetUserSessionByRefreshToken retrieves an active session by its refresh token hash.
 func (rep *Repository) GetUserSessionByRefreshToken(ctx context.Context, refreshToken string) (*authdomain.UserSession, error) {
-	session, err := scanUserSession(rep.db.QueryRow(ctx, getSessionByTokenSQL, refreshToken))
+	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, getSessionByTokenSQL, refreshToken))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrSessionNotFound
 	}
@@ -34,7 +34,7 @@ func (rep *Repository) GetUserSessionByRefreshToken(ctx context.Context, refresh
 
 // GetSessionByPrevHash retrieves a session by its previous refresh token hash (rotation detection).
 func (rep *Repository) GetSessionByPrevHash(ctx context.Context, prevRefreshToken string) (*authdomain.UserSession, error) {
-	session, err := scanUserSession(rep.db.QueryRow(ctx, getSessionByPrevHashSQL, prevRefreshToken))
+	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, getSessionByPrevHashSQL, prevRefreshToken))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrSessionNotFound
 	}
@@ -47,7 +47,7 @@ func (rep *Repository) GetSessionByPrevHash(ctx context.Context, prevRefreshToke
 
 // RevokeUserSession marks a single session as revoked with the given reason.
 func (rep *Repository) RevokeUserSession(ctx context.Context, sessionID, revokedByUserID string, revokeReason authdomain.RevokeReason) error {
-	tag, err := rep.db.Exec(ctx, revokeUserSessionSQL, revokeReason, revokedByUserID, sessionID)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, revokeUserSessionSQL, revokeReason, revokedByUserID, sessionID)
 	if err != nil {
 		return fmt.Errorf("repository.RevokeUserSession: %w", err)
 	}
@@ -60,7 +60,7 @@ func (rep *Repository) RevokeUserSession(ctx context.Context, sessionID, revoked
 
 // RevokeAllUserSessions revokes all active sessions for a user with the given reason.
 func (rep *Repository) RevokeAllUserSessions(ctx context.Context, userID, revokedByUserID string, revokeReason authdomain.RevokeReason) error {
-	tag, err := rep.db.Exec(ctx, revokeAllUserSessionsSQL, revokeReason, revokedByUserID, userID)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, revokeAllUserSessionsSQL, revokeReason, revokedByUserID, userID)
 	if err != nil {
 		return fmt.Errorf("repository.RevokeAllUserSessions: %w", err)
 	}
@@ -73,7 +73,7 @@ func (rep *Repository) RevokeAllUserSessions(ctx context.Context, userID, revoke
 
 // GetActiveSessionsByUserID returns all non-revoked sessions for the given user.
 func (rep *Repository) GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
-	rows, err := rep.db.Query(ctx, getActiveUserSessionSQL, userID)
+	rows, err := rep.queryRunner(ctx).Query(ctx, getActiveUserSessionSQL, userID)
 	if err != nil {
 		return nil, fmt.Errorf("repository.GetActiveSessionsByUserID: %w", err)
 	}
@@ -98,7 +98,7 @@ func (rep *Repository) GetActiveSessionsByUserID(ctx context.Context, userID str
 
 // UpdateSessionToken replaces the refresh token hash for a session (token rotation).
 func (rep *Repository) UpdateSessionToken(ctx context.Context, sessionID, tokenHash, ipAddress string) error {
-	tag, err := rep.db.Exec(ctx, updateSessionTokenSQL, sessionID, tokenHash, ipAddress)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, updateSessionTokenSQL, sessionID, tokenHash, ipAddress)
 	if err != nil {
 		return fmt.Errorf("repository.UpdateSessionToken: %w", err)
 	}
@@ -111,7 +111,7 @@ func (rep *Repository) UpdateSessionToken(ctx context.Context, sessionID, tokenH
 
 // UpdateFailedLoginAttempts increments the failed attempt counter and locks the session when the limit is reached.
 func (rep *Repository) UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error {
-	tag, err := rep.db.Exec(ctx, updateFailedLoginAttemptsSQL, sessionID, loginCountLimit, lockInterval)
+	tag, err := rep.queryRunner(ctx).Exec(ctx, updateFailedLoginAttemptsSQL, sessionID, loginCountLimit, lockInterval)
 	if err != nil {
 		return fmt.Errorf("repository.UpdateFailedLoginAttempts: %w", err)
 	}
