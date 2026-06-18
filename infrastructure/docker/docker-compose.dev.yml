@@ -10,40 +10,8 @@ services:
             - ../../.env
         environment:
             ENV: docker
-            ENVIRONMENT: ${ENVIRONMENT:-dev}
             PORT: ${BACK_PORT:-8080}
             GOMEMLIMIT: ${GOMEMLIMIT:-256MiB}
-            DB_HOST: ${DB_HOST:-postgres}
-            DB_PORT: ${DB_PORT:-5432}
-            DB_NAME: ${DB_NAME:-learnflow}
-            DB_USER: ${DB_USER:-postgres}
-            DB_PASSWORD: ${DB_PASSWORD:-postgres}
-            REDIS_ADDR: ${REDIS_ADDR:-}
-            REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-            DB_SSLMODE: ${DB_SSLMODE:-disable}
-            DB_OPEN_CONNECTION_LIMIT: ${DB_OPEN_CONNECTION_LIMIT:-25}
-            DB_MAX_IDLE_TIME: ${DB_MAX_IDLE_TIME:-15m}
-            DB_MAX_LIFETIME: ${DB_MAX_LIFETIME:-30m}
-            JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me-change-chang}
-            SERVER_TIMEOUT: ${SERVER_TIMEOUT:-30}
-            # Storage (MinIO for local dev)
-            STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
-            STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
-            STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
-            STORAGE_BUCKET: ${STORAGE_BUCKET:-learnflow}
-            STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
-            # Email
-            SMTP_HOST: ${SMTP_HOST:-stub}
-            SMTP_PORT: ${SMTP_PORT:-587}
-            SMTP_USERNAME: ${SMTP_USERNAME:-learnflow}
-            SMTP_PASSWORD: ${SMTP_PASSWORD:-password}
-
-            # Payments
-            STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-            STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-            P24_MERCHANT_ID: ${P24_MERCHANT_ID:-}
-            P24_API_KEY: ${P24_API_KEY:-}
-            P24_WEBHOOK_SECRET: ${P24_WEBHOOK_SECRET:-}
         volumes:
             - ../../backend:/app
         depends_on:
@@ -70,36 +38,7 @@ services:
             - ../../.env
         environment:
             ENV: docker
-            ENVIRONMENT: ${ENVIRONMENT:-dev}
             GOMEMLIMIT: ${GOMEMLIMIT:-256MiB}
-            DB_HOST: ${DB_HOST:-postgres}
-            DB_PORT: ${DB_PORT:-5432}
-            DB_NAME: ${DB_NAME:-learnflow}
-            DB_USER: ${DB_USER:-postgres}
-            DB_PASSWORD: ${DB_PASSWORD:-postgres}
-            DB_SSLMODE: ${DB_SSLMODE:-disable}
-            REDIS_ADDR: ${REDIS_ADDR:-}
-            REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-            JWT_SECRET: ${JWT_SECRET:-dev-secret-change-me}
-            SERVER_TIMEOUT: ${SERVER_TIMEOUT:-30}
-            # Storage (MinIO for local dev)
-            STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-http://minio:9000}
-            STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-minioadmin}
-            STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-minioadmin}
-            STORAGE_BUCKET: ${STORAGE_BUCKET:-learnflow}
-            STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
-            # Email
-            SMTP_HOST: ${SMTP_HOST:-stub}
-            SMTP_PORT: ${SMTP_PORT:-587}
-            SMTP_USERNAME: ${SMTP_USERNAME:-learnflow}
-            SMTP_PASSWORD: ${SMTP_PASSWORD:-password}
-
-            # Payments
-            STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-            STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-            P24_MERCHANT_ID: ${P24_MERCHANT_ID:-}
-            P24_API_KEY: ${P24_API_KEY:-}
-            P24_WEBHOOK_SECRET: ${P24_WEBHOOK_SECRET:-}
         command: ["air", "-c", ".air.worker.toml"]
         volumes:
             - ../../backend:/app
@@ -117,23 +56,21 @@ services:
                 limits:
                     memory: 512M
                     cpus: "1.0"
+        healthcheck:
+            test: ["CMD", "pgrep", "-f", "air"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 15s
 
     migrate:
         build:
             context: ../../backend
             dockerfile: Dockerfile.dev
-            # target: migrate
         container_name: learnflow_migrate_dev
         env_file:
             - ../../.env
         environment:
-            ENVIRONMENT: ${ENVIRONMENT:-dev}
-            DB_HOST: ${DB_HOST:-postgres}
-            DB_PORT: ${DB_PORT:-5432}
-            DB_NAME: ${DB_NAME:-learnflow}
-            DB_USER: ${DB_USER:-postgres}
-            DB_PASSWORD: ${DB_PASSWORD:-postgres}
-            DB_SSLMODE: ${DB_SSLMODE:-disable}
             STEPS: ${MIGRATION_STEPS:-0}
             DIRECTION: ${MIGRATION_DIRECTION:-up}
         depends_on:
@@ -143,11 +80,7 @@ services:
             - app-network
         command: ["air", "-c", ".air.migrate.toml"]
         volumes:
-            - ../../backend:/app # - must be added to work with air
-        # command:
-        #   - /bin/sh
-        #   - -c
-        #   - /app/migrate -dsn "postgres://$$DB_USER:$$DB_PASSWORD@$$DB_HOST:$$DB_PORT/$$DB_NAME?sslmode=disable" -direction up
+            - ../../backend:/app
         profiles:
             - manual
 

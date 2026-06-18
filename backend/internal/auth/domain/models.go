@@ -177,6 +177,15 @@ type VerifyEmailRequest struct {
 	Token string
 }
 
+// Validate checks that the token field is present.
+func (r *VerifyEmailRequest) Validate() error {
+	if r.Token == "" {
+		return ErrInvalidCredentialFormat
+	}
+
+	return nil
+}
+
 // RequestPasswordResetRequest carries the email for which a reset link should be sent.
 type RequestPasswordResetRequest struct {
 	Email string

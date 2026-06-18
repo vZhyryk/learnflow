@@ -2,6 +2,8 @@ package authservice
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
@@ -164,8 +166,9 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 		payload := events.UserRegisteredPayload{
 			UserID: id,
 			Email:  user.Email,
-			URL:    fmt.Sprintf("/api/v1/users/auth/email/verify/%s", rawToken),
+			URL:    fmt.Sprintf("/api/v1/users/auth/email/verify?token=%s", rawToken),
 		}
+
 		err = s.outbox.Emit(ctx, events.AggregationTypeUser, id, events.EventUserRegistered, payload)
 		if err != nil {
 			return fmt.Errorf("register: emit event: %w", err)
@@ -181,8 +184,45 @@ func (s *Service) Refresh(_ context.Context, _ authdomain.RefreshRequest) (*auth
 }
 
 // VerifyEmail confirms a user's email address using the provided token.
-func (s *Service) VerifyEmail(_ context.Context, _ authdomain.VerifyEmailRequest) error {
-	return nil
+func (s *Service) VerifyEmail(ctx context.Context, req authdomain.VerifyEmailRequest) error {
+	sum := sha256.Sum256([]byte(req.Token))
+	tokenHash := hex.EncodeToString(sum[:])
+
+	token, err := s.tokenRepo.GetEmailVerificationToken(ctx, tokenHash)
+	if err != nil {
+		return err
+	}
+
+	if token.UsedAt != nil {
+		return authdomain.ErrTokenUsed
+	}
+
+	if token.ExpiresAt.Before(time.Now()) {
+		return authdomain.ErrTokenExpired
+	}
+
+	if token.InvalidatedAt != nil {
+		return authdomain.ErrInvalidToken
+	}
+
+	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		err = s.userRepo.UpdateEmailVerifiedAt(ctx, token.UserID)
+		if err != nil {
+			return err
+		}
+
+		err = s.userRepo.UpdateStatus(ctx, token.UserID, authdomain.StatusActive)
+		if err != nil {
+			return err
+		}
+
+		err = s.tokenRepo.MarkEmailVerificationTokenUsed(ctx, tokenHash)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 // ChangePassword updates the user's password after verifying the current one.

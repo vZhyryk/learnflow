@@ -13,6 +13,8 @@ import (
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
 	lredis "learnflow_backend/internal/infrastructure/redis"
+	"learnflow_backend/internal/shared/mailer"
+	"learnflow_backend/internal/worker"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -45,22 +47,51 @@ func main() {
 	}
 
 	defer func() {
-		if err := redisClient.Close(); err != nil {
-			jsonLogger.Fatal(err, nil)
+		if closeErr := redisClient.Close(); closeErr != nil {
+			jsonLogger.Fatal(closeErr, nil)
 		}
 	}()
+
+	smtp, err := getSMTP(environment)
+	if err != nil {
+		jsonLogger.Fatal(err, nil)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	app := App{
-		Config:    appCfg,
-		Logger:    jsonLogger,
-		Outbox:    events.NewOutboxWriter(dbInstance),
-		Ctx:       ctx,
-		Cancel:    cancel,
-		Publisher: events.NewRedisPublisher(redisClient),
+		Config:      appCfg,
+		Logger:      jsonLogger,
+		Outbox:      events.NewOutboxWriter(dbInstance),
+		Publisher:   events.NewRedisPublisher(redisClient),
+		RedisClient: redisClient,
+		Mailer:      mailer.New(smtp.port, smtp.host, smtp.username, smtp.password, smtp.sender),
 	}
+
+	transactor := db.NewTransactor(dbInstance)
+
+	workers := []worker.Worker{
+		worker.NewOutboxPoller(dbInstance, app.Publisher, app.Logger, transactor),
+		worker.NewEmailVerificationWorker(dbInstance, redisClient, app.Logger, app.Mailer),
+		// worker.NewBriefSubmittedWorker(dbInstance, app.Publisher, app.Logger, transactor),
+		// worker.NewNotificationWorker(dbInstance, app.Publisher, app.Logger, transactor),
+	}
+
+	for _, w := range workers {
+		app.Wg.Add(1)
+		go func(w worker.Worker) {
+			defer app.Wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					app.Logger.Error(fmt.Errorf("worker panic: %v", r), nil)
+				}
+			}()
+			w.Run(ctx)
+		}(w)
+	}
+
+	app.Logger.Info("starting worker", nil)
 
 	// graceful shutdown при SIGTERM/SIGINT
 	quit := make(chan os.Signal, 1)
@@ -98,4 +129,32 @@ func getDatabaseConfig() (maxOpenConns int, maxIdleTime, maxLifetime string) {
 	maxIdleTime = env.GetStringEnv("DB_MAX_IDLE_TIME", "30m")
 	maxLifetime = env.GetStringEnv("DB_MAX_LIFETIME", "1h")
 	return maxOpenConns, maxIdleTime, maxLifetime
+}
+
+func getSMTP(environment string) (SMTP, error) {
+	smtp := SMTP{
+		host:     env.GetStringEnv("SMTP_HOST", "stub"),
+		username: env.GetStringEnv("SMTP_USERNAME", ""),
+		password: env.GetStringEnv("SMTP_PASSWORD", ""),
+		sender:   env.GetStringEnv("SMTP_SENDER", ""),
+		port:     env.GetIntEnv("SMTP_PORT", 587),
+	}
+
+	if smtp.host == "" || (smtp.host == "stub" && environment == "production") {
+		return smtp, fmt.Errorf("smtp host is not valid")
+	}
+
+	if smtp.username == "" {
+		return smtp, fmt.Errorf("smtp username is not valid")
+	}
+
+	if smtp.password == "" {
+		return smtp, fmt.Errorf("smtp password is not valid")
+	}
+
+	if smtp.sender == "" {
+		return smtp, fmt.Errorf("smtp sender is not valid")
+	}
+
+	return smtp, nil
 }

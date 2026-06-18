@@ -50,9 +50,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, chains AuthRouteChains) {
 		// set new password logic
 	}))
 
-	mux.Handle("GET /api/v1/users/auth/email/verify", chains.EmailVerify.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// verify email logic
-	}))
+	mux.Handle("GET /api/v1/users/auth/email/verify", chains.EmailVerify.ThenFunc(h.verifyEmail))
 
 	mux.Handle("POST /api/v1/auth/refresh", chains.StaticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		// refresh token

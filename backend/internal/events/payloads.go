@@ -21,7 +21,14 @@ type NotificationSendPayload struct {
 }
 
 // BookingCreatedPayload is the event payload emitted when a booking is created.
-type BookingCreatedPayload struct{}
+type BookingCreatedPayload struct {
+	BookingID string `json:"booking_id"`
+	UserID    string `json:"user_id"`
+}
 
 // PaymentCompletedPayload is the event payload emitted when a payment is completed.
-type PaymentCompletedPayload struct{}
+type PaymentCompletedPayload struct {
+	PaymentID   string `json:"payment_id"`
+	UserID      string `json:"user_id"`
+	AmountCents int64  `json:"amount_cents"`
+}

@@ -3,10 +3,10 @@ package mailer
 import (
 	"bytes"
 	"crypto/tls"
+	"embed"
 	"fmt"
 	"html/template"
 	"learnflow_backend/internal/infrastructure/validator"
-	"os"
 	"time"
 
 	"gopkg.in/mail.v2"
@@ -19,12 +19,10 @@ type Mailer struct {
 }
 
 // New returns a Mailer configured with the given SMTP credentials.
-func New(port int, host, username, password, sender string) Mailer {
-	// Initialize a new mail.Dialer instance with the given SMTP server settings. We also configure this to use a 5-second timeout whenever we send an email.
+func New(port int, host, username, password, sender string) *Mailer {
 	dialer := mail.NewDialer(host, port, username, password)
 	dialer.Timeout = 1 * time.Minute
-	// Return a Mailer instance containing the dialer and sender information.
-	return Mailer{
+	return &Mailer{
 		dialer: dialer,
 		sender: sender,
 	}
@@ -58,25 +56,21 @@ func (m Mailer) Send(templateFile string, data any, ccUser CCuser, attachmentLis
 		msg.Attach(path)
 	}
 
-	m.dialer.TLSConfig = &tls.Config{}
-	for i := 1; i <= 3; i++ {
-		err = m.dialer.DialAndSend(msg)
-		if err == nil {
-			return nil
-		}
-		time.Sleep(1 * time.Second)
+	m.dialer.TLSConfig = &tls.Config{
+		ServerName: m.dialer.Host,
 	}
 
-	return fmt.Errorf("mailer.Send: %w", err)
+	if err := m.dialer.DialAndSend(msg); err != nil {
+		return fmt.Errorf("mailer.Send: %w", err)
+	}
+	return nil
 }
 
-func renderEmail(templateFile string, data any) (subject, plainBody, htmlBody string, err error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", "", "", fmt.Errorf("mailer.renderEmail get pwd: %w", err)
-	}
+//go:embed templates
+var templateFS embed.FS
 
-	tmpl, err := template.New("email").ParseFiles(dir + templateFile)
+func renderEmail(templateFile string, data any) (subject, plainBody, htmlBody string, err error) {
+	tmpl, err := template.New("email").ParseFS(templateFS, "templates/"+templateFile)
 	if err != nil {
 		return "", "", "", fmt.Errorf("mailer.renderEmail parse template: %w", err)
 	}

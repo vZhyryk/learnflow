@@ -56,7 +56,7 @@ func NewRouter(a *app.App) *RouteHandler {
 	authRepo := authrepository.NewRepository(a.DB)
 	transactor := db.NewTransactor(a.DB)
 	outbox := events.NewOutboxWriter(a.DB)
-	authSvc := authservice.New(authRepo, authRepo, authRepo, transactor, outbox, a.Config.JWTSecret, a.Logger, a.Redis)
+	authSvc := authservice.New(authRepo, authRepo, authRepo, transactor, outbox, a.Config.JWTSecret, a.Logger)
 
 	auth.RegisterAuthRoutes(router, authSvc, chains, a.Logger)
 

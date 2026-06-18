@@ -7,7 +7,6 @@ import (
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/logger"
 
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -28,7 +27,6 @@ type Service struct {
 	transactor        authdomain.Transactor
 	outbox            *events.OutboxWriter
 	jsonLogger        *logger.Logger
-	publisher         events.Publisher
 	dummyPasswordHash []byte
 	jwtSecret         string
 }
@@ -42,7 +40,6 @@ func New(
 	outbox *events.OutboxWriter,
 	jwtSecret string,
 	jsonLogger *logger.Logger,
-	redisClient *redis.Client,
 ) *Service {
 	dummyPasswordHash, err := bcrypt.GenerateFromPassword([]byte("dummy"), hashDefaultCost)
 	if err != nil {
@@ -58,6 +55,5 @@ func New(
 		jwtSecret:         jwtSecret,
 		dummyPasswordHash: dummyPasswordHash,
 		jsonLogger:        jsonLogger,
-		publisher:         events.NewRedisPublisher(redisClient),
 	}
 }

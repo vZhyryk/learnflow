@@ -25,13 +25,8 @@ func (w *OutboxWriter) Emit(ctx context.Context, aggregateType AggregationType, 
 	if err != nil {
 		return fmt.Errorf("outbox.Emit marshal: %w", err)
 	}
-	tag, err := w.db.Exec(ctx, queryInsertOutbox, string(aggregateType), aggregateID, string(eventType), string(data))
-	if err != nil {
+	if _, err := w.db.Exec(ctx, queryInsertOutbox, string(aggregateType), aggregateID, string(eventType), string(data)); err != nil {
 		return fmt.Errorf("outbox.Emit insert: %w", err)
-	}
-
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("outbox.Emit insert: entry was not inserted")
 	}
 
 	return nil
