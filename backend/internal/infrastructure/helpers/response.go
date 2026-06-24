@@ -15,8 +15,8 @@ func ForbiddenResponse(w http.ResponseWriter, msg Envelope) error {
 }
 
 // ServerErrorResponse writes a 500 Internal Server Error response with the given error.
-func ServerErrorResponse(w http.ResponseWriter, err error) error {
-	return WriteJSON(w, http.StatusInternalServerError, Envelope{"error": err.Error()}, nil)
+func ServerErrorResponse(w http.ResponseWriter) error {
+	return WriteJSON(w, http.StatusInternalServerError, Envelope{"error": "internal server error"}, nil)
 }
 
 // BadRequestResponse writes a 400 Bad Request response with the given error.

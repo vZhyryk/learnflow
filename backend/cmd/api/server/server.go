@@ -30,11 +30,12 @@ func NewServer(r *router.RouteHandler, a *app.App) *Server {
 // then performs a graceful shutdown waiting up to 20 seconds for in-flight requests.
 func (server *Server) Serve() error {
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", server.App.Config.Port),
-		Handler:      server.Router.Router,
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		Addr:              fmt.Sprintf(":%d", server.App.Config.Port),
+		Handler:           server.Router.Router,
+		IdleTimeout:       server.App.Config.Timeouts.IdleTimeout,
+		ReadTimeout:       server.App.Config.Timeouts.ReadTimeout,
+		WriteTimeout:      server.App.Config.Timeouts.WriteTimeout,
+		ReadHeaderTimeout: server.App.Config.Timeouts.ReadHeaderTimeout,
 		// http.Server.ErrorLog requires *log.Logger; use the custom logger as its Writer
 		ErrorLog:       log.New(server.App.Logger, "", 0),
 		MaxHeaderBytes: 1 << 20, // 1MB

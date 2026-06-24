@@ -12,16 +12,17 @@ type Transactor interface {
 // Service defines all authentication use cases.
 type Service interface {
 	Login(ctx context.Context, req LoginRequest) (*AuthTokens, error)
-	Logout(ctx context.Context, req LogoutRequest) error
-	Register(ctx context.Context, req RegisterRequest) error
+	Logout(ctx context.Context, req LogoutRequest) (string, error)
+	Register(ctx context.Context, req RegisterRequest) (string, error)
 	Refresh(ctx context.Context, req RefreshRequest) (*AuthTokens, error)
-	VerifyEmail(ctx context.Context, req VerifyEmailRequest) error
+	VerifyEmail(ctx context.Context, req VerifyEmailRequest) (string, error)
 	ChangePassword(ctx context.Context, req ChangePasswordRequest) error
 	InitiatePasswordReset(ctx context.Context, req RequestPasswordResetRequest) error
 	ResetPassword(ctx context.Context, req ResetPasswordRequest) error
 	InitiateEmailChange(ctx context.Context, req RequestEmailChangeRequest) error
 	ChangeEmail(ctx context.Context, req EmailChangeRequest) error
 	RecoverAccount(ctx context.Context, req RecoverAccountRequest) error
+	InitRecoverAccount(ctx context.Context, req RequestRecoverAccountRequest) error
 }
 
 // SessionRepository defines persistence operations for user sessions.
@@ -29,9 +30,9 @@ type SessionRepository interface {
 	CreateUserSession(ctx context.Context, session *UserSession) (*UserSession, error)
 	GetUserSessionByRefreshToken(ctx context.Context, refreshToken string) (*UserSession, error)
 	RevokeUserSession(ctx context.Context, sessionID, revokedByUserID string, revokeReason RevokeReason) error
-	RevokeAllUserSessions(ctx context.Context, userID, revokedByUserID string, revokeReason RevokeReason) error
+	RevokeAllUserSessions(ctx context.Context, userID, revokedByUserID any, revokeReason RevokeReason) error
 	GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*UserSession, error)
-	UpdateSessionToken(ctx context.Context, sessionID, tokenHash, IPAddress string) error
+	UpdateSessionToken(ctx context.Context, sessionID, tokenHash, userAgent, ipAddress string) error
 	UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error
 	GetSessionByPrevHash(ctx context.Context, prevRefreshToken string) (*UserSession, error)
 }
@@ -56,6 +57,7 @@ type TokenRepository interface {
 // UserRepository defines persistence operations for User.
 type UserRepository interface {
 	CreateUser(ctx context.Context, user *User) (string, error)
+	CreateUserProfile(ctx context.Context, user *UserProfile) error
 	GetUserByID(ctx context.Context, userID string) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	UpdateStatus(ctx context.Context, userID string, status UserStatus) error
@@ -67,4 +69,7 @@ type UserRepository interface {
 	DeleteUser(ctx context.Context, userID string) error
 	IncrementFailedLogin(ctx context.Context, userID, lockInterval string, loginCountLimit int) error
 	ResetFailedLogin(ctx context.Context, userID string) error
+	GetUserProfileByUserID(ctx context.Context, userID string) (*UserProfile, error)
+	GetDeletedUserByID(ctx context.Context, userID string) (*User, error)
+	RestoreUser(ctx context.Context, userID string) error
 }

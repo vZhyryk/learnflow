@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/logger"
@@ -24,6 +25,8 @@ const (
     	VALUES ($1, $2, $3, $4, $5)
 	`
 )
+
+var errAlreadyProcessed = errors.New("already processed")
 
 // NewDLQ returns a DLQWriter backed by the given query runner.
 func NewDLQ(queryRunner db.QueryRunner, jsonLogger *logger.Logger) *DLQWriter {

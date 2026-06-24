@@ -5,18 +5,29 @@ type EventType string
 
 // Domain event type constants.
 const (
-	EventUserRegistered   EventType = "user.registered"
-	EventBriefSubmitted   EventType = "brief.submitted"
-	EventBookingCreated   EventType = "booking.created"
-	EventPaymentCompleted EventType = "payment.completed"
-	EventNotificationSend EventType = "notification.send"
+	EventUserRegistered                     EventType = "user.registered"
+	EventEmailChange                        EventType = "email.change"
+	EventAccountRecovery                    EventType = "account.recovery"
+	EventPasswordReset                      EventType = "password.reset"
+	EventBriefSubmitted                     EventType = "brief.submitted"
+	EventBookingCreated                     EventType = "booking.created"
+	EventPaymentCompleted                   EventType = "payment.completed"
+	EventNotificationSend                   EventType = "notification.send"
+	EventRegistrationAttemptOnExistingEmail EventType = "user.existed.register"
 )
 
 // IsKnownEventType reports whether t is a registered event type.
 func IsKnownEventType(t EventType) bool {
 	switch t {
-	case EventUserRegistered, EventBriefSubmitted, EventBookingCreated,
-		EventPaymentCompleted, EventNotificationSend:
+	case
+		EventUserRegistered,
+		EventEmailChange,
+		EventPasswordReset,
+		EventBriefSubmitted,
+		EventBookingCreated,
+		EventPaymentCompleted,
+		EventAccountRecovery,
+		EventNotificationSend:
 		return true
 	}
 	return false
@@ -29,6 +40,8 @@ type AggregationType string
 const (
 	AggregationTypeUser         AggregationType = "user"
 	AggregationTypeEmail        AggregationType = "email"
+	AggregationTypeAccount      AggregationType = "account"
+	AggregationTypePassword     AggregationType = "password"
 	AggregationTypeBrief        AggregationType = "brief"
 	AggregationTypeBooking      AggregationType = "booking"
 	AggregationTypePayment      AggregationType = "payment"
@@ -38,8 +51,14 @@ const (
 // IsKnownAggregationType reports whether t is a registered aggregate type.
 func IsKnownAggregationType(t AggregationType) bool {
 	switch t {
-	case AggregationTypeUser, AggregationTypeBrief, AggregationTypeBooking,
-		AggregationTypePayment, AggregationTypeNotification, AggregationTypeEmail:
+	case
+		AggregationTypeUser,
+		AggregationTypeEmail,
+		AggregationTypePassword,
+		AggregationTypeBrief,
+		AggregationTypeBooking,
+		AggregationTypePayment,
+		AggregationTypeNotification:
 		return true
 	}
 	return false

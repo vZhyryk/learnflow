@@ -31,6 +31,30 @@ func scanUser(row rowScanner) (*authdomain.User, error) {
 	return user, nil
 }
 
+func scanUserProfile(row rowScanner) (*authdomain.UserProfile, error) {
+	userProfile := &authdomain.UserProfile{}
+	err := row.Scan(
+		&userProfile.UserID,
+		&userProfile.FirstName,
+		&userProfile.LastName,
+		&userProfile.PhoneNumber,
+		&userProfile.Country,
+		&userProfile.City,
+		&userProfile.DateOfBirth,
+		&userProfile.Gender,
+		&userProfile.UiLanguage,
+		&userProfile.AvatarUrl,
+		&userProfile.Timezone,
+		&userProfile.Bio,
+		&userProfile.CreatedAt,
+		&userProfile.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return userProfile, nil
+}
+
 func scanUserSession(row rowScanner) (*authdomain.UserSession, error) {
 	session := &authdomain.UserSession{}
 	err := row.Scan(

@@ -1,0 +1,136 @@
+{{define "subject"}}Someone tried to register with your email — LearnFlow{{end}}
+
+{{define "plainBody"}}
+Hello {{.UserName}},
+
+Someone just tried to create a new LearnFlow account using your email address ({{.Email}}).
+
+No changes were made to your account — this is just a heads-up.
+
+If this was you, you can simply log in to your existing account.
+
+If you don't recognise this activity, no action is required. Your account remains secure.
+
+— The LearnFlow Team
+{{end}}
+
+{{define "htmlBody"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Someone tried to register with your email — LearnFlow</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f6f9;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f9;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+
+          <!-- Logo / Header -->
+          <tr>
+            <td align="center" style="padding-bottom:24px;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background-color:#2563eb;border-radius:12px;padding:10px 20px;">
+                    <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.5px;">LearnFlow</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color:#ffffff;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden;">
+
+              <!-- Amber top bar -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="background-color:#d97706;height:4px;font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
+
+              <!-- Body -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:40px 48px 32px;">
+
+                    <!-- Icon -->
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+                      <tr>
+                        <td style="background-color:#fffbeb;border-radius:50%;width:56px;height:56px;text-align:center;vertical-align:middle;">
+                          <span style="font-size:28px;line-height:56px;">🔔</span>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#111827;letter-spacing:-0.5px;">
+                      Registration attempt detected
+                    </h1>
+                    <p style="margin:0 0 24px;font-size:15px;color:#6b7280;line-height:1.6;">
+                      Hi <strong style="color:#111827;">{{.UserName}}</strong>,<br/>
+                      Someone tried to create a new LearnFlow account using your email address
+                      <strong style="color:#111827;">{{.Email}}</strong>.<br/>
+                      No changes were made to your account.
+                    </p>
+
+                    <!-- Info box -->
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                      <tr>
+                        <td style="background-color:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:16px 20px;">
+                          <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#92400e;">What does this mean?</p>
+                          <p style="margin:0;font-size:13px;color:#92400e;line-height:1.6;">
+                            If this was you, simply <strong>log in to your existing account</strong> instead of creating a new one.<br/>
+                            If you don't recognise this, no action is required — your account is safe.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Divider -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:0 48px;">
+                    <hr style="border:none;border-top:1px solid #f3f4f6;margin:0;" />
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Footer note -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding:20px 48px 32px;">
+                    <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6;">
+                      If you're concerned about your account security, consider changing your password.
+                      This notification was sent because your email address was used in a registration attempt.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:24px 0 8px;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#9ca3af;">
+                © 2026 LearnFlow. All rights reserved.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+{{end}}

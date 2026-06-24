@@ -44,4 +44,7 @@ var (
 
 	// ErrEmailAlreadyInUse is returned when the requested new email is taken by another account.
 	ErrEmailAlreadyInUse = errors.New("email is already in use")
+
+	// ErrInvalidAccountState is returned when the account is in an unexpected state.
+	ErrInvalidAccountState = errors.New("invalid account state")
 )

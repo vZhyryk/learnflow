@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"fmt"
+	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
 	"net"
@@ -10,8 +11,6 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
-
-	"golang.org/x/time/rate"
 )
 
 // RecoverPanic recovers from panics, logs the error, and returns a 500 response.
@@ -78,9 +77,9 @@ func (routes *RouteHandler) SetSecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// NewRouteRateLimiter creates a rate limiter middleware using the provided key function and request/time budget.
-func (route *RouteHandler) NewRouteRateLimiter(reqCount float64, duration time.Duration, burst int, getKeyFunc func(*http.Request) string) func(next http.Handler) http.Handler {
-	rps := reqCount / duration.Seconds()
+// NewRouteRateLimiter creates a Redis-backed rate limiter middleware using the provided key function and request/time budget.
+func (route *RouteHandler) NewRouteRateLimiter(reqCount float64, duration time.Duration, _ int, getKeyFunc func(*http.Request) string) func(next http.Handler) http.Handler {
+	limit := int(reqCount)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !route.App.Config.Limiter.Enabled {
@@ -89,19 +88,14 @@ func (route *RouteHandler) NewRouteRateLimiter(reqCount float64, duration time.D
 			}
 
 			key := getKeyFunc(r)
-
-			route.rateLimitMu.Lock()
-			if _, found := route.rateLimitClients[key]; !found {
-				route.rateLimitClients[key] = &rateLimitClient{
-					limiter: rate.NewLimiter(rate.Limit(rps), burst),
-				}
+			allowed, err := redisRateLimit(r.Context(), route.App.Redis, key, limit, duration)
+			if err != nil {
+				route.App.Logger.Error(fmt.Errorf("rate limiter: %w", err), nil)
+				next.ServeHTTP(w, r)
+				return
 			}
-
-			route.rateLimitClients[key].lastSeen = time.Now()
-			allowed := route.rateLimitClients[key].limiter.Allow()
-			route.rateLimitMu.Unlock()
 			if !allowed {
-				route.RateLimitExceededResponse(w, route.rateLimitClients[key].limiter)
+				route.RateLimitExceededResponse(w)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -109,20 +103,109 @@ func (route *RouteHandler) NewRouteRateLimiter(reqCount float64, duration time.D
 	}
 }
 
-// Timeout enforces a 10-second request timeout by wrapping the context.
+// Timeout enforces a 30-second request timeout by wrapping the context.
 func (route *RouteHandler) Timeout(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), route.App.Config.Timeouts.RequestTimeout)
 		defer cancel()
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (sw *statusResponseWriter) WriteHeader(code int) {
+	sw.status = code
+	sw.ResponseWriter.WriteHeader(code)
+}
+
+func (sw *statusResponseWriter) Unwrap() http.ResponseWriter {
+	return sw.ResponseWriter
+}
+
+// RequestLogger logs completed HTTP requests with method, path, status, elapsed time, IP, and request ID.
+func (routes *RouteHandler) RequestLogger(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		sw := &statusResponseWriter{ResponseWriter: w, status: http.StatusOK}
+
+		next.ServeHTTP(sw, r)
+
+		routes.App.Logger.Info("request", map[string]any{
+			"method":     r.Method,
+			"path":       r.URL.Path,
+			"status":     sw.status,
+			"elapsed_ms": time.Since(start).Milliseconds(),
+			"ip":         appcontext.IPAddressFromContext(r.Context()),
+			"request_id": appcontext.RequestIDFromContext(r.Context()),
+		})
 	})
 }
 
 // AuthenticateUser validates the JWT token from Authorization header and sets user in context.
 func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// code will be added in the future when we implement authentication
-		next.ServeHTTP(w, r)
+		parts := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			if err := helpers.InvalidCredentialsResponse(w); err != nil {
+				route.App.Logger.Error(err, nil)
+			}
+			return
+		}
+
+		tokenStr := parts[1]
+		claims, err := route.token.ValidateToken(tokenStr)
+		if err != nil {
+			if respErr := helpers.InvalidCredentialsResponse(w); respErr != nil {
+				route.App.Logger.Error(respErr, nil)
+			}
+			return
+		}
+
+		jti := claims.ID
+		blocked, err := route.App.Redis.Exists(r.Context(), "blocklist:"+jti).Result()
+		if err != nil {
+			route.App.Logger.Error(fmt.Errorf("AuthenticateUser: redis: %w", err), nil)
+			if respErr := helpers.ServerErrorResponse(w); respErr != nil {
+				route.App.Logger.Error(respErr, nil)
+			}
+			return
+		}
+		if blocked > 0 {
+			if respErr := helpers.InvalidCredentialsResponse(w); respErr != nil {
+				route.App.Logger.Error(respErr, nil)
+			}
+			return
+		}
+
+		blockedCount, err := route.App.Redis.Exists(r.Context(), "user_blocked:"+claims.Subject).Result()
+		if err != nil {
+			route.App.Logger.Error(fmt.Errorf("AuthenticateUser: user_blocked: %w", err), nil)
+			if respErr := helpers.ServerErrorResponse(w); respErr != nil {
+				route.App.Logger.Error(respErr, nil)
+			}
+			return
+		}
+		if blockedCount > 0 {
+			if respErr := helpers.InvalidCredentialsResponse(w); respErr != nil {
+				route.App.Logger.Error(respErr, nil)
+			}
+			return
+		}
+
+		user := &authdomain.User{
+			ID:   claims.Subject,
+			Role: authdomain.UserRole(claims.Role),
+		}
+
+		ctx := r.Context()
+		ctx = appcontext.WithUser(ctx, user)
+		ctx = appcontext.WithJTI(ctx, jti)
+		ctx = appcontext.WithAccessTokenExpiresAt(ctx, claims.ExpiresAt.Time)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

@@ -6,6 +6,7 @@ import (
 	"learnflow_backend/internal/infrastructure/logger"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -34,7 +35,16 @@ type Config struct {
 		Enabled bool
 	}
 
-	JWTSecret string
+	JWTSecret     string
+	JWTSecretPrev string
+
+	Timeouts struct {
+		ReadHeaderTimeout time.Duration
+		ReadTimeout       time.Duration
+		WriteTimeout      time.Duration
+		IdleTimeout       time.Duration
+		RequestTimeout    time.Duration
+	}
 }
 
 // App is the shared application container injected into every handler and worker.

@@ -3,7 +3,11 @@ package router
 
 import (
 	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"learnflow_backend/cmd/api/app"
 	"learnflow_backend/internal/auth"
@@ -15,30 +19,28 @@ import (
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
+	"learnflow_backend/internal/shared/tokens"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/justinas/alice"
-	"golang.org/x/time/rate"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // RouteHandler holds the compiled ServeMux and a reference to the shared App container.
 type RouteHandler struct {
-	Router           http.Handler
-	App              *app.App
-	rateLimitMu      *sync.Mutex
-	rateLimitClients map[string]*rateLimitClient
+	Router http.Handler
+	App    *app.App
+	token  *tokens.Tokens
 }
 
 // NewRouter registers all routes and returns a RouteHandler ready to serve.
-func NewRouter(a *app.App) *RouteHandler {
+func NewRouter(a *app.App) (*RouteHandler, error) {
 	router := http.NewServeMux()
 	route := &RouteHandler{
-		Router:           router,
-		App:              a,
-		rateLimitMu:      &sync.Mutex{},
-		rateLimitClients: make(map[string]*rateLimitClient),
+		Router: router,
+		App:    a,
+		token:  tokens.NewTokens(a.Config.JWTSecret, a.Config.JWTSecretPrev),
 	}
 
 	router.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -47,16 +49,14 @@ func NewRouter(a *app.App) *RouteHandler {
 		}
 	}))
 
-	if a.Config.Limiter.Enabled {
-		a.Wg.Add(1)
-		go route.startRateLimitCleanup()
-	}
-
 	chains := route.buildChains()
 	authRepo := authrepository.NewRepository(a.DB)
 	transactor := db.NewTransactor(a.DB)
 	outbox := events.NewOutboxWriter(a.DB)
-	authSvc := authservice.New(authRepo, authRepo, authRepo, transactor, outbox, a.Config.JWTSecret, a.Logger)
+	authSvc, err := authservice.New(authRepo, authRepo, authRepo, transactor, outbox, route.token, a.Logger, a.Redis)
+	if err != nil {
+		return nil, fmt.Errorf("router: NewRouter: %w", err)
+	}
 
 	auth.RegisterAuthRoutes(router, authSvc, chains, a.Logger)
 
@@ -80,36 +80,11 @@ func NewRouter(a *app.App) *RouteHandler {
 		}
 	}))
 
-	router.Handle("GET /readiness", http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// викликає `db.PingContext` + Redis PING. Повертає `503 {"status":"unavailable","reason":"..."}` при збої.
-	}))
+	router.Handle("GET /readiness", http.HandlerFunc(route.Readiness))
 
-	return route
-}
+	router.Handle("GET /metrics", promhttp.Handler())
 
-type rateLimitClient struct {
-	limiter  *rate.Limiter
-	lastSeen time.Time
-}
-
-func (route *RouteHandler) startRateLimitCleanup() {
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-	defer route.App.Wg.Done()
-	for {
-		select {
-		case <-route.App.Ctx.Done():
-			return
-		case <-ticker.C:
-			route.rateLimitMu.Lock()
-			for ip, c := range route.rateLimitClients {
-				if time.Since(c.lastSeen) > 3*time.Minute {
-					delete(route.rateLimitClients, ip)
-				}
-			}
-			route.rateLimitMu.Unlock()
-		}
-	}
+	return route, nil
 }
 
 // getEmailFromBody reads the request body to extract an email for rate-limit keying,
@@ -136,7 +111,33 @@ func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context())
 	}
 
-	return req.Email
+	hash := sha256.Sum256([]byte(req.Email))
+	return hex.EncodeToString(hash[:])
+}
+
+func (route *RouteHandler) getTokenFromBody(r *http.Request) string {
+	var req authdomain.VerifyEmailRequest
+	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 1_048_576))
+	if err != nil {
+		return ""
+	}
+
+	if err := r.Body.Close(); err != nil {
+		route.App.Logger.Error(err, nil)
+	}
+
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		return appcontext.IPAddressFromContext(r.Context())
+	}
+
+	if req.Token == "" {
+		return appcontext.IPAddressFromContext(r.Context())
+	}
+
+	hash := sha256.Sum256([]byte(req.Token))
+	return hex.EncodeToString(hash[:])
 }
 
 func (route *RouteHandler) buildChains() authhttp.AuthRouteChains {
@@ -144,34 +145,30 @@ func (route *RouteHandler) buildChains() authhttp.AuthRouteChains {
 		return appcontext.IPAddressFromContext(r.Context())
 	})
 
-	staticChain := alice.New(route.RecoverPanic, route.SetIPAddress, staticLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
+	staticChain := alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, staticLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
 
 	loginLimiter := route.NewRouteRateLimiter(5, time.Minute, 1, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getEmailFromBody(r)
 	})
 
-	loginChain := alice.New(route.RecoverPanic, route.SetIPAddress, loginLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
+	loginChain := alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, loginLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
 
 	registerLimiter := route.NewRouteRateLimiter(3, time.Hour, 1, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context())
 	})
 
-	registerChain := alice.New(route.RecoverPanic, route.SetIPAddress, registerLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
+	registerChain := alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, registerLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
 
 	passResetLimiter := route.NewRouteRateLimiter(2, time.Hour, 1, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getEmailFromBody(r)
 	})
-	passResetChain := alice.New(route.RecoverPanic, route.SetIPAddress, passResetLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
+	passResetChain := alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, passResetLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
 
 	emailVerifyLimiter := route.NewRouteRateLimiter(3, time.Hour, 1, func(r *http.Request) string {
-		token := r.URL.Query().Get("token")
-		if token == "" {
-			return appcontext.IPAddressFromContext(r.Context())
-		}
-		return appcontext.IPAddressFromContext(r.Context()) + ":" + token
+		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getTokenFromBody(r)
 	})
 
-	emailVerifyChain := alice.New(route.RecoverPanic, route.SetIPAddress, emailVerifyLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders, route.SetRequestID)
+	emailVerifyChain := alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, emailVerifyLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
 
 	staticWithAuth := staticChain.Append(route.AuthenticateUser)
 
@@ -183,4 +180,23 @@ func (route *RouteHandler) buildChains() authhttp.AuthRouteChains {
 		EmailVerify:    emailVerifyChain,
 		StaticWithAuth: staticWithAuth,
 	}
+}
+
+func (h *RouteHandler) Readiness(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	if err := h.App.DB.Ping(ctx); err != nil {
+		helpers.WriteJSON(w, http.StatusServiceUnavailable, helpers.Envelope{
+			"status": "unavailable", "reason": "database",
+		}, nil)
+		return
+	}
+	if err := h.App.Redis.Ping(ctx).Err(); err != nil {
+		helpers.WriteJSON(w, http.StatusServiceUnavailable, helpers.Envelope{
+			"status": "unavailable", "reason": "redis",
+		}, nil)
+		return
+	}
+	helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"status": "ready"}, nil)
 }

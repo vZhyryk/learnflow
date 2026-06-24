@@ -16,6 +16,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -73,12 +74,48 @@ func main() {
 		Redis:  redisClient,
 	}
 
-	r := router.NewRouter(application)
+	r, err := router.NewRouter(application)
+	if err != nil {
+		jsonLogger.Fatal(err, nil)
+	}
+
+	readHeaderTimeout, readTimeout, writeTimeout, idleTimeout, requestTimeout, err := getServerTimeout()
+	if err != nil {
+		jsonLogger.Fatal(err, nil)
+	}
+	appCfg.Timeouts.ReadHeaderTimeout = readHeaderTimeout
+	appCfg.Timeouts.ReadTimeout = readTimeout
+	appCfg.Timeouts.WriteTimeout = writeTimeout
+	appCfg.Timeouts.IdleTimeout = idleTimeout
+	appCfg.Timeouts.RequestTimeout = requestTimeout
+
 	srv := server.NewServer(r, application)
 
 	if err := srv.Serve(); err != nil {
 		jsonLogger.Fatal(err, nil)
 	}
+}
+
+func getServerTimeout() (readHeaderTimeout, readTimeout, writeTimeout, idleTimeout, requestTimeout time.Duration, err error) {
+	durations := []struct {
+		name     string
+		val      *time.Duration
+		envKey   string
+		fallback time.Duration
+	}{
+		{"READ_HEADER_TIMEOUT", &readHeaderTimeout, "READ_HEADER_TIMEOUT", 5 * time.Second},
+		{"READ_TIMEOUT", &readTimeout, "READ_TIMEOUT", 10 * time.Second},
+		{"WRITE_TIMEOUT", &writeTimeout, "WRITE_TIMEOUT", 30 * time.Second},
+		{"IDLE_TIMEOUT", &idleTimeout, "IDLE_TIMEOUT", 60 * time.Second},
+		{"REQUEST_TIMEOUT", &requestTimeout, "REQUEST_TIMEOUT", 30 * time.Second},
+	}
+	for _, d := range durations {
+		*d.val = env.GetDurationEnv(d.envKey, d.fallback)
+		if *d.val <= 0 {
+			return 0, 0, 0, 0, 0, fmt.Errorf("%s must be positive, got %v", d.name, *d.val)
+		}
+	}
+	return
 }
 
 func getAppConfig(environment string) (app.Config, error) {

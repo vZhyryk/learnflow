@@ -71,9 +71,19 @@ func main() {
 
 	transactor := db.NewTransactor(dbInstance)
 
+	baseURL := env.GetStringEnv("BASE_URL", "")
+	if baseURL == "" {
+		jsonLogger.Fatal(fmt.Errorf("base url is not valid"), nil)
+	}
+
 	workers := []worker.Worker{
 		worker.NewOutboxPoller(dbInstance, app.Publisher, app.Logger, transactor),
-		worker.NewEmailVerificationWorker(dbInstance, redisClient, app.Logger, app.Mailer),
+		worker.NewDLQRetryWorker(dbInstance, app.Publisher, app.Logger, transactor),
+		worker.NewEmailVerificationWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
+		worker.NewEmailChangeWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
+		worker.NewPasswordResetWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
+		worker.NewRegistrationAttemptsWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
+		worker.NewAccountRecoveryWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
 		// worker.NewBriefSubmittedWorker(dbInstance, app.Publisher, app.Logger, transactor),
 		// worker.NewNotificationWorker(dbInstance, app.Publisher, app.Logger, transactor),
 	}

@@ -1,72 +1,25 @@
 package authrepository
 
 const (
+	sessionColumns = `
+    id, user_id, refresh_hash, user_agent, ip, expires_at, revoked_at, revoke_reason, revoked_by_user_id,
+	created_at, failed_attempt_count, last_attempt_at, locked_until, token_version, previous_refresh_hash,
+	last_seen_at, last_seen_ip `
+
 	/* User Session */
 	createUserSessionSQL = `
 		INSERT INTO user_sessions (user_id, refresh_hash, user_agent, ip, expires_at)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING
-			id,
-			user_id,
-			refresh_hash,
-			user_agent,
-			ip,
-			expires_at,
-			revoked_at,
-			revoke_reason,
-			revoked_by_user_id,
-			created_at,
-			failed_attempt_count,
-			last_attempt_at,
-			locked_until,
-			token_version,
-			previous_refresh_hash,
-			last_seen_at,
-			last_seen_ip
-	`
+		RETURNING` + sessionColumns
 
 	getActiveUserSessionSQL = `
-		SELECT
-			id,
-			user_id,
-			refresh_hash,
-			user_agent,
-			ip,
-			expires_at,
-			revoked_at,
-			revoke_reason,
-			revoked_by_user_id,
-			created_at,
-			failed_attempt_count,
-			last_attempt_at,
-			locked_until,
-			token_version,
-			previous_refresh_hash,
-			last_seen_at,
-			last_seen_ip
+		SELECT` + sessionColumns + `
 		FROM user_sessions WHERE user_id = $1 AND revoked_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT 25
 	`
 	getSessionByTokenSQL = `
-		SELECT
-			id,
-			user_id,
-			refresh_hash,
-			user_agent,
-			ip,
-			expires_at,
-			revoked_at,
-			revoke_reason,
-			revoked_by_user_id,
-			created_at,
-			failed_attempt_count,
-			last_attempt_at,
-			locked_until,
-			token_version,
-			previous_refresh_hash,
-			last_seen_at,
-			last_seen_ip
+		SELECT` + sessionColumns + `
 		FROM user_sessions WHERE refresh_hash = $1 AND revoked_at IS NULL AND expires_at > now()
 		FOR UPDATE NOWAIT
 	`
@@ -74,24 +27,7 @@ const (
 	// Intentionally no revoked_at IS NULL filter — must find even revoked sessions
 	// to detect token reuse attacks (sliding window refresh pattern).
 	getSessionByPrevHashSQL = `
-		SELECT
-			id,
-			user_id,
-			refresh_hash,
-			user_agent,
-			ip,
-			expires_at,
-			revoked_at,
-			revoke_reason,
-			revoked_by_user_id,
-			created_at,
-			failed_attempt_count,
-			last_attempt_at,
-			locked_until,
-			token_version,
-			previous_refresh_hash,
-			last_seen_at,
-			last_seen_ip
+		SELECT` + sessionColumns + `
 		FROM user_sessions WHERE previous_refresh_hash = $1
 	`
 
@@ -109,10 +45,11 @@ const (
 		UPDATE user_sessions
 		SET previous_refresh_hash = refresh_hash,
 		refresh_hash = $2,
+		user_agent = $3,
 		token_version = token_version + 1,
 		last_attempt_at = now(),
 		last_seen_at = now(),
-		last_seen_ip = $3
+		last_seen_ip = $4
 		WHERE id = $1 AND revoked_at IS NULL AND expires_at > now()
 	`
 
@@ -129,12 +66,13 @@ const (
 	`
 
 	/* Token */
+	tokenColumns = ` id, user_id, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id `
 	// Create Token
 	createAccountRecoveryTokenSQL = `
 		INSERT INTO account_recovery_tokens (user_id, token_hash, expires_at)
 		VALUES ($1, $2, $3)
-		RETURNING id, user_id, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id
-	`
+		RETURNING` + tokenColumns
+
 	createEmailChangeTokenSQL = `
 		INSERT INTO email_change_tokens (user_id, token_hash, expires_at, new_email)
 		VALUES ($1, $2, $3, $4)
@@ -143,53 +81,43 @@ const (
 	createEmailVerificationTokenSQL = `
 		INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)
 		VALUES ($1, $2, $3)
-		RETURNING id, user_id, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id
+		RETURNING` + tokenColumns
 
-	`
 	createPasswordResetTokenSQL = `
 		INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
 		VALUES ($1, $2, $3)
-		RETURNING id, user_id, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id
-	`
+		RETURNING` + tokenColumns
 
 	// Get Token by Hash
 	getAccountRecoveryTokenByHashSQL = `
-		SELECT id, user_id, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id FROM account_recovery_tokens WHERE token_hash = $1 FOR UPDATE NOWAIT
-	`
+		SELECT` + tokenColumns + `FROM account_recovery_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() AND invalidated_at IS NULL FOR UPDATE NOWAIT`
 	getEmailChangeTokenByHashSQL = `
-		SELECT id, user_id, new_email, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id FROM email_change_tokens WHERE token_hash = $1 FOR UPDATE NOWAIT
-	`
+		SELECT id, user_id, new_email, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id FROM email_change_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() AND invalidated_at IS NULL FOR UPDATE NOWAIT`
 	getEmailVerificationTokenByHashSQL = `
-		SELECT id, user_id, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id FROM email_verification_tokens WHERE token_hash = $1 FOR UPDATE NOWAIT
-	`
+		SELECT` + tokenColumns + `FROM email_verification_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() AND invalidated_at IS NULL FOR UPDATE NOWAIT`
 	getPasswordResetTokenByHashSQL = `
-		SELECT id, user_id, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id FROM password_reset_tokens WHERE token_hash = $1 FOR UPDATE NOWAIT
-	`
+		SELECT` + tokenColumns + `FROM password_reset_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() AND invalidated_at IS NULL FOR UPDATE NOWAIT`
 
 	// Mark Token as Used
 	markAccountRecoveryTokenUsedSQL = `
 		UPDATE account_recovery_tokens
 		SET used_at = now()
 		WHERE token_hash = $1 AND used_at IS NULL
-		FOR UPDATE NOWAIT
 	`
 	markEmailChangeTokenUsedSQL = `
 		UPDATE email_change_tokens
 		SET used_at = now()
 		WHERE token_hash = $1 AND used_at IS NULL
-		FOR UPDATE NOWAIT
 	`
 	markEmailVerificationTokenUsedSQL = `
 		UPDATE email_verification_tokens
 		SET used_at = now()
 		WHERE token_hash = $1 AND used_at IS NULL
-		FOR UPDATE NOWAIT
 	`
 	markPasswordResetTokenUsedSQL = `
 		UPDATE password_reset_tokens
 		SET used_at = now()
 		WHERE token_hash = $1 AND used_at IS NULL
-		FOR UPDATE NOWAIT
 	`
 
 	deleteExpiredEmailVerificationTokensSQL = `DELETE FROM email_verification_tokens WHERE expires_at <= now()`
@@ -203,6 +131,44 @@ const (
 		VALUES ($1, $2, $3)
 		RETURNING id
 	`
+
+	createUserProfileSQL = `
+		INSERT INTO user_profiles (
+			user_id,
+			first_name,
+			last_name,
+  			phone_number,
+    		country,
+    		city,
+    		date_of_birth,
+    		gender,
+    		ui_language,
+    		avatar_url,
+    		timezone,
+    		bio
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	`
+
+	getUserProfileByUserIdSQL = `
+		SELECT
+			user_id,
+			first_name,
+			last_name,
+			phone_number,
+			country,
+			city,
+			date_of_birth,
+			gender,
+			ui_language,
+			avatar_url,
+			timezone,
+			bio,
+			created_at,
+			updated_at
+		FROM user_profiles WHERE user_id = $1
+	`
+
 	deleteUserSQL = `
 		UPDATE users
 		SET status = 'deleted',
@@ -210,45 +176,19 @@ const (
 		updated_at = now()
 		WHERE id = $1
 	`
+
+	userColumns = `
+	id, email, password_hash, role, status, email_verified_at, last_login_at, deleted_at, created_at, updated_at,
+	password_changed_at, email_changed_at, failed_login_count, last_failed_login_at, login_locked_until `
+
 	getUserByEmailSQL = `
-		SELECT
-			id,
-			email,
-			password_hash,
-			role,
-			status,
-			email_verified_at,
-			last_login_at,
-			deleted_at,
-			created_at,
-			updated_at,
-			password_changed_at,
-			email_changed_at,
-			failed_login_count,
-			last_failed_login_at,
-			login_locked_until
-		FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL
-	`
+		SELECT` + userColumns + `FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL`
 
 	getUserByIDSQL = `
-		SELECT
-			id,
-			email,
-			password_hash,
-			role,
-			status,
-			email_verified_at,
-			last_login_at,
-			deleted_at,
-			created_at,
-			updated_at,
-			password_changed_at,
-			email_changed_at,
-			failed_login_count,
-			last_failed_login_at,
-			login_locked_until
-		FROM users WHERE id = $1 AND deleted_at IS NULL
-	`
+		SELECT ` + userColumns + ` FROM users WHERE id = $1 AND deleted_at IS NULL`
+
+	getDeletedUserByIDSQL = `
+		SELECT` + userColumns + `FROM users WHERE id = $1 AND deleted_at IS NOT NULL`
 
 	updateLastLoginSQL = `
 		UPDATE users
@@ -280,6 +220,14 @@ const (
 		SET status  = $1,
 		updated_at = now()
 		WHERE id = $2
+	`
+
+	restoreUserSQL = `
+		UPDATE users
+		SET status = 'active',
+		deleted_at = NULL,
+		updated_at = now()
+		WHERE id = $1
 	`
 
 	updateEmailVerifiedAtSQL = `

@@ -24,6 +24,64 @@ func (rep *Repository) CreateUser(ctx context.Context, user *authdomain.User) (s
 	return user.ID, nil
 }
 
+// CreateUserProfile inserts a profile row linked to the given user ID.
+func (rep *Repository) CreateUserProfile(ctx context.Context, profile *authdomain.UserProfile) error {
+	_, err := rep.queryRunner(ctx).Exec(ctx, createUserProfileSQL,
+		profile.UserID,
+		profile.FirstName,
+		profile.LastName,
+		profile.PhoneNumber,
+		profile.Country,
+		profile.City,
+		profile.DateOfBirth,
+		profile.Gender,
+		profile.UiLanguage,
+		profile.AvatarUrl,
+		profile.Timezone,
+		profile.Bio,
+	)
+	if err != nil {
+		return fmt.Errorf("repository.CreateUserProfile: %w", err)
+	}
+	return nil
+}
+
+// GetDeletedUserByID returns a soft-deleted user record by its ID.
+func (rep *Repository) GetDeletedUserByID(ctx context.Context, userID string) (*authdomain.User, error) {
+	user, err := scanUser(rep.queryRunner(ctx).QueryRow(ctx, getDeletedUserByIDSQL, userID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, authdomain.ErrUserNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetDeletedUserByID: %w", err)
+	}
+	return user, nil
+}
+
+// GetUserProfileByUserID returns the profile row for the given user ID.
+func (rep *Repository) GetUserProfileByUserID(ctx context.Context, userID string) (*authdomain.UserProfile, error) {
+	profile, err := scanUserProfile(rep.queryRunner(ctx).QueryRow(ctx, getUserProfileByUserIdSQL, userID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, authdomain.ErrUserNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetUserProfileByUserID: %w", err)
+	}
+	return profile, nil
+}
+
+// RestoreUser clears the deleted_at timestamp for the given user ID.
+func (rep *Repository) RestoreUser(ctx context.Context, userID string) error {
+	tag, err := rep.queryRunner(ctx).Exec(ctx, restoreUserSQL, userID)
+	if err != nil {
+		return fmt.Errorf("repository.RestoreUser: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return authdomain.ErrUserNotFound
+	}
+	return nil
+}
+
 // GetUserByID returns a user by primary key.
 func (rep *Repository) GetUserByID(ctx context.Context, userID string) (*authdomain.User, error) {
 	user, err := scanUser(rep.queryRunner(ctx).QueryRow(ctx, getUserByIDSQL, userID))

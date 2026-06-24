@@ -11,7 +11,7 @@
 --         notifications, announcements, activity_log, event_outbox, failed_jobs,
 --         admin_actions, support_chats, support_messages,
 --         account_recovery_tokens, articles, gift_coupons, user_sessions
--- Synced through: migration 000004
+-- Synced through: migration 000005
 
 -- Index naming convention: idx_{table}_{col1}_{col2}[_{qualifier}]
 --   qualifier = domain condition key: active, available, booked, pending, open, unread, unresolved, unused
@@ -701,7 +701,7 @@ CREATE TABLE failed_jobs (
     payload_json    jsonb,
     attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT failed_jobs_attempt_count_check CHECK (attempt_count >= 0),
     error_message   text,
-    failed_at       timestamptz NOT NULL,
+    failed_at       timestamptz NOT NULL DEFAULT now(),
     resolved_at     timestamptz,
     resolution_note text,
     created_at      timestamptz NOT NULL DEFAULT now(),

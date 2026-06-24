@@ -5,11 +5,17 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"time"
+
+	authdomain "learnflow_backend/internal/auth/domain"
 )
 
 type (
-	requestIDKey struct{}
-	ipAddressKey struct{}
+	requestIDKey            struct{}
+	ipAddressKey            struct{}
+	userKey                 struct{}
+	jtiKey                  struct{}
+	accessTokenExpiresAtKey struct{}
 )
 
 // NewRequestID generates a random RFC 4122 v4 UUID.
@@ -54,4 +60,41 @@ func IPAddressFromContext(ctx context.Context) string {
 		return id
 	}
 	return ""
+}
+
+// WithUser stores the authenticated user in ctx.
+func WithUser(ctx context.Context, user *authdomain.User) context.Context {
+	return context.WithValue(ctx, userKey{}, user)
+}
+
+// UserFromContext retrieves the authenticated user from ctx.
+func UserFromContext(ctx context.Context) (*authdomain.User, bool) {
+	user, ok := ctx.Value(userKey{}).(*authdomain.User)
+	return user, ok && user != nil
+}
+
+// WithJTI stores the JWT ID in ctx.
+func WithJTI(ctx context.Context, jti string) context.Context {
+	return context.WithValue(ctx, jtiKey{}, jti)
+}
+
+// JTIFromContext retrieves the JWT ID from ctx.
+func JTIFromContext(ctx context.Context) string {
+	if jti, ok := ctx.Value(jtiKey{}).(string); ok {
+		return jti
+	}
+	return ""
+}
+
+// WithAccessTokenExpiresAt stores the access token expiry time in ctx.
+func WithAccessTokenExpiresAt(ctx context.Context, t time.Time) context.Context {
+	return context.WithValue(ctx, accessTokenExpiresAtKey{}, t)
+}
+
+// AccessTokenExpiresAtFromContext retrieves the access token expiry time from ctx.
+func AccessTokenExpiresAtFromContext(ctx context.Context) time.Time {
+	if t, ok := ctx.Value(accessTokenExpiresAtKey{}).(time.Time); ok {
+		return t
+	}
+	return time.Time{}
 }

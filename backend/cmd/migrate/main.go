@@ -13,7 +13,10 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+
+	"learnflow_backend/migrations"
+
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
 func main() {
@@ -35,7 +38,11 @@ func main() {
 	}
 
 	dsn := strings.Replace(cfg.DSN, "postgres://", "pgx5://", 1)
-	m, err := migrate.New("file://migrations", dsn)
+	d, err := iofs.New(migrations.FS, ".")
+	if err != nil {
+		jsonLogger.Fatal(fmt.Errorf("migrate source init: %w", err), nil)
+	}
+	m, err := migrate.NewWithSourceInstance("iofs", d, dsn)
 	if err != nil {
 		jsonLogger.Fatal(fmt.Errorf("migrate init failed: %w", err), nil)
 	}

@@ -34,10 +34,28 @@ const (
 const (
 	RevokeReasonLogout             RevokeReason = "logout"
 	RevokeReasonPasswordChanged    RevokeReason = "password_changed"
+	RevokeReasonPasswordReset      RevokeReason = "password_reset"
+	RevokeReasonEmailChanged       RevokeReason = "email_changed"
 	RevokeReasonAdmin              RevokeReason = "admin"
 	RevokeReasonSuspiciousActivity RevokeReason = "suspicious_activity"
 	RevokeReasonTokenExpired       RevokeReason = "token_expired"
 )
+
+// Valid reports whether r is a valid RevokeReason.
+func (r RevokeReason) Valid() bool {
+	switch r {
+	case
+		RevokeReasonLogout,
+		RevokeReasonPasswordChanged,
+		RevokeReasonPasswordReset,
+		RevokeReasonEmailChanged,
+		RevokeReasonAdmin,
+		RevokeReasonSuspiciousActivity,
+		RevokeReasonTokenExpired:
+		return true
+	}
+	return false
+}
 
 // User represents an authenticated account.
 type User struct {
@@ -117,12 +135,42 @@ type AuthTokens struct {
 	AccessToken  string
 	RefreshToken string
 	ExpiresAt    time.Time
+	UserID       string
 }
 
-// RegisterRequest carries credentials for new account creation.
+// UserProfile holds public profile data for a user.
+type UserProfile struct {
+	UserID      string
+	FirstName   string
+	LastName    string
+	PhoneNumber string
+	Country     string
+	City        string
+	DateOfBirth *string
+	Gender      string
+	UiLanguage  string
+	AvatarUrl   string
+	Timezone    string
+	Bio         string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// RegisterRequest carries credentials and profile data for new account creation.
 type RegisterRequest struct {
-	Email    string
-	Password string
+	Email       string
+	Password    string
+	FirstName   string
+	LastName    string
+	PhoneNumber string
+	Country     string
+	City        string
+	Gender      string
+	DateOfBirth *string
+	UiLanguage  string
+	AvatarUrl   string
+	Timezone    string
+	Bio         string
 }
 
 // Validate checks that email and password meet format requirements.
@@ -167,9 +215,27 @@ type RefreshRequest struct {
 	IPAddress    string
 }
 
+// Validate checks that the refresh request fields are valid.
+func (r *RefreshRequest) Validate() error {
+	if r.RefreshToken == "" {
+		return ErrInvalidCredentialFormat
+	}
+	return nil
+}
+
 // LogoutRequest carries the refresh token to be revoked on logout.
 type LogoutRequest struct {
-	RefreshToken string
+	RefreshToken         string
+	JTI                  string
+	AccessTokenExpiresAt time.Time
+}
+
+// Validate checks that the logout request fields are valid.
+func (r *LogoutRequest) Validate() error {
+	if r.RefreshToken == "" {
+		return ErrInvalidCredentialFormat
+	}
+	return nil
 }
 
 // VerifyEmailRequest carries the token submitted to confirm an email address.
@@ -191,17 +257,50 @@ type RequestPasswordResetRequest struct {
 	Email string
 }
 
+// Validate checks that the request password reset fields are valid.
+func (r *RequestPasswordResetRequest) Validate() error {
+	if len(r.Email) < 3 || !validator.MatchesEmail(r.Email) {
+		return ErrInvalidCredentialFormat
+	}
+	return nil
+}
+
 // ResetPasswordRequest carries the reset token and the new password.
 type ResetPasswordRequest struct {
 	Token       string
 	NewPassword string
 }
 
+// Validate checks that the reset password fields are valid.
+func (r *ResetPasswordRequest) Validate() error {
+	if r.Token == "" {
+		return ErrInvalidCredentialFormat
+	}
+	if len(r.NewPassword) < 8 || len(r.NewPassword) > 72 {
+		return ErrInvalidCredentialFormat
+	}
+	return nil
+}
+
 // ChangePasswordRequest carries the user ID, current password, and desired new password.
 type ChangePasswordRequest struct {
-	UserID      string
-	OldPassword string
-	NewPassword string
+	UserID               string
+	OldPassword          string
+	NewPassword          string
+	IsAllSessionsLogout  bool
+	JTI                  string
+	AccessTokenExpiresAt time.Time
+}
+
+// Validate checks that the change password fields are valid.
+func (r *ChangePasswordRequest) Validate() error {
+	if r.OldPassword == "" {
+		return ErrInvalidCredentialFormat
+	}
+	if len(r.NewPassword) < 8 || len(r.NewPassword) > 72 {
+		return ErrInvalidCredentialFormat
+	}
+	return nil
 }
 
 // RequestEmailChangeRequest carries the user ID and the desired new email address.
@@ -210,12 +309,53 @@ type RequestEmailChangeRequest struct {
 	NewEmail string
 }
 
+// Validate checks that the request email change fields are valid.
+func (r *RequestEmailChangeRequest) Validate() error {
+	if len(r.NewEmail) < 3 || !validator.MatchesEmail(r.NewEmail) {
+		return ErrInvalidCredentialFormat
+	}
+	return nil
+}
+
 // EmailChangeRequest carries the token submitted to confirm an email address change.
 type EmailChangeRequest struct {
+	Token                string
+	UserID               string
+	IsAllSessionsLogout  bool
+	JTI                  string
+	AccessTokenExpiresAt time.Time
+}
+
+// Validate checks that the email change fields are valid.
+func (r *EmailChangeRequest) Validate() error {
+	if r.Token == "" {
+		return ErrInvalidCredentialFormat
+	}
+	return nil
+}
+
+// RecoverAccountRequest carries the recovery token submitted to restore a deleted account.
+type RecoverAccountRequest struct {
 	Token string
 }
 
-// RecoverAccountRequest carries the email for which account recovery should be initiated.
-type RecoverAccountRequest struct {
+// Validate checks that the recover account fields are valid.
+func (r *RecoverAccountRequest) Validate() error {
+	if r.Token == "" {
+		return ErrInvalidCredentialFormat
+	}
+	return nil
+}
+
+// RequestRecoverAccountRequest carries the email for which account recovery should be initiated.
+type RequestRecoverAccountRequest struct {
 	Email string
+}
+
+// Validate checks that the recover account request fields are valid.
+func (r *RequestRecoverAccountRequest) Validate() error {
+	if len(r.Email) < 3 || !validator.MatchesEmail(r.Email) {
+		return ErrInvalidCredentialFormat
+	}
+	return nil
 }

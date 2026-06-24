@@ -1,5 +1,6 @@
 -- LearnFlow database initialization — annotated version
 -- PostgreSQL 17+; run once on empty volume via /docker-entrypoint-initdb.d/
+-- Synced through: migration 000005
 --
 -- GLOBAL DESIGN DECISIONS
 -- ───────────────────────
@@ -1327,7 +1328,7 @@ CREATE TABLE failed_jobs (
     payload_json    jsonb,
     attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT failed_jobs_attempt_count_check CHECK (attempt_count >= 0),
     error_message   text,
-    failed_at       timestamptz NOT NULL,
+    failed_at       timestamptz NOT NULL DEFAULT now(),
 
     -- [resolved_at + resolution_note]: Admin resolves a DLQ entry by either:
     --   1. Replaying it (re-inserting into event_outbox)

@@ -9,61 +9,35 @@ import (
 )
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
-	var req authdomain.LoginRequest
-	if err := helpers.ReadJSON(w, r, &req); err != nil {
-		if respErr := helpers.BadRequestResponse(w, err); respErr != nil {
-			h.jsonLogger.Error(err, nil)
-		}
-		return
-	}
 	ctx := r.Context()
 	ua := r.UserAgent()
-	req.IPAddress = appcontext.IPAddressFromContext(r.Context())
-	req.UserAgent = ua
 
-	err := req.Validate()
-	if err != nil {
-		if respErr := helpers.BadRequestResponse(w, err); respErr != nil {
-			h.jsonLogger.Error(err, nil)
-		}
+	var req authdomain.LoginRequest
+	if !h.decodeAndValidate(w, r, &req, func() {
+		req.IPAddress = appcontext.IPAddressFromContext(r.Context())
+		req.UserAgent = ua
+	}) {
 		return
 	}
 
 	tokens, err := h.svc.Login(ctx, req)
 	if err != nil {
-		h.handleErrorLoginResponse(w, err)
+		switch {
+		case errors.Is(err, authdomain.ErrInvalidCredentials):
+			h.logAuthFailure(r, loginEvent, "invalid_credentials", map[string]any{})
+		case errors.Is(err, authdomain.ErrAccountLocked):
+			h.logAuthFailure(r, loginEvent, "account_locked", map[string]any{})
+		case errors.Is(err, authdomain.ErrAccountBlocked):
+			h.logAuthFailure(r, loginEvent, "account_blocked", map[string]any{})
+		}
+		h.handleErrorResponse(w, err)
 		return
 	}
 
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"tokens": tokens}, nil)
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"auth": tokens}, nil)
 	if err != nil {
-		h.jsonLogger.Error(err, nil)
+		h.jsonLogger.Error(err, map[string]any{"event": loginEvent, "path": r.URL.Path})
 	}
-}
 
-func (h *Handler) handleErrorLoginResponse(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, authdomain.ErrInvalidCredentials):
-		if respErr := helpers.InvalidCredentialsResponse(w); respErr != nil {
-			h.jsonLogger.Error(err, nil)
-		}
-	case errors.Is(err, authdomain.ErrAccountLocked):
-		w.Header().Set("Retry-After", "900")
-		if respErr := helpers.ErrorResponse(w, http.StatusTooManyRequests, "account temporarily locked"); respErr != nil {
-			h.jsonLogger.Error(err, nil)
-		}
-	case errors.Is(err, authdomain.ErrAccountBlocked):
-		if respErr := helpers.ForbiddenResponse(w, helpers.Envelope{"error": "account is blocked", "code": "account_blocked"}); respErr != nil {
-			h.jsonLogger.Error(err, nil)
-		}
-	case errors.Is(err, authdomain.ErrEmailNotVerified):
-		if respErr := helpers.ForbiddenResponse(w, helpers.Envelope{"error": "email not verified", "code": "email_not_verified"}); respErr != nil {
-			h.jsonLogger.Error(err, nil)
-		}
-	default:
-		h.jsonLogger.Error(err, nil)
-		if respErr := helpers.ServerErrorResponse(w, err); respErr != nil {
-			h.jsonLogger.Error(err, nil)
-		}
-	}
+	h.logAuthEvent(r, loginEvent, map[string]any{"user_id": tokens.UserID})
 }
