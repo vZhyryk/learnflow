@@ -10,6 +10,7 @@ import (
 	"time"
 )
 
+// FailedJob represents a dead-letter queue entry that failed all retry attempts.
 type FailedJob struct {
 	ID           string
 	EventType    events.EventType
@@ -18,6 +19,7 @@ type FailedJob struct {
 	AttemptCount int
 }
 
+// DLQRetryWorker polls the failed_jobs table and re-publishes eligible events.
 type DLQRetryWorker struct {
 	db         db.QueryRunner
 	publisher  events.Publisher
@@ -70,6 +72,7 @@ const (
 	`
 )
 
+// Run starts the DLQ retry loop, polling every 5 minutes until ctx is cancelled.
 func (p *DLQRetryWorker) Run(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()

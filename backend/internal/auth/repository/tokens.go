@@ -69,7 +69,7 @@ func (rep *Repository) MarkEmailVerificationTokenUsed(ctx context.Context, token
 func (rep *Repository) CreatePasswordResetToken(ctx context.Context, token *authdomain.PasswordResetToken) (*authdomain.PasswordResetToken, error) {
 	base, err := scanToken(rep.queryRunner(ctx).QueryRow(ctx, createPasswordResetTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt))
 	if err != nil {
-		return token, fmt.Errorf("repository.CreatePasswordResetToken: %w", err)
+		return nil, fmt.Errorf("repository.CreatePasswordResetToken: %w", err)
 	}
 
 	return &authdomain.PasswordResetToken{TokenBase: *base}, nil

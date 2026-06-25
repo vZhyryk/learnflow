@@ -16,14 +16,14 @@ func (h *Handler) initiateEmailChange(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user, ok := appcontext.UserFromContext(ctx)
 	if !ok {
-		h.handleErrorResponse(w, authdomain.ErrUserNotFound)
+		h.handleErrorResponse(w, r, authdomain.ErrUserNotFound)
 		return
 	}
 	req.UserID = user.ID
 
 	err := h.svc.InitiateEmailChange(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, err)
+		h.handleErrorResponse(w, r, err)
 		return
 	}
 
@@ -31,6 +31,7 @@ func (h *Handler) initiateEmailChange(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
+	h.logAuthEvent(r, initiateEmailChangeEvent, map[string]any{"user_id": user.ID})
 }
 
 func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +43,7 @@ func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user, ok := appcontext.UserFromContext(ctx)
 	if !ok {
-		h.handleErrorResponse(w, authdomain.ErrInvalidCredentials)
+		h.handleErrorResponse(w, r, authdomain.ErrInvalidCredentials)
 		return
 	}
 
@@ -52,7 +53,7 @@ func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
 
 	err := h.svc.ChangeEmail(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, err)
+		h.handleErrorResponse(w, r, err)
 		return
 	}
 
@@ -60,4 +61,5 @@ func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
+	h.logAuthEvent(r, changeEmailEvent, map[string]any{"user_id": user.ID})
 }

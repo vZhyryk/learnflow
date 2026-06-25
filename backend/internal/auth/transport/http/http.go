@@ -9,11 +9,18 @@ import (
 )
 
 const (
-	loginEvent       = "auth.login"
-	logoutEvent      = "auth.logout"
-	refreshEvent     = "auth.refresh"
-	registerEvent    = "auth.register"
-	verifyEmailEvent = "auth.verify_email"
+	loginEvent               = "auth.login"
+	logoutEvent              = "auth.logout"
+	refreshEvent             = "auth.refresh"
+	registerEvent            = "auth.register"
+	verifyEmailEvent         = "auth.verify_email"
+	changePasswordEvent      = "auth.change_password"
+	initiateEmailChangeEvent = "auth.initiate_email_change"
+	changeEmailEvent         = "auth.change_email"
+	initiatePassResetEvent   = "auth.initiate_pass_reset"
+	resetPasswordEvent       = "auth.reset_password"
+	initRecoverAccountEvent  = "auth.init_recover_account"
+	recoverAccountEvent      = "auth.recover_account"
 )
 
 // Handler handles HTTP requests for auth endpoints.

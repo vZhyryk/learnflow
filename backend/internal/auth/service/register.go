@@ -20,8 +20,8 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 	}
 
 	if user != nil {
-		userEmailUserProfile, err := s.userRepo.GetUserProfileByUserID(ctx, user.ID)
-		if err != nil {
+		userEmailUserProfile, getErr := s.userRepo.GetUserProfileByUserID(ctx, user.ID)
+		if getErr != nil {
 			return "", fmt.Errorf("register: get user profile: %w", err)
 		}
 
@@ -51,8 +51,8 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 	var userID string
 
 	err = s.transactor.InTransaction(ctx, func(ctx context.Context) error {
-		id, err := s.userRepo.CreateUser(ctx, user)
-		if err != nil {
+		id, createErr := s.userRepo.CreateUser(ctx, user)
+		if createErr != nil {
 			return fmt.Errorf("register: create user: %w", err)
 		}
 
@@ -65,8 +65,8 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 			City:        req.City,
 			Gender:      req.Gender,
 			DateOfBirth: req.DateOfBirth,
-			UiLanguage:  req.UiLanguage,
-			AvatarUrl:   req.AvatarUrl,
+			UILanguage:  req.UILanguage,
+			AvatarURL:   req.AvatarURL,
 			Timezone:    req.Timezone,
 			Bio:         req.Bio,
 		}
@@ -76,12 +76,12 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 			return fmt.Errorf("register: create user profile: %w", err)
 		}
 
-		rawToken, hashToken, err := tokens.GenerateSecureToken()
-		if err != nil {
+		rawToken, hashToken, tokenErr := tokens.GenerateSecureToken()
+		if tokenErr != nil {
 			return fmt.Errorf("register: generate token: %w", err)
 		}
 
-		expiresAt := time.Now().Add(emailVerificationTokenTTL)
+		expiresAt := time.Now().UTC().Add(emailVerificationTokenTTL)
 
 		token := &authdomain.EmailVerificationToken{
 			TokenBase: authdomain.TokenBase{

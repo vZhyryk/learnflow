@@ -16,7 +16,7 @@ func (h *Handler) verifyEmail(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := h.svc.VerifyEmail(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, err)
+		h.handleErrorResponse(w, r, err)
 		return
 	}
 
@@ -26,5 +26,4 @@ func (h *Handler) verifyEmail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logAuthEvent(r, verifyEmailEvent, map[string]any{"user_id": userID})
-
 }

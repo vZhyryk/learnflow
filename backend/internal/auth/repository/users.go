@@ -35,8 +35,8 @@ func (rep *Repository) CreateUserProfile(ctx context.Context, profile *authdomai
 		profile.City,
 		profile.DateOfBirth,
 		profile.Gender,
-		profile.UiLanguage,
-		profile.AvatarUrl,
+		profile.UILanguage,
+		profile.AvatarURL,
 		profile.Timezone,
 		profile.Bio,
 	)
@@ -60,7 +60,7 @@ func (rep *Repository) GetDeletedUserByID(ctx context.Context, userID string) (*
 
 // GetUserProfileByUserID returns the profile row for the given user ID.
 func (rep *Repository) GetUserProfileByUserID(ctx context.Context, userID string) (*authdomain.UserProfile, error) {
-	profile, err := scanUserProfile(rep.queryRunner(ctx).QueryRow(ctx, getUserProfileByUserIdSQL, userID))
+	profile, err := scanUserProfile(rep.queryRunner(ctx).QueryRow(ctx, getUserProfileByUserIDSQL, userID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrUserNotFound
 	}
@@ -103,6 +103,19 @@ func (rep *Repository) GetUserByEmail(ctx context.Context, email string) (*authd
 	}
 	if err != nil {
 		return nil, fmt.Errorf("repository.GetUserByEmail: %w", err)
+	}
+
+	return user, nil
+}
+
+// GetDeletedUserByEmail retrieves a soft-deleted user by email address.
+func (rep *Repository) GetDeletedUserByEmail(ctx context.Context, email string) (*authdomain.User, error) {
+	user, err := scanUser(rep.queryRunner(ctx).QueryRow(ctx, getDeletedUserByEmailSQL, email))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, authdomain.ErrUserNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetDeletedUserByEmail: %w", err)
 	}
 
 	return user, nil

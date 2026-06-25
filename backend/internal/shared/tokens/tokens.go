@@ -18,6 +18,7 @@ const (
 	jtibyteLength   = 32
 )
 
+// GenerateSecureToken generates a cryptographically random token and returns both the raw value and its SHA-256 hex hash.
 func GenerateSecureToken() (raw, hash string, err error) {
 	b := make([]byte, tokenByteLength)
 	if _, err = rand.Read(b); err != nil {
@@ -37,13 +38,17 @@ func generateJTI() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// Tokens holds JWT signing configuration and exposes token generation and validation.
 type Tokens struct {
 	secret     string
 	prevSecret string
+	issuer     string
+	audience   string
 }
 
-func NewTokens(secret, prevSecret string) *Tokens {
-	return &Tokens{secret: secret, prevSecret: prevSecret}
+// NewTokens returns a Tokens instance configured with the provided JWT secret, optional previous secret for rotation, issuer, and audience.
+func NewTokens(secret, prevSecret, issuer, audience string) *Tokens {
+	return &Tokens{secret: secret, prevSecret: prevSecret, issuer: issuer, audience: audience}
 }
 
 type jwtClaims struct {
@@ -51,6 +56,7 @@ type jwtClaims struct {
 	jwt.RegisteredClaims
 }
 
+// GenerateAccessToken creates a signed HS256 JWT for the given user with the specified TTL.
 func (t *Tokens) GenerateAccessToken(user *authdomain.User, accessTokenTTL time.Duration) (string, error) {
 	rClaimsID, err := generateJTI()
 	if err != nil {
@@ -61,11 +67,11 @@ func (t *Tokens) GenerateAccessToken(user *authdomain.User, accessTokenTTL time.
 		Role: string(user.Role),
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.ID,
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(accessTokenTTL)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			Audience:  jwt.ClaimStrings{"learnflow-api"},
+			ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(accessTokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
+			Audience:  jwt.ClaimStrings{t.audience},
 			ID:        rClaimsID,
-			Issuer:    "learnflow-api",
+			Issuer:    t.issuer,
 		},
 	}
 
@@ -78,6 +84,7 @@ func (t *Tokens) GenerateAccessToken(user *authdomain.User, accessTokenTTL time.
 	return signed, nil
 }
 
+// ValidateToken parses and validates a JWT, falling back to prevSecret on signature mismatch to support key rotation.
 func (t *Tokens) ValidateToken(tokenString string) (*jwtClaims, error) {
 	claims, err := t.validateWithSecret(tokenString, t.secret)
 	if err == nil {
@@ -99,9 +106,9 @@ func (t *Tokens) validateWithSecret(tokenString, secret string) (*jwtClaims, err
 		return []byte(secret), nil
 	}
 
-	token, err := jwt.ParseWithClaims(tokenString, &jwtClaims{}, keyFunc, jwt.WithAudience("learnflow-api"), jwt.WithIssuer("learnflow-api"), jwt.WithExpirationRequired())
+	token, err := jwt.ParseWithClaims(tokenString, &jwtClaims{}, keyFunc, jwt.WithAudience(t.audience), jwt.WithIssuer(t.issuer), jwt.WithExpirationRequired())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("validateWithSecret: parse error: %w", err)
 	}
 
 	claims, ok := token.Claims.(*jwtClaims)

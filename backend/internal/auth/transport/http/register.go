@@ -15,7 +15,7 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	userID, err := h.svc.Register(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, err)
+		h.handleErrorResponse(w, r, err)
 		return
 	}
 
@@ -25,5 +25,4 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.logAuthEvent(r, registerEvent, map[string]any{"user_id": userID})
-
 }

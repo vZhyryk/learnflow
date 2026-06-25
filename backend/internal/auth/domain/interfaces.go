@@ -30,7 +30,7 @@ type SessionRepository interface {
 	CreateUserSession(ctx context.Context, session *UserSession) (*UserSession, error)
 	GetUserSessionByRefreshToken(ctx context.Context, refreshToken string) (*UserSession, error)
 	RevokeUserSession(ctx context.Context, sessionID, revokedByUserID string, revokeReason RevokeReason) error
-	RevokeAllUserSessions(ctx context.Context, userID, revokedByUserID any, revokeReason RevokeReason) error
+	RevokeAllUserSessions(ctx context.Context, userID string, revokedByUserID *string, revokeReason RevokeReason) error
 	GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*UserSession, error)
 	UpdateSessionToken(ctx context.Context, sessionID, tokenHash, userAgent, ipAddress string) error
 	UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error
@@ -72,4 +72,5 @@ type UserRepository interface {
 	GetUserProfileByUserID(ctx context.Context, userID string) (*UserProfile, error)
 	GetDeletedUserByID(ctx context.Context, userID string) (*User, error)
 	RestoreUser(ctx context.Context, userID string) error
+	GetDeletedUserByEmail(ctx context.Context, email string) (*User, error)
 }

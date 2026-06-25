@@ -1,7 +1,6 @@
 package authdomain
 
 import (
-	"fmt"
 	"learnflow_backend/internal/infrastructure/validator"
 	"time"
 )
@@ -148,8 +147,8 @@ type UserProfile struct {
 	City        string
 	DateOfBirth *string
 	Gender      string
-	UiLanguage  string
-	AvatarUrl   string
+	UILanguage  string
+	AvatarURL   string
 	Timezone    string
 	Bio         string
 	CreatedAt   time.Time
@@ -167,8 +166,8 @@ type RegisterRequest struct {
 	City        string
 	Gender      string
 	DateOfBirth *string
-	UiLanguage  string
-	AvatarUrl   string
+	UILanguage  string
+	AvatarURL   string
 	Timezone    string
 	Bio         string
 }
@@ -202,7 +201,7 @@ func (r *LoginRequest) Validate() error {
 		return ErrInvalidCredentialFormat
 	}
 	if r.UserAgent == "" || len(r.UserAgent) > 2000 {
-		return fmt.Errorf("invalid user-agent")
+		return ErrInvalidCredentialFormat
 	}
 
 	return nil
@@ -299,6 +298,10 @@ func (r *ChangePasswordRequest) Validate() error {
 	}
 	if len(r.NewPassword) < 8 || len(r.NewPassword) > 72 {
 		return ErrInvalidCredentialFormat
+	}
+
+	if r.NewPassword == r.OldPassword {
+		return ErrWrongPassword
 	}
 	return nil
 }

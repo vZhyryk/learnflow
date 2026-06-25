@@ -19,7 +19,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := h.svc.Logout(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, err)
+		h.handleErrorResponse(w, r, err)
 		return
 	}
 

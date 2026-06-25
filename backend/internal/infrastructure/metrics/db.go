@@ -5,6 +5,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// RegisterDBMetrics registers Prometheus gauges and counters for pgxpool connection stats.
 func RegisterDBMetrics(pool *pgxpool.Pool) {
 	prometheus.MustRegister(
 		prometheus.NewGaugeFunc(prometheus.GaugeOpts{

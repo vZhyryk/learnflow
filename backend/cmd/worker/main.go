@@ -6,7 +6,9 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"syscall"
+	"time"
 
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
@@ -92,12 +94,20 @@ func main() {
 		app.Wg.Add(1)
 		go func(w worker.Worker) {
 			defer app.Wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					app.Logger.Error(fmt.Errorf("worker panic: %v", r), nil)
+			for {
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							app.Logger.Error(fmt.Errorf("worker panic: %v\n%s", r, debug.Stack()), nil)
+						}
+					}()
+					w.Run(ctx)
+				}()
+				if ctx.Err() != nil {
+					return
 				}
-			}()
-			w.Run(ctx)
+				time.Sleep(time.Second)
+			}
 		}(w)
 	}
 

@@ -150,7 +150,7 @@ const (
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 
-	getUserProfileByUserIdSQL = `
+	getUserProfileByUserIDSQL = `
 		SELECT
 			user_id,
 			first_name,
@@ -183,6 +183,9 @@ const (
 
 	getUserByEmailSQL = `
 		SELECT` + userColumns + `FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NULL`
+
+	getDeletedUserByEmailSQL = `
+		SELECT` + userColumns + `FROM users WHERE LOWER(email) = LOWER($1) AND deleted_at IS NOT NULL`
 
 	getUserByIDSQL = `
 		SELECT ` + userColumns + ` FROM users WHERE id = $1 AND deleted_at IS NULL`

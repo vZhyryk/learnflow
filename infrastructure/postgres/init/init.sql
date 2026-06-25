@@ -679,7 +679,7 @@ CREATE TABLE event_outbox (
     aggregate_id    uuid        NOT NULL,
     event_type      text        NOT NULL,
     payload_json    jsonb       NOT NULL,
-    status          text        NOT NULL CONSTRAINT event_outbox_status_check        CHECK (status IN ('pending', 'published', 'failed')),
+    status          text        NOT NULL DEFAULT 'pending' CONSTRAINT event_outbox_status_check CHECK (status IN ('pending', 'processing', 'published', 'failed', 'dead_letter')),
     attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT event_outbox_attempt_count_check CHECK (attempt_count >= 0),
     available_at    timestamptz NOT NULL DEFAULT now(),
     locked_until    timestamptz,
@@ -699,7 +699,7 @@ CREATE TABLE failed_jobs (
     event_type      text        NOT NULL,
     queue_name      text        NOT NULL,
     payload_json    jsonb,
-    attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT failed_jobs_attempt_count_check CHECK (attempt_count >= 0),
+    attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT failed_jobs_attempt_count_check CHECK (attempt_count >= 0 AND attempt_count <= 10),
     error_message   text,
     failed_at       timestamptz NOT NULL DEFAULT now(),
     resolved_at     timestamptz,
@@ -927,7 +927,7 @@ CREATE TABLE user_sessions (
     CONSTRAINT user_sessions_expires_after_created      CHECK (expires_at > created_at),
     CONSTRAINT user_sessions_revoked_after_created      CHECK (revoked_at IS NULL OR revoked_at >= created_at),
     CONSTRAINT user_sessions_revoke_reason_check
-        CHECK (revoke_reason IN ('logout', 'password_changed', 'admin', 'suspicious_activity', 'token_expired')),
+        CHECK (revoke_reason IN ('logout', 'password_changed', 'admin', 'suspicious_activity', 'token_expired', 'password_reset', 'email_change')),
     CONSTRAINT user_sessions_token_version_positive CHECK (token_version > 0),
     CONSTRAINT user_sessions_failed_attempts_non_negative CHECK (failed_attempt_count >= 0)
 );

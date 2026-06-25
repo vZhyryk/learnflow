@@ -1281,7 +1281,7 @@ CREATE TABLE event_outbox (
     -- [NOT NULL payload_json]: An event without a payload cannot be processed correctly.
     -- NULL payload would cause silent failures or panics in the worker. DB rejects it.
     payload_json    jsonb       NOT NULL,
-    status          text        NOT NULL CONSTRAINT event_outbox_status_check        CHECK (status IN ('pending', 'published', 'failed')),
+    status          text        NOT NULL DEFAULT 'pending' CONSTRAINT event_outbox_status_check CHECK (status IN ('pending', 'processing', 'published', 'failed', 'dead_letter')),
 
     -- [CHECK >= 0 attempt_count]: Starts at 0, increments on each attempt.
     -- A negative count indicates a bug in worker increment logic — rejected at DB level.
@@ -1326,7 +1326,7 @@ CREATE TABLE failed_jobs (
     event_type      text        NOT NULL,
     queue_name      text        NOT NULL,
     payload_json    jsonb,
-    attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT failed_jobs_attempt_count_check CHECK (attempt_count >= 0),
+    attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT failed_jobs_attempt_count_check CHECK (attempt_count >= 0 AND attempt_count <= 10),
     error_message   text,
     failed_at       timestamptz NOT NULL DEFAULT now(),
 
@@ -1850,7 +1850,7 @@ CREATE TABLE user_sessions (
     last_seen_at            timestamptz,
 
     CONSTRAINT user_sessions_revoke_reason_check
-        CHECK (revoke_reason IN ('logout', 'password_changed', 'admin', 'suspicious_activity', 'token_expired')),
+        CHECK (revoke_reason IN ('logout', 'password_changed', 'admin', 'suspicious_activity', 'token_expired', 'password_reset', 'email_change')),
     CONSTRAINT user_sessions_token_version_positive CHECK (token_version > 0),
     CONSTRAINT user_sessions_failed_attempts_non_negative CHECK (failed_attempt_count >= 0)
 );

@@ -36,14 +36,6 @@ func main() {
 		jsonLogger.Fatal(err, nil)
 	}
 
-	if appCfg.JWTSecret == "" {
-		jsonLogger.Fatal(fmt.Errorf("JWT_SECRET required"), nil)
-	}
-
-	if len(appCfg.JWTSecret) < 32 {
-		jsonLogger.Fatal(fmt.Errorf("JWT_SECRET must be at least 32 bytes, got %d", len(appCfg.JWTSecret)), nil)
-	}
-
 	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, int32(appCfg.Database.MaxOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
 	if err != nil {
 		jsonLogger.Fatal(err, nil)
@@ -57,8 +49,8 @@ func main() {
 	}
 
 	defer func() {
-		if err := redisClient.Close(); err != nil {
-			jsonLogger.Fatal(err, nil)
+		if closeErr := redisClient.Close(); closeErr != nil {
+			jsonLogger.Fatal(closeErr, nil)
 		}
 	}()
 
@@ -157,7 +149,24 @@ func getAppConfig(environment string) (app.Config, error) {
 
 	cfg.Port = env.GetIntEnv("PORT", 8080)
 
-	cfg.JWTSecret = env.GetStringEnv("JWT_SECRET", "")
+	cfg.Secret.JWTSecret = env.GetStringEnv("JWT_SECRET", "")
+
+	if cfg.Secret.JWTSecret == "" {
+		return cfg, fmt.Errorf("JWT_SECRET required: %w", err)
+	}
+
+	if len(cfg.Secret.JWTSecret) < 32 {
+		return cfg, fmt.Errorf("JWT_SECRET must be at least 32 bytes, got %d", len(cfg.Secret.JWTSecret))
+	}
+
+	cfg.Secret.JWTIssuer = env.GetStringEnv("JWT_ISSUER", "")
+	if cfg.Secret.JWTIssuer == "" {
+		return cfg, fmt.Errorf("JWT_ISSUER required: %w", err)
+	}
+	cfg.Secret.JWTAudience = env.GetStringEnv("JWT_AUDIENCE", "")
+	if cfg.Secret.JWTAudience == "" {
+		return cfg, fmt.Errorf("JWT_AUDIENCE required: %w", err)
+	}
 
 	return cfg, nil
 }

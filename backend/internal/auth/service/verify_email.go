@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"time"
 )
@@ -17,26 +18,26 @@ func (s *Service) VerifyEmail(ctx context.Context, req authdomain.VerifyEmailReq
 	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		token, err := s.tokenRepo.GetEmailVerificationToken(ctx, tokenHash)
 		if err != nil {
-			return err
+			return fmt.Errorf("verify_email.GetEmailVerificationToken: %w", err)
 		}
 
-		if token.ExpiresAt.Before(time.Now()) {
+		if token.ExpiresAt.Before(time.Now().UTC()) {
 			return authdomain.ErrTokenExpired
 		}
 
 		err = s.userRepo.UpdateEmailVerifiedAt(ctx, token.UserID)
 		if err != nil {
-			return err
+			return fmt.Errorf("verify_email.UpdateEmailVerifiedAt: %w", err)
 		}
 
 		err = s.userRepo.UpdateStatus(ctx, token.UserID, authdomain.StatusActive)
 		if err != nil {
-			return err
+			return fmt.Errorf("verify_email.UpdateStatus: %w", err)
 		}
 
 		err = s.tokenRepo.MarkEmailVerificationTokenUsed(ctx, tokenHash)
 		if err != nil {
-			return err
+			return fmt.Errorf("verify_email.MarkEmailVerificationTokenUsed: %w", err)
 		}
 
 		userID = token.UserID
@@ -44,7 +45,7 @@ func (s *Service) VerifyEmail(ctx context.Context, req authdomain.VerifyEmailReq
 	})
 
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("verify_email: %w", err)
 	}
 
 	return userID, nil

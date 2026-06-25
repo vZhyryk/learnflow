@@ -19,10 +19,34 @@ const (
 )
 
 // Login authenticates a user and returns access/refresh tokens.
+//
+// Check order is intentional and security-sensitive — do not reorder:
+//
+//  1. loginGetUser: fetch user by email. If not found, run dummy bcrypt to prevent
+//     user-enumeration via timing (found vs not-found responses take the same time).
+//
+//  2. LoginLockedUntil (brute-force lock) before bcrypt: skipping bcrypt for locked
+//     accounts avoids ~100ms CPU cost per request during an active attack. Revealing
+//     that an account is locked is acceptable — the attacker most likely triggered the
+//     lock themselves, and the HTTP 429 response already communicates this explicitly.
+//
+//  3. bcrypt: always runs for existing, non-locked accounts regardless of outcome.
+//     bcrypt takes the same ~100ms whether the password is correct or wrong, so the
+//     result does not leak via timing.
+//
+//  4. Status checks (StatusBlocked, StatusPendingVerification) after bcrypt: intentional.
+//     Checking status before bcrypt would create a timing oracle — a blocked account
+//     with the correct password would return faster (no bcrypt) than with a wrong
+//     password, letting an attacker confirm a valid password by measuring response time.
+//     Placing status checks after bcrypt eliminates this difference.
 func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*authdomain.AuthTokens, error) {
 	user, err := s.loginGetUser(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+
+	if user.LoginLockedUntil != nil && user.LoginLockedUntil.After(time.Now().UTC()) {
+		return nil, authdomain.ErrAccountLocked
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
@@ -43,13 +67,12 @@ func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*auth
 		return nil, authdomain.ErrInvalidCredentials
 	}
 
-	if user.LoginLockedUntil != nil && user.LoginLockedUntil.After(time.Now()) {
-		return nil, authdomain.ErrAccountLocked
-	}
-
 	return s.loginHandleSession(ctx, req, user)
 }
 
+// loginGetUser fetches the user by email. If the email does not exist, it runs a dummy
+// bcrypt comparison against a precomputed hash to match the response time of a real
+// password check, preventing user-enumeration via timing differences.
 func (s *Service) loginGetUser(ctx context.Context, req authdomain.LoginRequest) (*authdomain.User, error) {
 	user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
 	if err == nil {
@@ -60,16 +83,10 @@ func (s *Service) loginGetUser(ctx context.Context, req authdomain.LoginRequest)
 		return nil, fmt.Errorf("login: get user: %w", err)
 	}
 
-	dummyPasswordHash, err := bcrypt.GenerateFromPassword([]byte("dummy"), hashDefaultCost)
-	if err != nil {
-		return nil, fmt.Errorf("login: hash dummy: %w", err)
-	}
-
-	err = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(req.Password))
-	if err != nil {
-		return nil, authdomain.ErrInvalidCredentials
-	}
-
+	// Dummy bcrypt: keeps response time constant whether the email exists or not.
+	// dummyPasswordHash is precomputed at startup — never generate it per-request
+	// (GenerateFromPassword is slow by design and would invert the timing signature).
+	bcrypt.CompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck // error is intentionally discarded — call exists only to consume constant time and prevent user enumeration via timing
 	return nil, authdomain.ErrInvalidCredentials
 }
 
@@ -89,7 +106,7 @@ func (s *Service) loginHandleSession(ctx context.Context, req authdomain.LoginRe
 		RefreshHash: tokenHash,
 		UserAgent:   &req.UserAgent,
 		IPAddress:   &req.IPAddress,
-		ExpiresAt:   time.Now().Add(refreshTokenTTL),
+		ExpiresAt:   time.Now().UTC().Add(refreshTokenTTL),
 	}
 
 	var createdSession *authdomain.UserSession

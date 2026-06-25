@@ -12,9 +12,10 @@ import (
 	"time"
 )
 
+// InitRecoverAccount sends an account recovery email for a soft-deleted user.
 func (s *Service) InitRecoverAccount(ctx context.Context, req authdomain.RequestRecoverAccountRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
-		user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
+		user, err := s.userRepo.GetDeletedUserByEmail(ctx, req.Email)
 		if err != nil && !errors.Is(err, authdomain.ErrUserNotFound) {
 			return fmt.Errorf("init_recover_account: get user: %w", err)
 		}
@@ -37,7 +38,7 @@ func (s *Service) InitRecoverAccount(ctx context.Context, req authdomain.Request
 			return fmt.Errorf("init_recover_account: generate token: %w", err)
 		}
 
-		expiresAt := time.Now().Add(accountRecoverTokenTTL)
+		expiresAt := time.Now().UTC().Add(accountRecoverTokenTTL)
 
 		token := &authdomain.AccountRecoveryToken{
 			TokenBase: authdomain.TokenBase{
@@ -79,7 +80,7 @@ func (s *Service) RecoverAccount(ctx context.Context, req authdomain.RecoverAcco
 			return fmt.Errorf("recover_account: get token: %w", err)
 		}
 
-		if token.ExpiresAt.Before(time.Now()) {
+		if token.ExpiresAt.Before(time.Now().UTC()) {
 			return authdomain.ErrTokenExpired
 		}
 
@@ -104,5 +105,4 @@ func (s *Service) RecoverAccount(ctx context.Context, req authdomain.RecoverAcco
 
 		return nil
 	})
-
 }

@@ -27,7 +27,10 @@ func (routes *RouteHandler) RecoverPanic(next http.Handler) http.Handler {
 
 				err = helpers.WriteJSON(w, http.StatusInternalServerError, helpers.Envelope{"error": "internal server error"}, nil)
 				if err != nil {
-					routes.App.Logger.Error(fmt.Errorf("response err: %v", err), nil)
+					routes.App.Logger.Error(fmt.Errorf("response err: %v", err), map[string]any{
+						"method": r.Method,
+						"url":    r.URL.String(),
+					})
 				}
 			}
 		}()
@@ -90,12 +93,22 @@ func (route *RouteHandler) NewRouteRateLimiter(reqCount float64, duration time.D
 			key := getKeyFunc(r)
 			allowed, err := redisRateLimit(r.Context(), route.App.Redis, key, limit, duration)
 			if err != nil {
-				route.App.Logger.Error(fmt.Errorf("rate limiter: %w", err), nil)
-				next.ServeHTTP(w, r)
+				route.App.Logger.Error(fmt.Errorf("rate limiter: %w", err), map[string]any{
+					"method":         r.Method,
+					"path":           r.URL.Path,
+					"rate_limit_key": key,
+					"request_id":     appcontext.RequestIDFromContext(r.Context()),
+				})
+				if respErr := helpers.ServerErrorResponse(w); respErr != nil {
+					route.App.Logger.Error(respErr, map[string]any{
+						"method": r.Method,
+						"path":   r.URL.Path,
+					})
+				}
 				return
 			}
 			if !allowed {
-				route.RateLimitExceededResponse(w)
+				route.RateLimitExceededResponse(w, r)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -129,7 +142,7 @@ func (sw *statusResponseWriter) Unwrap() http.ResponseWriter {
 // RequestLogger logs completed HTTP requests with method, path, status, elapsed time, IP, and request ID.
 func (routes *RouteHandler) RequestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+		start := time.Now().UTC()
 		sw := &statusResponseWriter{ResponseWriter: w, status: http.StatusOK}
 
 		next.ServeHTTP(sw, r)
@@ -151,7 +164,11 @@ func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 		parts := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			if err := helpers.InvalidCredentialsResponse(w); err != nil {
-				route.App.Logger.Error(err, nil)
+				route.App.Logger.Error(err, map[string]any{
+					"method": r.Method,
+					"path":   r.URL.Path,
+					"ip":     appcontext.IPAddressFromContext(r.Context()),
+				})
 			}
 			return
 		}
@@ -160,39 +177,23 @@ func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 		claims, err := route.token.ValidateToken(tokenStr)
 		if err != nil {
 			if respErr := helpers.InvalidCredentialsResponse(w); respErr != nil {
-				route.App.Logger.Error(respErr, nil)
+				route.App.Logger.Error(respErr, map[string]any{
+					"method": r.Method,
+					"path":   r.URL.Path,
+					"ip":     appcontext.IPAddressFromContext(r.Context()),
+				})
 			}
 			return
 		}
 
 		jti := claims.ID
-		blocked, err := route.App.Redis.Exists(r.Context(), "blocklist:"+jti).Result()
+		err = route.authUserRedis(w, r, "blocklist:", jti)
 		if err != nil {
-			route.App.Logger.Error(fmt.Errorf("AuthenticateUser: redis: %w", err), nil)
-			if respErr := helpers.ServerErrorResponse(w); respErr != nil {
-				route.App.Logger.Error(respErr, nil)
-			}
-			return
-		}
-		if blocked > 0 {
-			if respErr := helpers.InvalidCredentialsResponse(w); respErr != nil {
-				route.App.Logger.Error(respErr, nil)
-			}
 			return
 		}
 
-		blockedCount, err := route.App.Redis.Exists(r.Context(), "user_blocked:"+claims.Subject).Result()
+		err = route.authUserRedis(w, r, "user_blocked:", claims.Subject)
 		if err != nil {
-			route.App.Logger.Error(fmt.Errorf("AuthenticateUser: user_blocked: %w", err), nil)
-			if respErr := helpers.ServerErrorResponse(w); respErr != nil {
-				route.App.Logger.Error(respErr, nil)
-			}
-			return
-		}
-		if blockedCount > 0 {
-			if respErr := helpers.InvalidCredentialsResponse(w); respErr != nil {
-				route.App.Logger.Error(respErr, nil)
-			}
 			return
 		}
 
@@ -205,6 +206,46 @@ func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 		ctx = appcontext.WithUser(ctx, user)
 		ctx = appcontext.WithJTI(ctx, jti)
 		ctx = appcontext.WithAccessTokenExpiresAt(ctx, claims.ExpiresAt.Time)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request, key, obj string) error {
+	blocked, err := route.App.Redis.Exists(r.Context(), key+obj).Result()
+	if err != nil {
+		wrapped := fmt.Errorf("AuthenticateUser: %s %w", key, err)
+		route.App.Logger.Error(wrapped, map[string]any{
+			"method":     r.Method,
+			"path":       r.URL.Path,
+			"request_id": appcontext.RequestIDFromContext(r.Context()),
+		})
+		if respErr := helpers.ServerErrorResponse(w); respErr != nil {
+			route.App.Logger.Error(respErr, map[string]any{
+				"method":     r.Method,
+				"path":       r.URL.Path,
+				"request_id": appcontext.RequestIDFromContext(r.Context()),
+			})
+		}
+		return wrapped
+	}
+	if blocked > 0 {
+		if respErr := helpers.InvalidCredentialsResponse(w); respErr != nil {
+			route.App.Logger.Error(respErr, map[string]any{
+				"method": r.Method,
+				"path":   r.URL.Path,
+			})
+		}
+		return fmt.Errorf("%s invalid credentials", key)
+	}
+
+	return nil
+}
+
+// SetIPAddress extracts the client IP from headers and stores it in context.
+func (routes *RouteHandler) SetIPAddress(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ip := realClientIP(r, routes.App.Config.TrustedProxies)
+		ctx := appcontext.WithIPAddress(r.Context(), ip)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -246,25 +287,12 @@ func parseIP(s string) string {
 	return ""
 }
 
-// SetIPAddress extracts the client IP from headers and stores it in context.
-func (routes *RouteHandler) SetIPAddress(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := realClientIP(r, routes.App.Config.TrustedProxies)
-		ctx := appcontext.WithIPAddress(r.Context(), ip)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
 const requestIDHeader = "X-Request-ID"
 
 // SetRequestID generates or retrieves a request ID and stores it in context and response headers.
 func (routes *RouteHandler) SetRequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestID := r.Header.Get(requestIDHeader)
-		if requestID == "" {
-			requestID = appcontext.NewRequestID()
-		}
-
+		requestID := appcontext.NewRequestID()
 		w.Header().Set(requestIDHeader, requestID)
 		ctx := appcontext.WithRequestID(r.Context(), requestID)
 		next.ServeHTTP(w, r.WithContext(ctx))

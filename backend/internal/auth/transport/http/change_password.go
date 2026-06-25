@@ -16,7 +16,7 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user, ok := appcontext.UserFromContext(ctx)
 	if !ok {
-		h.handleErrorResponse(w, authdomain.ErrUserNotFound)
+		h.handleErrorResponse(w, r, authdomain.ErrUserNotFound)
 		return
 	}
 	req.UserID = user.ID
@@ -26,7 +26,7 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 
 	err := h.svc.ChangePassword(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, err)
+		h.handleErrorResponse(w, r, err)
 		return
 	}
 
@@ -34,4 +34,5 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
+	h.logAuthEvent(r, changePasswordEvent, map[string]any{"user_id": user.ID})
 }

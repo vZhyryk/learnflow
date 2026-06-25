@@ -21,7 +21,7 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.svc.Refresh(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, err)
+		h.handleErrorResponse(w, r, err)
 		return
 	}
 

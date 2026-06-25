@@ -1,7 +1,6 @@
 package authhttp
 
 import (
-	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
@@ -22,15 +21,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 
 	tokens, err := h.svc.Login(ctx, req)
 	if err != nil {
-		switch {
-		case errors.Is(err, authdomain.ErrInvalidCredentials):
-			h.logAuthFailure(r, loginEvent, "invalid_credentials", map[string]any{})
-		case errors.Is(err, authdomain.ErrAccountLocked):
-			h.logAuthFailure(r, loginEvent, "account_locked", map[string]any{})
-		case errors.Is(err, authdomain.ErrAccountBlocked):
-			h.logAuthFailure(r, loginEvent, "account_blocked", map[string]any{})
-		}
-		h.handleErrorResponse(w, err)
+		h.handleErrorResponse(w, r, err)
 		return
 	}
 

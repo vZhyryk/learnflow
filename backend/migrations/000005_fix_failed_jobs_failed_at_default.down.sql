@@ -9,3 +9,9 @@ ALTER TABLE user_sessions
     DROP CONSTRAINT user_sessions_revoke_reason_check,
     ADD CONSTRAINT user_sessions_revoke_reason_check
         CHECK (revoke_reason IN ('logout', 'password_changed', 'admin', 'suspicious_activity', 'token_expired'));
+
+DROP INDEX IF EXISTS idx_users_email_deleted_unique;
+DROP INDEX IF EXISTS idx_email_verification_tokens_expires_at_unused;
+DROP INDEX IF EXISTS idx_password_reset_tokens_expires_at_unused;
+DROP INDEX IF EXISTS idx_email_change_tokens_expires_at_unused;
+DROP INDEX IF EXISTS idx_account_recovery_tokens_expires_at_unused;

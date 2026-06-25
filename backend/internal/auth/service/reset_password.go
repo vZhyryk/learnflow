@@ -36,7 +36,7 @@ func (s *Service) InitiatePasswordReset(ctx context.Context, req authdomain.Requ
 			return fmt.Errorf("init_password_reset: generate token: %w", err)
 		}
 
-		expiresAt := time.Now().Add(passwordResetTokenTTL)
+		expiresAt := time.Now().UTC().Add(passwordResetTokenTTL)
 
 		token := &authdomain.PasswordResetToken{
 			TokenBase: authdomain.TokenBase{
@@ -77,7 +77,7 @@ func (s *Service) ResetPassword(ctx context.Context, req authdomain.ResetPasswor
 			return fmt.Errorf("reset_password: get token: %w", err)
 		}
 
-		if token.ExpiresAt.Before(time.Now()) {
+		if token.ExpiresAt.Before(time.Now().UTC()) {
 			return authdomain.ErrTokenExpired
 		}
 
@@ -108,5 +108,4 @@ func (s *Service) ResetPassword(ctx context.Context, req authdomain.ResetPasswor
 
 		return nil
 	})
-
 }

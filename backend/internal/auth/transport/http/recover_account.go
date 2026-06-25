@@ -15,7 +15,7 @@ func (h *Handler) initRecoverAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	err := h.svc.InitRecoverAccount(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, err)
+		h.handleErrorResponse(w, r, err)
 		return
 	}
 
@@ -23,6 +23,7 @@ func (h *Handler) initRecoverAccount(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
 	}
+	h.logAuthEvent(r, initRecoverAccountEvent, nil)
 }
 
 func (h *Handler) recoverAccount(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +35,7 @@ func (h *Handler) recoverAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	err := h.svc.RecoverAccount(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, err)
+		h.handleErrorResponse(w, r, err)
 		return
 	}
 
@@ -42,4 +43,5 @@ func (h *Handler) recoverAccount(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
 	}
+	h.logAuthEvent(r, recoverAccountEvent, nil)
 }

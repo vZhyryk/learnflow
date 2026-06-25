@@ -40,7 +40,7 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	route := &RouteHandler{
 		Router: router,
 		App:    a,
-		token:  tokens.NewTokens(a.Config.JWTSecret, a.Config.JWTSecretPrev),
+		token:  tokens.NewTokens(a.Config.Secret.JWTSecret, a.Config.Secret.JWTSecretPrev, a.Config.Secret.JWTIssuer, a.Config.Secret.JWTAudience),
 	}
 
 	router.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -68,15 +68,13 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 		// update user profile logic
 	}))
 
-	// Monitoring
-	router.Handle("GET /metrics", http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// handle prometheus metrics logic
-	}))
-
-	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		err := helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"status": "ok"}, nil)
 		if err != nil {
-			route.App.Logger.Error(err, nil)
+			route.App.Logger.Error(err, map[string]any{
+				"method": r.Method,
+				"path":   r.URL.Path,
+			})
 		}
 	}))
 
@@ -92,7 +90,7 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 // Do NOT add any body-reading middleware between this call and the handler.
 func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
 	var req authdomain.RequestPasswordResetRequest
-	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 1_048_576))
+	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 4_096))
 	if err != nil {
 		return ""
 	}
@@ -117,7 +115,7 @@ func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
 
 func (route *RouteHandler) getTokenFromBody(r *http.Request) string {
 	var req authdomain.VerifyEmailRequest
-	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 1_048_576))
+	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 4_096))
 	if err != nil {
 		return ""
 	}
@@ -182,21 +180,33 @@ func (route *RouteHandler) buildChains() authhttp.AuthRouteChains {
 	}
 }
 
+// Readiness checks DB and Redis connectivity and returns 200 if the service is ready to handle traffic.
 func (h *RouteHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
 	if err := h.App.DB.Ping(ctx); err != nil {
-		helpers.WriteJSON(w, http.StatusServiceUnavailable, helpers.Envelope{
-			"status": "unavailable", "reason": "database",
-		}, nil)
+		if respErr := helpers.WriteJSON(w, http.StatusServiceUnavailable, helpers.Envelope{"status": "unavailable", "reason": "database"}, nil); respErr != nil {
+			h.App.Logger.Error(respErr, map[string]any{
+				"status":  http.StatusServiceUnavailable,
+				"envelop": helpers.Envelope{"status": "unavailable", "reason": "database"},
+			})
+		}
 		return
 	}
 	if err := h.App.Redis.Ping(ctx).Err(); err != nil {
-		helpers.WriteJSON(w, http.StatusServiceUnavailable, helpers.Envelope{
-			"status": "unavailable", "reason": "redis",
-		}, nil)
+		if respErr := helpers.WriteJSON(w, http.StatusServiceUnavailable, helpers.Envelope{"status": "unavailable", "reason": "redis"}, nil); respErr != nil {
+			h.App.Logger.Error(respErr, map[string]any{
+				"status":  http.StatusServiceUnavailable,
+				"envelop": helpers.Envelope{"status": "unavailable", "reason": "redis"},
+			})
+		}
 		return
 	}
-	helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"status": "ready"}, nil)
+	if respErr := helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"status": "ready"}, nil); respErr != nil {
+		h.App.Logger.Error(respErr, map[string]any{
+			"status":  http.StatusOK,
+			"envelop": helpers.Envelope{"status": "ready"},
+		})
+	}
 }

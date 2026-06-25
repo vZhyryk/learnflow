@@ -84,13 +84,7 @@ linters:
 
 formatters:
     enable:
-        - gofmt
         - goimports
-        - gofumpt
-
-    settings:
-        gofumpt:
-            extra-rules: true
 
 issues:
     max-same-issues: 50

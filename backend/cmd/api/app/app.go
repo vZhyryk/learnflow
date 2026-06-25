@@ -35,8 +35,12 @@ type Config struct {
 		Enabled bool
 	}
 
-	JWTSecret     string
-	JWTSecretPrev string
+	Secret struct {
+		JWTSecret     string
+		JWTSecretPrev string
+		JWTIssuer     string
+		JWTAudience   string
+	}
 
 	Timeouts struct {
 		ReadHeaderTimeout time.Duration

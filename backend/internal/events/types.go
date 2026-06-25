@@ -22,12 +22,13 @@ func IsKnownEventType(t EventType) bool {
 	case
 		EventUserRegistered,
 		EventEmailChange,
+		EventAccountRecovery,
 		EventPasswordReset,
 		EventBriefSubmitted,
 		EventBookingCreated,
 		EventPaymentCompleted,
-		EventAccountRecovery,
-		EventNotificationSend:
+		EventNotificationSend,
+		EventRegistrationAttemptOnExistingEmail:
 		return true
 	}
 	return false
@@ -54,6 +55,7 @@ func IsKnownAggregationType(t AggregationType) bool {
 	case
 		AggregationTypeUser,
 		AggregationTypeEmail,
+		AggregationTypeAccount,
 		AggregationTypePassword,
 		AggregationTypeBrief,
 		AggregationTypeBooking,

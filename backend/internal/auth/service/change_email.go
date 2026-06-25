@@ -47,7 +47,7 @@ func (s *Service) InitiateEmailChange(ctx context.Context, req authdomain.Reques
 			return fmt.Errorf("init_email_change: generate token: %w", err)
 		}
 
-		expiresAt := time.Now().Add(emailChangeTokenTTL)
+		expiresAt := time.Now().UTC().Add(emailChangeTokenTTL)
 
 		token := &authdomain.EmailChangeToken{
 			TokenBase: authdomain.TokenBase{
@@ -90,7 +90,7 @@ func (s *Service) ChangeEmail(ctx context.Context, req authdomain.EmailChangeReq
 			return fmt.Errorf("change_email: get token: %w", err)
 		}
 
-		if token.ExpiresAt.Before(time.Now()) {
+		if token.ExpiresAt.Before(time.Now().UTC()) {
 			return authdomain.ErrTokenExpired
 		}
 
@@ -118,19 +118,10 @@ func (s *Service) ChangeEmail(ctx context.Context, req authdomain.EmailChangeReq
 		}
 
 		if req.IsAllSessionsLogout {
-			revokeErr := s.sessionRepo.RevokeAllUserSessions(ctx, token.UserID, nil, authdomain.RevokeReasonEmailChanged)
+			revokeErr := s.revokeAllUserSessions(ctx, token.UserID, req.JTI, req.AccessTokenExpiresAt)
 			if revokeErr != nil {
-				return fmt.Errorf("change_email: revoke sessions: %w", revokeErr)
+				return revokeErr
 			}
-
-			remaining := time.Until(req.AccessTokenExpiresAt)
-			if remaining > 0 && req.JTI != "" {
-				_, err := s.redis.SetNX(ctx, "blocklist:"+req.JTI, "1", remaining).Result()
-				if err != nil {
-					return fmt.Errorf("change_email: session blocklist: %w", err)
-				}
-			}
-
 		}
 
 		return nil
