@@ -53,7 +53,7 @@ func New(
 		return nil, fmt.Errorf("authservice.New: generate dummy hash: %w", err)
 	}
 
-	return &Service{
+	service := &Service{
 		userRepo:          userRepo,
 		sessionRepo:       sessionRepo,
 		tokenRepo:         tokenRepo,
@@ -63,5 +63,7 @@ func New(
 		dummyPasswordHash: dummyPasswordHash,
 		jsonLogger:        jsonLogger,
 		redis:             redisClient,
-	}, nil
+	}
+
+	return service, nil
 }

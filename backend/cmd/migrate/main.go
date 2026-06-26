@@ -47,15 +47,7 @@ func main() {
 		jsonLogger.Fatal(fmt.Errorf("migrate init failed: %w", err), nil)
 	}
 
-	defer func() {
-		sourceErr, dbErr := m.Close()
-		if sourceErr != nil {
-			jsonLogger.Error(fmt.Errorf("migrate close failed: %w", sourceErr), nil)
-		}
-		if dbErr != nil {
-			jsonLogger.Error(fmt.Errorf("migrate close failed: %w", dbErr), nil)
-		}
-	}()
+	defer handleDefer(m, jsonLogger)
 
 	err = run(m, cfg.Direction, cfg.Steps)
 	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
@@ -138,4 +130,14 @@ func handleMigrationServiceConfig(cfg migrationConfig) (migrationConfig, error) 
 		return cfg, fmt.Errorf("invalid direction: %s", cfg.Direction)
 	}
 	return cfg, nil
+}
+
+func handleDefer(m *migrate.Migrate, jsonLogger *logger.Logger) {
+	sourceErr, dbErr := m.Close()
+	if sourceErr != nil {
+		jsonLogger.Error(fmt.Errorf("migrate close failed: %w", sourceErr), nil)
+	}
+	if dbErr != nil {
+		jsonLogger.Error(fmt.Errorf("migrate close failed: %w", dbErr), nil)
+	}
 }

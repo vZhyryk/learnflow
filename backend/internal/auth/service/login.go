@@ -46,7 +46,7 @@ func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*auth
 	}
 
 	if user.LoginLockedUntil != nil && user.LoginLockedUntil.After(time.Now().UTC()) {
-		return nil, authdomain.ErrAccountLocked
+		return nil, &authdomain.ErrAccountLockedError{LockedUntil: *user.LoginLockedUntil}
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))

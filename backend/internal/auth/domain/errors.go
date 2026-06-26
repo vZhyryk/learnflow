@@ -1,6 +1,9 @@
 package authdomain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	// ErrUserNotFound is returned when no user matches the lookup criteria.
@@ -19,6 +22,9 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	// ErrEmailNotVerified is returned when the account email has not been confirmed.
 	ErrEmailNotVerified = errors.New("email not verified")
+
+	// ErrForbidden is returned when the caller lacks permission to perform the operation.
+	ErrForbidden = errors.New("forbidden")
 
 	// ErrInvalidToken is returned when a single-use token cannot be found or has an invalid signature.
 	ErrInvalidToken = errors.New("invalid token")
@@ -48,3 +54,16 @@ var (
 	// ErrInvalidAccountState is returned when the account is in an unexpected state.
 	ErrInvalidAccountState = errors.New("invalid account state")
 )
+
+// ErrAccountLockedError carries the unlock time when a brute-force lockout is in effect.
+type ErrAccountLockedError struct {
+	LockedUntil time.Time
+}
+
+// Error implements the error interface.
+func (e *ErrAccountLockedError) Error() string { return "account locked" }
+
+// Is reports whether ErrAccountLockedError matches ErrAccountLocked.
+func (e *ErrAccountLockedError) Is(target error) bool {
+	return target == ErrAccountLocked
+}

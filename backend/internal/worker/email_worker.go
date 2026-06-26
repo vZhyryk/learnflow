@@ -56,6 +56,12 @@ func NewEmailWorker[T any](
 func (w *EmailWorker[T]) Run(ctx context.Context) {
 	for {
 		result, err := w.redisClient.BLPop(ctx, 5*time.Second, w.cfg.EventType).Result()
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		if errors.Is(err, redis.Nil) {
 			continue
 		}
@@ -79,9 +85,9 @@ func (w *EmailWorker[T]) Run(ctx context.Context) {
 		if err := retry.Do(ctx, 3, func() error {
 			return w.cfg.Process(*payload, w.baseURL, w.mailer)
 		}); err != nil {
-			w.redisClient.Del(ctx, key)
 			w.logger.Error(err, nil)
 			w.dlq.Write(ctx, w.cfg.EventType, w.cfg.AggregationType, payload, err, 3)
+			w.redisClient.Del(ctx, key)
 		}
 	}
 }

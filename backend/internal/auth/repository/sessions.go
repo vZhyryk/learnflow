@@ -64,7 +64,7 @@ func (rep *Repository) RevokeUserSession(ctx context.Context, sessionID, revoked
 // RevokeAllUserSessions revokes all active sessions for a user with the given reason.
 func (rep *Repository) RevokeAllUserSessions(ctx context.Context, userID string, revokedByUserID *string, revokeReason authdomain.RevokeReason) error {
 	if !revokeReason.Valid() {
-		return fmt.Errorf("repository.RevokeUserSession: invalid revoke reason: %s", revokeReason)
+		return fmt.Errorf("repository.RevokeAllUserSessions: invalid revoke reason: %s", revokeReason)
 	}
 	_, err := rep.queryRunner(ctx).Exec(ctx, revokeAllUserSessionsSQL, revokeReason, revokedByUserID, userID)
 	if err != nil {

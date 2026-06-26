@@ -92,23 +92,7 @@ func main() {
 
 	for _, w := range workers {
 		app.Wg.Add(1)
-		go func(w worker.Worker) {
-			defer app.Wg.Done()
-			for {
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							app.Logger.Error(fmt.Errorf("worker panic: %v\n%s", r, debug.Stack()), nil)
-						}
-					}()
-					w.Run(ctx)
-				}()
-				if ctx.Err() != nil {
-					return
-				}
-				time.Sleep(time.Second)
-			}
-		}(w)
+		go app.handleWorker(ctx, w)
 	}
 
 	app.Logger.Info("starting worker", nil)
@@ -119,6 +103,24 @@ func main() {
 	<-quit
 	cancel()
 	app.Wg.Wait()
+}
+
+func (app *App) handleWorker(ctx context.Context, w worker.Worker) {
+	defer app.Wg.Done()
+	for {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					app.Logger.Error(fmt.Errorf("worker panic: %v\n%s", r, debug.Stack()), nil)
+				}
+			}()
+			w.Run(ctx)
+		}()
+		if ctx.Err() != nil {
+			return
+		}
+		time.Sleep(time.Second)
+	}
 }
 
 func getRedis() (*redis.Client, error) {

@@ -2,8 +2,6 @@ package authservice
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
@@ -31,45 +29,36 @@ func (s *Service) InitiatePasswordReset(ctx context.Context, req authdomain.Requ
 			return fmt.Errorf("init_password_reset: get user profile: %w", err)
 		}
 
-		rawToken, hashToken, err := tokens.GenerateSecureToken()
-		if err != nil {
-			return fmt.Errorf("init_password_reset: generate token: %w", err)
-		}
+		return s.emitTokenEvent(ctx, user.ID, passwordResetTokenTTL, events.AggregationTypePassword, events.EventPasswordReset,
+			func(ctx context.Context, rawToken, hashToken string, expiresAt time.Time) (any, error) {
+				token := &authdomain.PasswordResetToken{
+					TokenBase: authdomain.TokenBase{
+						UserID:    user.ID,
+						TokenHash: hashToken,
+						ExpiresAt: expiresAt,
+					},
+				}
 
-		expiresAt := time.Now().UTC().Add(passwordResetTokenTTL)
+				_, err := s.tokenRepo.CreatePasswordResetToken(ctx, token)
+				if err != nil {
+					return nil, fmt.Errorf("init_password_reset: create token: %w", err)
+				}
 
-		token := &authdomain.PasswordResetToken{
-			TokenBase: authdomain.TokenBase{
-				UserID:    user.ID,
-				TokenHash: hashToken,
-				ExpiresAt: expiresAt,
+				return events.InitPasswordResetToken{
+					UserID:    user.ID,
+					Email:     user.Email,
+					ExpiresAt: expiresAt,
+					RawToken:  rawToken,
+					UserName:  userProfile.FirstName,
+				}, nil
 			},
-		}
-
-		if _, err = s.tokenRepo.CreatePasswordResetToken(ctx, token); err != nil {
-			return fmt.Errorf("init_password_reset: create token: %w", err)
-		}
-		payload := events.InitPasswordResetToken{
-			UserID:    user.ID,
-			Email:     user.Email,
-			ExpiresAt: expiresAt,
-			RawToken:  rawToken,
-			UserName:  userProfile.FirstName,
-		}
-
-		err = s.outbox.Emit(ctx, events.AggregationTypePassword, user.ID, events.EventPasswordReset, payload)
-		if err != nil {
-			return fmt.Errorf("init_password_reset: emit event: %w", err)
-		}
-
-		return nil
+		)
 	})
 }
 
 // ResetPassword sets a new password using the provided reset token.
 func (s *Service) ResetPassword(ctx context.Context, req authdomain.ResetPasswordRequest) error {
-	sum := sha256.Sum256([]byte(req.Token))
-	tokenHash := hex.EncodeToString(sum[:])
+	tokenHash := tokens.MakeHash(req.Token)
 
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		token, err := s.tokenRepo.GetPasswordResetToken(ctx, tokenHash)

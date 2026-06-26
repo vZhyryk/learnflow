@@ -6,7 +6,6 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
-	"learnflow_backend/internal/shared/tokens"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -20,20 +19,7 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 	}
 
 	if user != nil {
-		userEmailUserProfile, getErr := s.userRepo.GetUserProfileByUserID(ctx, user.ID)
-		if getErr != nil {
-			return "", fmt.Errorf("register: get user profile: %w", err)
-		}
-
-		err = s.outbox.Emit(ctx, events.AggregationTypeUser, user.ID, events.EventRegistrationAttemptOnExistingEmail, events.RegistrationAttemptPayload{
-			Email:    user.Email,
-			UserID:   user.ID,
-			UserName: userEmailUserProfile.FirstName,
-		})
-		if err != nil {
-			return "", fmt.Errorf("register: inform user: %w", err)
-		}
-		return "", authdomain.ErrUserAlreadyExists
+		return "", s.handleGetUserByEmailRegisterError(ctx, user)
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), hashDefaultCost)
@@ -53,7 +39,7 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 	err = s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		id, createErr := s.userRepo.CreateUser(ctx, user)
 		if createErr != nil {
-			return fmt.Errorf("register: create user: %w", err)
+			return fmt.Errorf("register: create user: %w", createErr)
 		}
 
 		userProfile := &authdomain.UserProfile{
@@ -76,41 +62,30 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 			return fmt.Errorf("register: create user profile: %w", err)
 		}
 
-		rawToken, hashToken, tokenErr := tokens.GenerateSecureToken()
-		if tokenErr != nil {
-			return fmt.Errorf("register: generate token: %w", err)
-		}
-
-		expiresAt := time.Now().UTC().Add(emailVerificationTokenTTL)
-
-		token := &authdomain.EmailVerificationToken{
-			TokenBase: authdomain.TokenBase{
-				UserID:    id,
-				TokenHash: hashToken,
-				ExpiresAt: expiresAt,
-			},
-		}
-
-		if _, err = s.tokenRepo.CreateEmailVerificationToken(ctx, token); err != nil {
-			return fmt.Errorf("register: create verification token: %w", err)
-		}
-
-		payload := events.UserRegisteredPayload{
-			UserID:    id,
-			Email:     user.Email,
-			ExpiresAt: expiresAt,
-			RawToken:  rawToken,
-			UserName:  userProfile.FirstName,
-		}
-
-		err = s.outbox.Emit(ctx, events.AggregationTypeUser, id, events.EventUserRegistered, payload)
-		if err != nil {
-			return fmt.Errorf("register: emit event: %w", err)
-		}
-
 		userID = id
 
-		return nil
+		return s.emitTokenEvent(ctx, id, emailVerificationTokenTTL, events.AggregationTypeUser, events.EventUserRegistered, func(ctx context.Context, rawToken, hashToken string, expiresAt time.Time) (any, error) {
+			token := &authdomain.EmailVerificationToken{
+				TokenBase: authdomain.TokenBase{
+					UserID:    id,
+					TokenHash: hashToken,
+					ExpiresAt: expiresAt,
+				},
+			}
+
+			_, err = s.tokenRepo.CreateEmailVerificationToken(ctx, token)
+			if err != nil {
+				return nil, fmt.Errorf("register: create verification token: %w", err)
+			}
+
+			return events.UserRegisteredPayload{
+				UserID:    id,
+				Email:     user.Email,
+				ExpiresAt: expiresAt,
+				RawToken:  rawToken,
+				UserName:  userProfile.FirstName,
+			}, nil
+		})
 	})
 
 	if err != nil {
@@ -118,4 +93,21 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 	}
 
 	return userID, nil
+}
+
+func (s *Service) handleGetUserByEmailRegisterError(ctx context.Context, user *authdomain.User) error {
+	userEmailUserProfile, getErr := s.userRepo.GetUserProfileByUserID(ctx, user.ID)
+	if getErr != nil {
+		return fmt.Errorf("register: get user profile: %w", getErr)
+	}
+
+	emitErr := s.outbox.Emit(ctx, events.AggregationTypeUser, user.ID, events.EventRegistrationAttemptOnExistingEmail, events.RegistrationAttemptPayload{
+		Email:    user.Email,
+		UserID:   user.ID,
+		UserName: userEmailUserProfile.FirstName,
+	})
+	if emitErr != nil {
+		return fmt.Errorf("register: inform user: %w", emitErr)
+	}
+	return authdomain.ErrUserAlreadyExists
 }

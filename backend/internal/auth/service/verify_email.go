@@ -2,18 +2,15 @@ package authservice
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/tokens"
 	"time"
 )
 
 // VerifyEmail confirms a user's email address using the provided token.
 func (s *Service) VerifyEmail(ctx context.Context, req authdomain.VerifyEmailRequest) (string, error) {
-	sum := sha256.Sum256([]byte(req.Token))
-	tokenHash := hex.EncodeToString(sum[:])
-
+	tokenHash := tokens.MakeHash(req.Token)
 	var userID string
 	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		token, err := s.tokenRepo.GetEmailVerificationToken(ctx, tokenHash)

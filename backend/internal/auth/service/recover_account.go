@@ -2,8 +2,6 @@ package authservice
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
@@ -33,47 +31,34 @@ func (s *Service) InitRecoverAccount(ctx context.Context, req authdomain.Request
 			return fmt.Errorf("init_recover_account: get user profile: %w", err)
 		}
 
-		rawToken, hashToken, err := tokens.GenerateSecureToken()
-		if err != nil {
-			return fmt.Errorf("init_recover_account: generate token: %w", err)
-		}
-
-		expiresAt := time.Now().UTC().Add(accountRecoverTokenTTL)
-
-		token := &authdomain.AccountRecoveryToken{
-			TokenBase: authdomain.TokenBase{
-				UserID:    user.ID,
-				TokenHash: hashToken,
-				ExpiresAt: expiresAt,
+		return s.emitTokenEvent(ctx, user.ID, accountRecoverTokenTTL, events.AggregationTypeAccount, events.EventAccountRecovery,
+			func(ctx context.Context, rawToken, hashToken string, expiresAt time.Time) (any, error) {
+				token := &authdomain.AccountRecoveryToken{
+					TokenBase: authdomain.TokenBase{
+						UserID:    user.ID,
+						TokenHash: hashToken,
+						ExpiresAt: expiresAt,
+					},
+				}
+				_, err := s.tokenRepo.CreateAccountRecoveryToken(ctx, token)
+				if err != nil {
+					return nil, fmt.Errorf("init_recover_account: create token: %w", err)
+				}
+				return events.InitAccountRecoveryToken{
+					UserID:    user.ID,
+					Email:     user.Email,
+					ExpiresAt: expiresAt,
+					RawToken:  rawToken,
+					UserName:  userProfile.FirstName,
+				}, nil
 			},
-		}
-
-		if _, err = s.tokenRepo.CreateAccountRecoveryToken(ctx, token); err != nil {
-			return fmt.Errorf("recover_account: create recovery token: %w", err)
-		}
-
-		payload := events.InitAccountRecoveryToken{
-			UserID:    user.ID,
-			Email:     user.Email,
-			ExpiresAt: expiresAt,
-			RawToken:  rawToken,
-			UserName:  userProfile.FirstName,
-		}
-
-		err = s.outbox.Emit(ctx, events.AggregationTypeAccount, user.ID, events.EventAccountRecovery, payload)
-		if err != nil {
-			return fmt.Errorf("recover_account: emit event: %w", err)
-		}
-
-		return nil
+		)
 	})
 }
 
 // RecoverAccount restores a soft-deleted account using the provided recovery token.
 func (s *Service) RecoverAccount(ctx context.Context, req authdomain.RecoverAccountRequest) error {
-	sum := sha256.Sum256([]byte(req.Token))
-	tokenHash := hex.EncodeToString(sum[:])
-
+	tokenHash := tokens.MakeHash(req.Token)
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		token, err := s.tokenRepo.GetAccountRecoveryToken(ctx, tokenHash)
 		if err != nil {

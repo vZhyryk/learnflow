@@ -18,6 +18,12 @@ const (
 	jtibyteLength   = 32
 )
 
+// MakeHash returns the SHA-256 hex digest of raw.
+func MakeHash(raw string) string {
+	sum := sha256.Sum256([]byte(raw))
+	return hex.EncodeToString(sum[:])
+}
+
 // GenerateSecureToken generates a cryptographically random token and returns both the raw value and its SHA-256 hex hash.
 func GenerateSecureToken() (raw, hash string, err error) {
 	b := make([]byte, tokenByteLength)
@@ -25,8 +31,7 @@ func GenerateSecureToken() (raw, hash string, err error) {
 		return "", "", fmt.Errorf("generateSecureToken: %w", err)
 	}
 	raw = base64.RawURLEncoding.EncodeToString(b)
-	sum := sha256.Sum256([]byte(raw))
-	hash = hex.EncodeToString(sum[:])
+	hash = MakeHash(raw)
 	return raw, hash, nil
 }
 

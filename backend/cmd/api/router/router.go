@@ -4,8 +4,6 @@ package router
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +18,9 @@ import (
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
 	"learnflow_backend/internal/shared/tokens"
+	"learnflow_backend/internal/users"
+	usersrepository "learnflow_backend/internal/users/repository"
+	usersservice "learnflow_backend/internal/users/service"
 	"net/http"
 	"time"
 
@@ -60,13 +61,9 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 
 	auth.RegisterAuthRoutes(router, authSvc, chains, a.Logger)
 
-	// Profile
-	router.Handle("GET /api/v1/users/profile", chains.StaticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// get user profile logic
-	}))
-	router.Handle("PATCH /api/v1/users/profile", chains.StaticWithAuth.ThenFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		// update user profile logic
-	}))
+	usersrepo := usersrepository.NewRepository(a.DB)
+	userSvc := usersservice.New(usersrepo)
+	users.RegisterUsersRoutes(router, userSvc, chains.StaticWithAuth, a.Logger)
 
 	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		err := helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"status": "ok"}, nil)
@@ -109,8 +106,7 @@ func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context())
 	}
 
-	hash := sha256.Sum256([]byte(req.Email))
-	return hex.EncodeToString(hash[:])
+	return tokens.MakeHash(req.Email)
 }
 
 func (route *RouteHandler) getTokenFromBody(r *http.Request) string {
@@ -134,8 +130,7 @@ func (route *RouteHandler) getTokenFromBody(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context())
 	}
 
-	hash := sha256.Sum256([]byte(req.Token))
-	return hex.EncodeToString(hash[:])
+	return tokens.MakeHash(req.Token)
 }
 
 func (route *RouteHandler) buildChains() authhttp.AuthRouteChains {

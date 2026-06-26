@@ -57,6 +57,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	err = getServerTimeout(&appCfg)
+	if err != nil {
+		jsonLogger.Fatal(err, nil)
+	}
+
 	application := &app.App{
 		Config: appCfg,
 		Logger: jsonLogger,
@@ -71,16 +76,6 @@ func main() {
 		jsonLogger.Fatal(err, nil)
 	}
 
-	readHeaderTimeout, readTimeout, writeTimeout, idleTimeout, requestTimeout, err := getServerTimeout()
-	if err != nil {
-		jsonLogger.Fatal(err, nil)
-	}
-	appCfg.Timeouts.ReadHeaderTimeout = readHeaderTimeout
-	appCfg.Timeouts.ReadTimeout = readTimeout
-	appCfg.Timeouts.WriteTimeout = writeTimeout
-	appCfg.Timeouts.IdleTimeout = idleTimeout
-	appCfg.Timeouts.RequestTimeout = requestTimeout
-
 	srv := server.NewServer(r, application)
 
 	if err := srv.Serve(); err != nil {
@@ -88,26 +83,26 @@ func main() {
 	}
 }
 
-func getServerTimeout() (readHeaderTimeout, readTimeout, writeTimeout, idleTimeout, requestTimeout time.Duration, err error) {
+func getServerTimeout(appCfg *app.Config) error {
 	durations := []struct {
 		name     string
 		val      *time.Duration
 		envKey   string
 		fallback time.Duration
 	}{
-		{"READ_HEADER_TIMEOUT", &readHeaderTimeout, "READ_HEADER_TIMEOUT", 5 * time.Second},
-		{"READ_TIMEOUT", &readTimeout, "READ_TIMEOUT", 10 * time.Second},
-		{"WRITE_TIMEOUT", &writeTimeout, "WRITE_TIMEOUT", 30 * time.Second},
-		{"IDLE_TIMEOUT", &idleTimeout, "IDLE_TIMEOUT", 60 * time.Second},
-		{"REQUEST_TIMEOUT", &requestTimeout, "REQUEST_TIMEOUT", 30 * time.Second},
+		{"READ_HEADER_TIMEOUT", &appCfg.Timeouts.ReadHeaderTimeout, "READ_HEADER_TIMEOUT", 5 * time.Second},
+		{"READ_TIMEOUT", &appCfg.Timeouts.ReadTimeout, "READ_TIMEOUT", 10 * time.Second},
+		{"WRITE_TIMEOUT", &appCfg.Timeouts.WriteTimeout, "WRITE_TIMEOUT", 30 * time.Second},
+		{"IDLE_TIMEOUT", &appCfg.Timeouts.IdleTimeout, "IDLE_TIMEOUT", 60 * time.Second},
+		{"REQUEST_TIMEOUT", &appCfg.Timeouts.RequestTimeout, "REQUEST_TIMEOUT", 30 * time.Second},
 	}
 	for _, d := range durations {
 		*d.val = env.GetDurationEnv(d.envKey, d.fallback)
 		if *d.val <= 0 {
-			return 0, 0, 0, 0, 0, fmt.Errorf("%s must be positive, got %v", d.name, *d.val)
+			return fmt.Errorf("%s must be positive, got %v", d.name, *d.val)
 		}
 	}
-	return
+	return nil
 }
 
 func getAppConfig(environment string) (app.Config, error) {
@@ -152,7 +147,7 @@ func getAppConfig(environment string) (app.Config, error) {
 	cfg.Secret.JWTSecret = env.GetStringEnv("JWT_SECRET", "")
 
 	if cfg.Secret.JWTSecret == "" {
-		return cfg, fmt.Errorf("JWT_SECRET required: %w", err)
+		return cfg, fmt.Errorf("JWT_SECRET cannot be empty")
 	}
 
 	if len(cfg.Secret.JWTSecret) < 32 {
@@ -161,11 +156,11 @@ func getAppConfig(environment string) (app.Config, error) {
 
 	cfg.Secret.JWTIssuer = env.GetStringEnv("JWT_ISSUER", "")
 	if cfg.Secret.JWTIssuer == "" {
-		return cfg, fmt.Errorf("JWT_ISSUER required: %w", err)
+		return cfg, fmt.Errorf("JWT_ISSUER cannot be empty")
 	}
 	cfg.Secret.JWTAudience = env.GetStringEnv("JWT_AUDIENCE", "")
 	if cfg.Secret.JWTAudience == "" {
-		return cfg, fmt.Errorf("JWT_AUDIENCE required: %w", err)
+		return cfg, fmt.Errorf("JWT_AUDIENCE cannot be empty")
 	}
 
 	return cfg, nil
