@@ -8,36 +8,36 @@ import (
 
 // UserProfile holds a user's extended profile information.
 type UserProfile struct {
-	UserID      string
-	FirstName   string
-	LastName    string
-	PhoneNumber string
-	Country     string
-	City        string
-	DateOfBirth *string
-	Gender      string
-	UILanguage  string
-	AvatarURL   string
-	Timezone    string
-	Bio         string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	UserID      string    `json:"user_id"`
+	FirstName   string    `json:"first_name"`
+	LastName    string    `json:"last_name"`
+	PhoneNumber string    `json:"phone_number"`
+	Country     string    `json:"country"`
+	City        string    `json:"city"`
+	DateOfBirth *string   `json:"date_of_birth"`
+	Gender      string    `json:"gender"`
+	UILanguage  string    `json:"ui_language"`
+	AvatarURL   string    `json:"avatar_url"`
+	Timezone    string    `json:"timezone"`
+	Bio         string    `json:"bio"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // ChangeUserProfileRequest carries optional fields for a profile update; nil fields are left unchanged.
 type ChangeUserProfileRequest struct {
-	UserID      *string
-	FirstName   *string
-	LastName    *string
-	PhoneNumber *string
-	Country     *string
-	City        *string
-	DateOfBirth *string
-	Gender      *string
-	UILanguage  *string
-	AvatarURL   *string
-	Timezone    *string
-	Bio         *string
+	UserID      *string `json:"-"`
+	FirstName   *string `json:"first_name"`
+	LastName    *string `json:"last_name"`
+	PhoneNumber *string `json:"phone_number"`
+	Country     *string `json:"country"`
+	City        *string `json:"city"`
+	DateOfBirth *string `json:"date_of_birth"`
+	Gender      *string `json:"gender"`
+	UILanguage  *string `json:"ui_language"`
+	AvatarURL   *string `json:"avatar_url"`
+	Timezone    *string `json:"timezone"`
+	Bio         *string `json:"bio"`
 }
 
 // Validate checks all non-nil fields against their domain constraints.

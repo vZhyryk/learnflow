@@ -20,7 +20,7 @@ func (s *Service) revokeUserSessions(ctx context.Context, caller, jti string, ac
 	// Trade-off: Redis unavailability also prevents a successful email change.
 	remaining := time.Until(accessTokenExpiresAt)
 	if remaining > 0 && jti != "" {
-		_, err := s.redis.SetNX(ctx, "blocklist:"+jti, "1", remaining).Result()
+		_, err := s.redisClient.SetNX(ctx, "blocklist:"+jti, "1", remaining).Result()
 		if err != nil {
 			return fmt.Errorf("%s: session blocklist: %w", caller, err)
 		}

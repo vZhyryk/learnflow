@@ -22,7 +22,7 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 		return "", s.handleGetUserByEmailRegisterError(ctx, user)
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), hashDefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), s.cost)
 	if err != nil {
 		return "", fmt.Errorf("register: hash password: %w", err)
 	}

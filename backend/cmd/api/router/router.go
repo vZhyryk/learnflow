@@ -54,7 +54,20 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	authRepo := authrepository.NewRepository(a.DB)
 	transactor := db.NewTransactor(a.DB)
 	outbox := events.NewOutboxWriter(a.DB)
-	authSvc, err := authservice.New(authRepo, authRepo, authRepo, transactor, outbox, route.token, a.Logger, a.Redis)
+	authSvc, err := authservice.New(
+		authservice.Repos{
+			UserRepo:    authRepo,
+			SessionRepo: authRepo,
+			TokenRepo:   authRepo,
+			Transactor:  transactor,
+		},
+		authservice.Utils{
+			Outbox:      outbox,
+			Token:       route.token,
+			JSONLogger:  a.Logger,
+			RedisClient: a.Redis,
+		},
+		authservice.Options{})
 	if err != nil {
 		return nil, fmt.Errorf("router: NewRouter: %w", err)
 	}

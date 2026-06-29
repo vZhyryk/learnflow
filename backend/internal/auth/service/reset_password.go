@@ -75,7 +75,7 @@ func (s *Service) ResetPassword(ctx context.Context, req authdomain.ResetPasswor
 			return fmt.Errorf("reset_password: get user: %w", err)
 		}
 
-		hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), hashDefaultCost)
+		hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), s.cost)
 		if err != nil {
 			return fmt.Errorf("reset_password: hash password: %w", err)
 		}

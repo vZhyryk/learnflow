@@ -21,7 +21,10 @@ func ServerErrorResponse(w http.ResponseWriter) error {
 
 // BadRequestResponse writes a 400 Bad Request response with the given error.
 func BadRequestResponse(w http.ResponseWriter, err error) error {
-	return WriteJSON(w, http.StatusBadRequest, Envelope{"error": err.Error()}, nil)
+	if err != nil {
+		return WriteJSON(w, http.StatusBadRequest, Envelope{"error": err.Error()}, nil)
+	}
+	return WriteJSON(w, http.StatusBadRequest, Envelope{"error": "bad request"}, nil)
 }
 
 // ErrorResponse writes a response with the given status code and error message.

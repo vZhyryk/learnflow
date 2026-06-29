@@ -47,5 +47,5 @@ type App struct {
 // go vet detects accidental copies of types that embed noCopy.
 type noCopy struct{}
 
-func (*noCopy) Lock()   {}
-func (*noCopy) Unlock() {}
+func (*noCopy) Lock()   {} // intentionally empty — required by sync.Locker for go vet noCopy detection
+func (*noCopy) Unlock() {} // intentionally empty — required by sync.Locker for go vet noCopy detection

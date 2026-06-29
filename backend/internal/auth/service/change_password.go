@@ -21,7 +21,7 @@ func (s *Service) ChangePassword(ctx context.Context, req authdomain.ChangePassw
 			return authdomain.ErrWrongPassword
 		}
 
-		hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), hashDefaultCost)
+		hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), s.cost)
 		if err != nil {
 			return fmt.Errorf("change_password: hash password: %w", err)
 		}

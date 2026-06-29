@@ -35,3 +35,5 @@ backend/todo.md
 frontend/coverage/
 backend/tmp/
 design/
+
+tests*

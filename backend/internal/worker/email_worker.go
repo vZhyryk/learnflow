@@ -62,15 +62,13 @@ func (w *EmailWorker[T]) Run(ctx context.Context) {
 		default:
 		}
 
-		if errors.Is(err, redis.Nil) {
+		isCont, isRet := w.handleRunBLPopErrors(err)
+		if isCont {
 			continue
 		}
-		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return
-			}
-			w.logger.Error(fmt.Errorf("%s: BLPop: %w", w.cfg.EventType, err), nil)
-			continue
+
+		if isRet {
+			return
 		}
 
 		payload, key, msgErr := w.handleMessage(ctx, result[1])
@@ -109,4 +107,19 @@ func (w *EmailWorker[T]) handleMessage(ctx context.Context, message string) (res
 		return nil, "", errAlreadyProcessed
 	}
 	return &payload, key, nil
+}
+
+func (w *EmailWorker[T]) handleRunBLPopErrors(err error) (shouldContinue, shouldReturn bool) {
+	if errors.Is(err, redis.Nil) {
+		return true, false
+	}
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return false, true
+		}
+		w.logger.Error(fmt.Errorf("%s: BLPop: %w", w.cfg.EventType, err), nil)
+		return true, false
+	}
+
+	return false, false
 }

@@ -1,6 +1,7 @@
 package authservice
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -33,37 +34,64 @@ type Service struct {
 	outbox            *events.OutboxWriter
 	jsonLogger        *logger.Logger
 	dummyPasswordHash []byte
+	cost              int
 	token             *tokens.Tokens
-	redis             *redis.Client
+	redisClient       RedisOps
+}
+
+// Repos groups the repository dependencies required by the auth Service.
+type Repos struct {
+	UserRepo    authdomain.UserRepository
+	SessionRepo authdomain.SessionRepository
+	TokenRepo   authdomain.TokenRepository
+	Transactor  authdomain.Transactor
+}
+
+// Utils groups the infrastructure utilities required by the auth Service.
+type Utils struct {
+	Outbox      *events.OutboxWriter
+	Token       *tokens.Tokens
+	JSONLogger  *logger.Logger
+	RedisClient RedisOps
 }
 
 // New returns a new auth Service with the given repositories and configuration.
 func New(
-	userRepo authdomain.UserRepository,
-	sessionRepo authdomain.SessionRepository,
-	tokenRepo authdomain.TokenRepository,
-	transactor authdomain.Transactor,
-	outbox *events.OutboxWriter,
-	token *tokens.Tokens,
-	jsonLogger *logger.Logger,
-	redisClient *redis.Client,
+	repos Repos,
+	utils Utils,
+	opts Options,
 ) (*Service, error) {
-	dummyPasswordHash, err := bcrypt.GenerateFromPassword([]byte("dummy"), hashDefaultCost)
+	cost := opts.BcryptCost
+	if cost == 0 {
+		cost = hashDefaultCost
+	}
+	dummyPasswordHash, err := bcrypt.GenerateFromPassword([]byte("dummy"), cost)
 	if err != nil {
 		return nil, fmt.Errorf("authservice.New: generate dummy hash: %w", err)
 	}
 
 	service := &Service{
-		userRepo:          userRepo,
-		sessionRepo:       sessionRepo,
-		tokenRepo:         tokenRepo,
-		transactor:        transactor,
-		outbox:            outbox,
-		token:             token,
+		userRepo:          repos.UserRepo,
+		sessionRepo:       repos.SessionRepo,
+		tokenRepo:         repos.TokenRepo,
+		transactor:        repos.Transactor,
+		outbox:            utils.Outbox,
+		token:             utils.Token,
+		jsonLogger:        utils.JSONLogger,
+		redisClient:       utils.RedisClient,
+		cost:              cost,
 		dummyPasswordHash: dummyPasswordHash,
-		jsonLogger:        jsonLogger,
-		redis:             redisClient,
 	}
 
 	return service, nil
+}
+
+// Options configures optional parameters for the auth Service.
+type Options struct {
+	BcryptCost int // default hashDefaultCost (12), bcrypt.MinCost (4) in tests
+}
+
+// RedisOps is the subset of redis.Client methods used by the auth Service.
+type RedisOps interface {
+	SetNX(ctx context.Context, key string, value any, expiration time.Duration) *redis.BoolCmd
 }
