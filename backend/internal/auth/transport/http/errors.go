@@ -13,6 +13,7 @@ import (
 func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, authdomain.ErrUserAlreadyExists):
+		// 202: prevents email enumeration; async outbox — email not sent synchronously.
 		h.handleErrorRespond(r, "user_already_exists", func() error {
 			return helpers.ErrorResponse(w, http.StatusAccepted, "If this email is not yet registered, you will receive a confirmation link.")
 		})

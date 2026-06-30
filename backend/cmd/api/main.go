@@ -12,6 +12,7 @@ import (
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
 	lredis "learnflow_backend/internal/infrastructure/redis"
+	"net"
 	"net/url"
 	"os"
 	"runtime"
@@ -36,7 +37,7 @@ func main() {
 		jsonLogger.Fatal(err, nil)
 	}
 
-	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, int32(appCfg.Database.MaxOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
+	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, int32(appCfg.Database.MaxOpenConns), int32(appCfg.Database.MinOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
 	if err != nil {
 		jsonLogger.Fatal(err, nil)
 	}
@@ -135,35 +136,65 @@ func getAppConfig(environment string) (app.Config, error) {
 		return cfg, fmt.Errorf("CORS config: %w", err)
 	}
 
-	maxOpenConns, maxIdleTime, maxLifetime := getDatabaseConfig()
+	maxOpenConns, minOpenConns, maxIdleTime, maxLifetime := getDatabaseConfig()
 
 	cfg.Database.DSN = dsn
 	cfg.Database.MaxIdleTime = maxIdleTime
 	cfg.Database.MaxOpenConns = maxOpenConns
+	cfg.Database.MinOpenConns = minOpenConns
 	cfg.Database.MaxLifetime = maxLifetime
 
 	cfg.Port = env.GetIntEnv("PORT", 8080)
 
-	cfg.Secret.JWTSecret = env.GetStringEnv("JWT_SECRET", "")
-
-	if cfg.Secret.JWTSecret == "" {
-		return cfg, fmt.Errorf("JWT_SECRET cannot be empty")
+	if err = getJWTConfig(&cfg); err != nil {
+		return cfg, err
 	}
 
-	if len(cfg.Secret.JWTSecret) < 32 {
-		return cfg, fmt.Errorf("JWT_SECRET must be at least 32 bytes, got %d", len(cfg.Secret.JWTSecret))
-	}
-
-	cfg.Secret.JWTIssuer = env.GetStringEnv("JWT_ISSUER", "")
-	if cfg.Secret.JWTIssuer == "" {
-		return cfg, fmt.Errorf("JWT_ISSUER cannot be empty")
-	}
-	cfg.Secret.JWTAudience = env.GetStringEnv("JWT_AUDIENCE", "")
-	if cfg.Secret.JWTAudience == "" {
-		return cfg, fmt.Errorf("JWT_AUDIENCE cannot be empty")
+	cfg.TrustedProxies, err = parseTrustedProxies(env.GetStringEnv("TRUSTED_PROXIES", ""))
+	if err != nil {
+		return cfg, fmt.Errorf("TRUSTED_PROXIES config: %w", err)
 	}
 
 	return cfg, nil
+}
+
+func getJWTConfig(cfg *app.Config) error {
+	cfg.Secret.JWTSecret = env.GetStringEnv("JWT_SECRET", "")
+	cfg.Secret.JWTSecretPrev = env.GetStringEnv("JWT_SECRET_PREV", "")
+	if cfg.Secret.JWTSecret == "" {
+		return fmt.Errorf("JWT_SECRET cannot be empty")
+	}
+	if len(cfg.Secret.JWTSecret) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 bytes, got %d", len(cfg.Secret.JWTSecret))
+	}
+	cfg.Secret.JWTIssuer = env.GetStringEnv("JWT_ISSUER", "")
+	if cfg.Secret.JWTIssuer == "" {
+		return fmt.Errorf("JWT_ISSUER cannot be empty")
+	}
+	cfg.Secret.JWTAudience = env.GetStringEnv("JWT_AUDIENCE", "")
+	if cfg.Secret.JWTAudience == "" {
+		return fmt.Errorf("JWT_AUDIENCE cannot be empty")
+	}
+	return nil
+}
+
+func parseTrustedProxies(raw string) ([]net.IPNet, error) {
+	if raw == "" {
+		return nil, nil
+	}
+	var cidrs []net.IPNet
+	for _, s := range strings.Split(raw, ",") {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		_, cidr, err := net.ParseCIDR(s)
+		if err != nil {
+			return nil, fmt.Errorf("invalid CIDR %q: %w", s, err)
+		}
+		cidrs = append(cidrs, *cidr)
+	}
+	return cidrs, nil
 }
 
 func getCorsTrustedOrigins() (map[string]struct{}, error) {
@@ -189,11 +220,12 @@ func getCorsTrustedOrigins() (map[string]struct{}, error) {
 	return valid, nil
 }
 
-func getDatabaseConfig() (maxOpenConns int, maxIdleTime, maxLifetime string) {
+func getDatabaseConfig() (maxOpenConns, minOpenConns int, maxIdleTime, maxLifetime string) {
 	maxOpenConns = max(env.GetIntEnv("DB_OPEN_CONNECTION_LIMIT", 25), runtime.NumCPU()*4)
+	minOpenConns = env.GetIntEnv("DB_MIN_CONNECTION_LIMIT", 2)
 	maxIdleTime = env.GetStringEnv("DB_MAX_IDLE_TIME", "30m")
 	maxLifetime = env.GetStringEnv("DB_MAX_LIFETIME", "1h")
-	return maxOpenConns, maxIdleTime, maxLifetime
+	return maxOpenConns, minOpenConns, maxIdleTime, maxLifetime
 }
 
 func getRedis() (*redis.Client, error) {

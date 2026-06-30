@@ -1,7 +1,7 @@
 package authdomain
 
 import (
-	"learnflow_backend/internal/infrastructure/validator"
+	"learnflow_backend/internal/shared/validator"
 	"time"
 )
 
@@ -224,7 +224,7 @@ func (r *RefreshRequest) Validate() error {
 
 // LogoutRequest carries the refresh token to be revoked on logout.
 type LogoutRequest struct {
-	RefreshToken         string
+	RefreshToken         string `json:"refresh_token"`
 	JTI                  string
 	AccessTokenExpiresAt time.Time
 }

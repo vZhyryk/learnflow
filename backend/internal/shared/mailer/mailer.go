@@ -6,7 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"html/template"
-	"learnflow_backend/internal/infrastructure/validator"
+	"learnflow_backend/internal/shared/validator"
 	"time"
 
 	"gopkg.in/mail.v2"
@@ -58,6 +58,7 @@ func (m Mailer) Send(templateFile string, data any, ccUser CCuser, attachmentLis
 
 	m.dialer.TLSConfig = &tls.Config{
 		ServerName: m.dialer.Host,
+		MinVersion: tls.VersionTLS12,
 	}
 
 	if err := m.dialer.DialAndSend(msg); err != nil {

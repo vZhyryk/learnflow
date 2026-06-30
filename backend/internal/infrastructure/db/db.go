@@ -9,8 +9,8 @@ import (
 )
 
 // InitDatabase opens a PostgreSQL connection and configures pool settings.
-func InitDatabase(dsn, maxIdleTime, maxLifetime string, maxOpenConns int32) (*pgxpool.Pool, error) {
-	config, err := parseConfigs(dsn, maxIdleTime, maxLifetime, maxOpenConns)
+func InitDatabase(dsn, maxIdleTime, maxLifetime string, maxOpenConns, minOpenConns int32) (*pgxpool.Pool, error) {
+	config, err := parseConfigs(dsn, maxIdleTime, maxLifetime, maxOpenConns, minOpenConns)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func InitDatabase(dsn, maxIdleTime, maxLifetime string, maxOpenConns int32) (*pg
 	return pool, nil
 }
 
-func parseConfigs(dsn, maxIdleTime, maxLifetime string, maxOpenConns int32) (*pgxpool.Config, error) {
+func parseConfigs(dsn, maxIdleTime, maxLifetime string, maxOpenConns, minOpenConns int32) (*pgxpool.Config, error) {
 	config, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, fmt.Errorf("db: failed to parse config: %w", err)
@@ -53,12 +53,16 @@ func parseConfigs(dsn, maxIdleTime, maxLifetime string, maxOpenConns int32) (*pg
 	}
 
 	if lifetime <= 0 {
-		return nil, fmt.Errorf("db: max life time must be positive, got %s", maxIdleTime)
+		return nil, fmt.Errorf("db: max lifetime must be positive, got %s", maxLifetime)
 	}
 
+	if minOpenConns >= maxOpenConns {
+		return nil, fmt.Errorf("db: minOpenConns (%d) must be less than maxOpenConns (%d)", minOpenConns, maxOpenConns)
+	}
 	config.MaxConnLifetime = lifetime
+	config.MaxConnIdleTime = idleDuration
 	config.MaxConns = maxOpenConns
-	config.MinConns = 2
+	config.MinConns = minOpenConns
 	config.HealthCheckPeriod = 1 * time.Minute
 
 	return config, nil

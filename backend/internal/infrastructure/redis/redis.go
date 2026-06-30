@@ -11,9 +11,15 @@ import (
 // InitRedis creates and pings a Redis client using the given address and password.
 func InitRedis(addr, password string) (*redis.Client, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: password,
-		DB:       0,
+		Addr:            addr,
+		Password:        password,
+		DB:              0,
+		PoolSize:        10,
+		MinIdleConns:    2,
+		MaxRetries:      3,
+		DialTimeout:     3 * time.Second,
+		ReadTimeout:     3 * time.Second,
+		ConnMaxLifetime: 5 * time.Minute,
 	})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

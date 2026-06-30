@@ -31,7 +31,6 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 		Email:        req.Email,
 		PasswordHash: string(hash),
 		Role:         authdomain.RoleUser,
-		Status:       authdomain.StatusPendingVerification,
 	}
 
 	var userID string

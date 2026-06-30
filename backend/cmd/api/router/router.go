@@ -64,7 +64,6 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 		authservice.Utils{
 			Outbox:      outbox,
 			Token:       route.token,
-			JSONLogger:  a.Logger,
 			RedisClient: a.Redis,
 		},
 		authservice.Options{})
@@ -109,6 +108,10 @@ func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
 		route.App.Logger.Error(err, nil)
 	}
 
+	if len(bodyBytes) >= 4_096 {
+		return "oversized-body"
+	}
+
 	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
 	if err := json.Unmarshal(bodyBytes, &req); err != nil {
@@ -131,6 +134,10 @@ func (route *RouteHandler) getTokenFromBody(r *http.Request) string {
 
 	if err := r.Body.Close(); err != nil {
 		route.App.Logger.Error(err, nil)
+	}
+
+	if len(bodyBytes) >= 4_096 {
+		return "oversized-body"
 	}
 
 	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))

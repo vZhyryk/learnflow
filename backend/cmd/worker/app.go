@@ -16,6 +16,7 @@ type Config struct {
 		DSN          string
 		MaxIdleTime  string
 		MaxOpenConns int
+		MinOpenConns int
 		MaxLifetime  string
 	}
 

@@ -36,7 +36,7 @@ func main() {
 		jsonLogger.Fatal(err, nil)
 	}
 
-	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, int32(appCfg.Database.MaxOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
+	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, int32(appCfg.Database.MaxOpenConns), int32(appCfg.Database.MinOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
 	if err != nil {
 		jsonLogger.Fatal(err, nil)
 	}
@@ -136,21 +136,23 @@ func getAppConfig(environment string) (Config, error) {
 		return cfg, fmt.Errorf("failed to resolve database DSN: %w", err)
 	}
 
-	maxOpenConns, maxIdleTime, maxLifetime := getDatabaseConfig()
+	maxOpenConns, minOpenConns, maxIdleTime, maxLifetime := getDatabaseConfig()
 
 	cfg.Database.DSN = dsn
 	cfg.Database.MaxIdleTime = maxIdleTime
 	cfg.Database.MaxOpenConns = maxOpenConns
+	cfg.Database.MinOpenConns = minOpenConns
 	cfg.Database.MaxLifetime = maxLifetime
 
 	return cfg, nil
 }
 
-func getDatabaseConfig() (maxOpenConns int, maxIdleTime, maxLifetime string) {
+func getDatabaseConfig() (maxOpenConns, minOpenConns int, maxIdleTime, maxLifetime string) {
 	maxOpenConns = max(env.GetIntEnv("DB_OPEN_CONNECTION_LIMIT", 25), runtime.NumCPU()*4)
+	minOpenConns = env.GetIntEnv("DB_MIN_CONNECTION_LIMIT", 2)
 	maxIdleTime = env.GetStringEnv("DB_MAX_IDLE_TIME", "30m")
 	maxLifetime = env.GetStringEnv("DB_MAX_LIFETIME", "1h")
-	return maxOpenConns, maxIdleTime, maxLifetime
+	return maxOpenConns, minOpenConns, maxIdleTime, maxLifetime
 }
 
 func getSMTP(environment string) (SMTP, error) {

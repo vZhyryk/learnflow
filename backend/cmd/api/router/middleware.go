@@ -80,9 +80,8 @@ func (routes *RouteHandler) SetSecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// NewRouteRateLimiter creates a Redis-backed rate limiter middleware using the provided key function and request/time budget.
-func (route *RouteHandler) NewRouteRateLimiter(reqCount float64, duration time.Duration, _ int, getKeyFunc func(*http.Request) string) func(next http.Handler) http.Handler {
-	limit := int(reqCount)
+// NewRouteRateLimiter creates a Redis-backed token-bucket rate limiter middleware.
+func (route *RouteHandler) NewRouteRateLimiter(rps float64, duration time.Duration, burst int, getKeyFunc func(*http.Request) string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !route.App.Config.Limiter.Enabled {
@@ -91,7 +90,7 @@ func (route *RouteHandler) NewRouteRateLimiter(reqCount float64, duration time.D
 			}
 
 			key := getKeyFunc(r)
-			allowed, err := redisRateLimit(r.Context(), route.App.Redis, key, limit, duration)
+			allowed, err := redisRateLimit(r.Context(), route.App.Redis, key, rps, burst, duration)
 			if err != nil {
 				route.App.Logger.Error(fmt.Errorf("rate limiter: %w", err), map[string]any{
 					"method":         r.Method,

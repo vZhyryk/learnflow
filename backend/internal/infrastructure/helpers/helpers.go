@@ -87,7 +87,7 @@ func parseJSONError(err error) error {
 		return fmt.Errorf("body must not be larger than %d bytes", maxBytesError.Limit)
 
 	case errors.As(err, &invalidUnmarshalError):
-		panic(err)
+		return fmt.Errorf("invalid unmarshal target: %w", err)
 
 	default:
 		return fmt.Errorf("error parsing JSON: %w", err)

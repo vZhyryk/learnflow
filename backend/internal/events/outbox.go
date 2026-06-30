@@ -19,13 +19,21 @@ func NewOutboxWriter(pool *pgxpool.Pool) *OutboxWriter {
 	return &OutboxWriter{db: pool}
 }
 
+func (w *OutboxWriter) queryRunner(ctx context.Context) db.QueryRunner {
+	if tx, ok := db.ExtractTx(ctx); ok {
+		return tx
+	}
+	return w.db
+}
+
 // Emit serializes payload and inserts a pending event into the outbox table.
 func (w *OutboxWriter) Emit(ctx context.Context, aggregateType AggregationType, aggregateID string, eventType EventType, payload any) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("outbox.Emit marshal: %w", err)
 	}
-	if _, err := w.db.Exec(ctx, queryInsertOutbox, string(aggregateType), aggregateID, string(eventType), string(data)); err != nil {
+
+	if _, err := w.queryRunner(ctx).Exec(ctx, queryInsertOutbox, string(aggregateType), aggregateID, string(eventType), string(data)); err != nil {
 		return fmt.Errorf("outbox.Emit insert: %w", err)
 	}
 

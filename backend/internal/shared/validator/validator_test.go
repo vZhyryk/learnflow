@@ -1,9 +1,8 @@
 package validator_test
 
 import (
+	"learnflow_backend/internal/shared/validator"
 	"testing"
-
-	"learnflow_backend/internal/infrastructure/validator"
 
 	. "github.com/smartystreets/goconvey/convey"
 )

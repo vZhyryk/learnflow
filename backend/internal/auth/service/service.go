@@ -7,7 +7,6 @@ import (
 
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
-	"learnflow_backend/internal/infrastructure/logger"
 	"learnflow_backend/internal/shared/tokens"
 
 	"github.com/redis/go-redis/v9"
@@ -32,7 +31,6 @@ type Service struct {
 	tokenRepo         authdomain.TokenRepository
 	transactor        authdomain.Transactor
 	outbox            *events.OutboxWriter
-	jsonLogger        *logger.Logger
 	dummyPasswordHash []byte
 	cost              int
 	token             *tokens.Tokens
@@ -51,7 +49,6 @@ type Repos struct {
 type Utils struct {
 	Outbox      *events.OutboxWriter
 	Token       *tokens.Tokens
-	JSONLogger  *logger.Logger
 	RedisClient RedisOps
 }
 
@@ -77,7 +74,6 @@ func New(
 		transactor:        repos.Transactor,
 		outbox:            utils.Outbox,
 		token:             utils.Token,
-		jsonLogger:        utils.JSONLogger,
 		redisClient:       utils.RedisClient,
 		cost:              cost,
 		dummyPasswordHash: dummyPasswordHash,
