@@ -146,8 +146,8 @@ func getAppConfig(environment string) (app.Config, error) {
 
 	cfg.Port = env.GetIntEnv("PORT", 8080)
 
-	if err = getJWTConfig(&cfg); err != nil {
-		return cfg, err
+	if jwtErr := getJWTConfig(&cfg); jwtErr != nil {
+		return cfg, jwtErr
 	}
 
 	cfg.TrustedProxies, err = parseTrustedProxies(env.GetStringEnv("TRUSTED_PROXIES", ""))

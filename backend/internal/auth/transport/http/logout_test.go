@@ -37,8 +37,8 @@ func newLogoutFixture() *logoutFixture {
 	return f
 }
 
-func TestLogout(t *testing.T) {
-	Convey("POST /api/v1/auth/logout", t, func() {
+func TestLogoutRequestValidation(t *testing.T) {
+	Convey("POST /api/v1/auth/logout — request validation", t, func() {
 		f := newLogoutFixture()
 
 		Convey("Empty request body", func() {
@@ -64,6 +64,12 @@ func TestLogout(t *testing.T) {
 			f.mux.ServeHTTP(w, f.patch(`{"refresh_token":""}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
+	})
+}
+
+func TestLogoutServiceOutcomes(t *testing.T) {
+	Convey("POST /api/v1/auth/logout — service outcomes", t, func() {
+		f := newLogoutFixture()
 
 		Convey("Service returns ErrUserNotFound", func() {
 			f.svcErr = authdomain.ErrUserNotFound

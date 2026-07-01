@@ -67,66 +67,81 @@ func TestGetProfile(t *testing.T) {
 
 // --- PATCH /api/v1/users/profile ---
 
-func TestChangeProfile(t *testing.T) {
-	Convey("PATCH /api/v1/users/profile", t, func() {
-		var svcErr error
+type changeProfileFixture struct {
+	svcErr error
+	mux    *http.ServeMux
+	patch  func(body string) *http.Request
+}
 
-		svc := &mockService{
-			changeUserProfile: func(_ context.Context, _ usersdomain.ChangeUserProfileRequest) error {
-				return svcErr
-			},
-		}
-		handler := usershttp.NewHTTPHandler(svc, newTestLogger())
-		mux := http.NewServeMux()
-		handler.RegisterRoutes(mux, noopChain())
+func newChangeProfileFixture() *changeProfileFixture {
+	f := &changeProfileFixture{}
+	svc := &mockService{
+		changeUserProfile: func(_ context.Context, _ usersdomain.ChangeUserProfileRequest) error {
+			return f.svcErr
+		},
+	}
+	handler := usershttp.NewHTTPHandler(svc, newTestLogger())
+	f.mux = http.NewServeMux()
+	handler.RegisterRoutes(f.mux, noopChain())
+	f.patch = func(body string) *http.Request {
+		return httptest.NewRequestWithContext(context.Background(), http.MethodPatch, "/api/v1/users/profile", strings.NewReader(body))
+	}
+	return f
+}
 
-		patch := func(body string) *http.Request {
-			return httptest.NewRequestWithContext(context.Background(), http.MethodPatch, "/api/v1/users/profile", strings.NewReader(body))
-		}
+func TestChangeProfileRequestValidation(t *testing.T) {
+	Convey("PATCH /api/v1/users/profile — request validation", t, func() {
+		f := newChangeProfileFixture()
 
 		Convey("When the body is invalid JSON", func() {
 			w := httptest.NewRecorder()
-			mux.ServeHTTP(w, withUser(patch(`{bad json`)))
+			f.mux.ServeHTTP(w, withUser(f.patch(`{bad json`)))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("When a field fails validation", func() {
 			w := httptest.NewRecorder()
-			mux.ServeHTTP(w, withUser(patch(`{"gender":"invalid_value"}`)))
+			f.mux.ServeHTTP(w, withUser(f.patch(`{"gender":"invalid_value"}`)))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("When no user in context", func() {
 			w := httptest.NewRecorder()
-			mux.ServeHTTP(w, patch(`{"first_name":"Jane"}`))
+			f.mux.ServeHTTP(w, f.patch(`{"first_name":"Jane"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
+	})
+}
+
+func TestChangeProfileServiceOutcomes(t *testing.T) {
+	Convey("PATCH /api/v1/users/profile — service outcomes", t, func() {
+		f := newChangeProfileFixture()
 
 		Convey("When the update succeeds", func() {
 			w := httptest.NewRecorder()
-			mux.ServeHTTP(w, withUser(patch(`{"first_name":"Jane"}`)))
+			f.mux.ServeHTTP(w, withUser(f.patch(`{"first_name":"Jane"}`)))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(decodeBody(t, w.Body.Bytes())["message"], ShouldNotBeNil)
 		})
 
 		Convey("When the profile is not found", func() {
-			svcErr = usersdomain.ErrUserNotFound
+			f.svcErr = usersdomain.ErrUserNotFound
 			w := httptest.NewRecorder()
-			mux.ServeHTTP(w, withUser(patch(`{"first_name":"Jane"}`)))
+			f.mux.ServeHTTP(w, withUser(f.patch(`{"first_name":"Jane"}`)))
 			So(w.Code, ShouldEqual, http.StatusNotFound)
 		})
 
 		Convey("When the service returns a domain validation error", func() {
-			svcErr = usersdomain.ErrFirstNameInvalid
+			f.svcErr = usersdomain.ErrFirstNameInvalid
 			w := httptest.NewRecorder()
-			mux.ServeHTTP(w, withUser(patch(`{"first_name":"Jane"}`)))
+			f.mux.ServeHTTP(w, withUser(f.patch(`{"first_name":"Jane"}`)))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
 		Convey("When the service returns an unexpected error", func() {
-			svcErr = errors.New("db down")
+			f.svcErr = errors.New("db down")
 			w := httptest.NewRecorder()
-			mux.ServeHTTP(w, withUser(patch(`{"first_name":"Jane"}`)))
+			f.mux.ServeHTTP(w, withUser(f.patch(`{"first_name":"Jane"}`)))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 	})

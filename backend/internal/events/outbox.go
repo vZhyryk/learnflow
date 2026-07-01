@@ -19,6 +19,12 @@ func NewOutboxWriter(pool *pgxpool.Pool) *OutboxWriter {
 	return &OutboxWriter{db: pool}
 }
 
+// NewOutboxWriterWithRunner returns a new OutboxWriter backed by an arbitrary db.QueryRunner.
+// Intended for tests that need to substitute a fake runner instead of a real pgxpool.Pool.
+func NewOutboxWriterWithRunner(runner db.QueryRunner) *OutboxWriter {
+	return &OutboxWriter{db: runner}
+}
+
 func (w *OutboxWriter) queryRunner(ctx context.Context) db.QueryRunner {
 	if tx, ok := db.ExtractTx(ctx); ok {
 		return tx

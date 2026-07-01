@@ -1,6 +1,7 @@
 package usersdomain
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,8 @@ func TestValidateFirstName(t *testing.T) {
 		})
 		Convey("empty string is invalid", func() {
 			firstName := ""
-			So((&ChangeUserProfileRequest{FirstName: &firstName}).Validate(), ShouldEqual, ErrFirstNameInvalid)
+			err := (&ChangeUserProfileRequest{FirstName: &firstName}).Validate()
+			So(errors.Is(err, ErrFirstNameInvalid), ShouldBeTrue)
 		})
 		Convey("100 runes is valid", func() {
 			firstName := strings.Repeat("а", 100)
@@ -25,7 +27,8 @@ func TestValidateFirstName(t *testing.T) {
 		})
 		Convey("101 runes is invalid", func() {
 			firstName := strings.Repeat("а", 101)
-			So((&ChangeUserProfileRequest{FirstName: &firstName}).Validate(), ShouldEqual, ErrFirstNameInvalid)
+			err := (&ChangeUserProfileRequest{FirstName: &firstName}).Validate()
+			So(errors.Is(err, ErrFirstNameInvalid), ShouldBeTrue)
 		})
 	})
 }
@@ -45,7 +48,8 @@ func TestValidateLastName(t *testing.T) {
 		})
 		Convey("101 runes is invalid", func() {
 			lastName := strings.Repeat("б", 101)
-			So((&ChangeUserProfileRequest{LastName: &lastName}).Validate(), ShouldEqual, ErrLastNameTooLong)
+			err := (&ChangeUserProfileRequest{LastName: &lastName}).Validate()
+			So(errors.Is(err, ErrLastNameTooLong), ShouldBeTrue)
 		})
 	})
 }
@@ -61,7 +65,8 @@ func TestValidatePhoneNumber(t *testing.T) {
 		})
 		Convey("21 chars is invalid", func() {
 			phone := strings.Repeat("1", 21)
-			So((&ChangeUserProfileRequest{PhoneNumber: &phone}).Validate(), ShouldEqual, ErrPhoneNumberInvalid)
+			err := (&ChangeUserProfileRequest{PhoneNumber: &phone}).Validate()
+			So(errors.Is(err, ErrPhoneNumberInvalid), ShouldBeTrue)
 		})
 	})
 }
@@ -77,15 +82,18 @@ func TestValidateCountry(t *testing.T) {
 		})
 		Convey("1-char code is invalid", func() {
 			country := "U"
-			So((&ChangeUserProfileRequest{Country: &country}).Validate(), ShouldEqual, ErrCountryInvalid)
+			err := (&ChangeUserProfileRequest{Country: &country}).Validate()
+			So(errors.Is(err, ErrCountryInvalid), ShouldBeTrue)
 		})
 		Convey("3-char code is invalid", func() {
 			country := "UKR"
-			So((&ChangeUserProfileRequest{Country: &country}).Validate(), ShouldEqual, ErrCountryInvalid)
+			err := (&ChangeUserProfileRequest{Country: &country}).Validate()
+			So(errors.Is(err, ErrCountryInvalid), ShouldBeTrue)
 		})
 		Convey("empty string is invalid", func() {
 			country := ""
-			So((&ChangeUserProfileRequest{Country: &country}).Validate(), ShouldEqual, ErrCountryInvalid)
+			err := (&ChangeUserProfileRequest{Country: &country}).Validate()
+			So(errors.Is(err, ErrCountryInvalid), ShouldBeTrue)
 		})
 	})
 }
@@ -105,15 +113,18 @@ func TestValidateDateOfBirth(t *testing.T) {
 		})
 		Convey("date before 1900 is invalid", func() {
 			dob := "1899-12-31"
-			So((&ChangeUserProfileRequest{DateOfBirth: &dob}).Validate(), ShouldEqual, ErrDateOfBirthInvalid)
+			err := (&ChangeUserProfileRequest{DateOfBirth: &dob}).Validate()
+			So(errors.Is(err, ErrDateOfBirthInvalid), ShouldBeTrue)
 		})
 		Convey("future date is invalid", func() {
 			dob := time.Now().UTC().AddDate(0, 0, 1).Format("2006-01-02")
-			So((&ChangeUserProfileRequest{DateOfBirth: &dob}).Validate(), ShouldEqual, ErrDateOfBirthInvalid)
+			err := (&ChangeUserProfileRequest{DateOfBirth: &dob}).Validate()
+			So(errors.Is(err, ErrDateOfBirthInvalid), ShouldBeTrue)
 		})
 		Convey("malformed date is invalid", func() {
 			dob := "15-06-1990"
-			So((&ChangeUserProfileRequest{DateOfBirth: &dob}).Validate(), ShouldEqual, ErrDateOfBirthInvalid)
+			err := (&ChangeUserProfileRequest{DateOfBirth: &dob}).Validate()
+			So(errors.Is(err, ErrDateOfBirthInvalid), ShouldBeTrue)
 		})
 	})
 }
@@ -131,7 +142,8 @@ func TestValidateGender(t *testing.T) {
 		}
 		Convey("unknown value is invalid", func() {
 			gender := "unknown"
-			So((&ChangeUserProfileRequest{Gender: &gender}).Validate(), ShouldEqual, ErrGenderInvalid)
+			err := (&ChangeUserProfileRequest{Gender: &gender}).Validate()
+			So(errors.Is(err, ErrGenderInvalid), ShouldBeTrue)
 		})
 	})
 }
@@ -149,7 +161,8 @@ func TestValidateUILanguage(t *testing.T) {
 		}
 		Convey("unsupported code is invalid", func() {
 			lang := "de"
-			So((&ChangeUserProfileRequest{UILanguage: &lang}).Validate(), ShouldEqual, ErrUILanguageInvalid)
+			err := (&ChangeUserProfileRequest{UILanguage: &lang}).Validate()
+			So(errors.Is(err, ErrUILanguageInvalid), ShouldBeTrue)
 		})
 	})
 }
@@ -165,15 +178,18 @@ func TestValidateAvatarURL(t *testing.T) {
 		})
 		Convey("http URL is invalid", func() {
 			url := "http://cdn.example.com/avatar.jpg"
-			So((&ChangeUserProfileRequest{AvatarURL: &url}).Validate(), ShouldEqual, ErrAvatarURLInvalid)
+			err := (&ChangeUserProfileRequest{AvatarURL: &url}).Validate()
+			So(errors.Is(err, ErrAvatarURLInvalid), ShouldBeTrue)
 		})
 		Convey("URL without host is invalid", func() {
 			url := "https://"
-			So((&ChangeUserProfileRequest{AvatarURL: &url}).Validate(), ShouldEqual, ErrAvatarURLInvalid)
+			err := (&ChangeUserProfileRequest{AvatarURL: &url}).Validate()
+			So(errors.Is(err, ErrAvatarURLInvalid), ShouldBeTrue)
 		})
 		Convey("plain string is invalid", func() {
 			url := "not-a-url"
-			So((&ChangeUserProfileRequest{AvatarURL: &url}).Validate(), ShouldEqual, ErrAvatarURLInvalid)
+			err := (&ChangeUserProfileRequest{AvatarURL: &url}).Validate()
+			So(errors.Is(err, ErrAvatarURLInvalid), ShouldBeTrue)
 		})
 	})
 }
@@ -193,7 +209,8 @@ func TestValidateTimezone(t *testing.T) {
 		})
 		Convey("invalid timezone is rejected", func() {
 			tz := "Mars/Olympus"
-			So((&ChangeUserProfileRequest{Timezone: &tz}).Validate(), ShouldEqual, ErrTimezoneInvalid)
+			err := (&ChangeUserProfileRequest{Timezone: &tz}).Validate()
+			So(errors.Is(err, ErrTimezoneInvalid), ShouldBeTrue)
 		})
 	})
 }
@@ -209,7 +226,8 @@ func TestValidateBio(t *testing.T) {
 		})
 		Convey("501 runes is invalid", func() {
 			bio := strings.Repeat("я", 501)
-			So((&ChangeUserProfileRequest{Bio: &bio}).Validate(), ShouldEqual, ErrBioTooLong)
+			err := (&ChangeUserProfileRequest{Bio: &bio}).Validate()
+			So(errors.Is(err, ErrBioTooLong), ShouldBeTrue)
 		})
 	})
 }

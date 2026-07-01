@@ -71,22 +71,42 @@ func castTime(v any, idx int) *time.Time {
 	return s
 }
 
+func fakeProfile(now time.Time) *usersdomain.UserProfile {
+	return &usersdomain.UserProfile{
+		UserID:      "user-123",
+		FirstName:   "John",
+		LastName:    "Doe",
+		PhoneNumber: "+380991234567",
+		Country:     "UA",
+		City:        "Kyiv",
+		DateOfBirth: nil,
+		Gender:      "male",
+		UILanguage:  "uk",
+		AvatarURL:   "",
+		Timezone:    "Europe/Kiev",
+		Bio:         "bio text",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+}
+
 func fakeScanProfile(now time.Time) func(dest ...any) error {
+	p := fakeProfile(now)
 	return func(dest ...any) error {
-		*castStr(dest[0], 0) = "user-123"
-		*castStr(dest[1], 1) = "John"
-		*castStr(dest[2], 2) = "Doe"
-		*castStr(dest[3], 3) = "+380991234567"
-		*castStr(dest[4], 4) = "UA"
-		*castStr(dest[5], 5) = "Kyiv"
-		*castPtrStr(dest[6], 6) = nil
-		*castStr(dest[7], 7) = "male"
-		*castStr(dest[8], 8) = "uk"
-		*castStr(dest[9], 9) = ""
-		*castStr(dest[10], 10) = "Europe/Kiev"
-		*castStr(dest[11], 11) = "bio text"
-		*castTime(dest[12], 12) = now
-		*castTime(dest[13], 13) = now
+		*castStr(dest[0], 0) = p.UserID
+		*castStr(dest[1], 1) = p.FirstName
+		*castStr(dest[2], 2) = p.LastName
+		*castStr(dest[3], 3) = p.PhoneNumber
+		*castStr(dest[4], 4) = p.Country
+		*castStr(dest[5], 5) = p.City
+		*castPtrStr(dest[6], 6) = p.DateOfBirth
+		*castStr(dest[7], 7) = p.Gender
+		*castStr(dest[8], 8) = p.UILanguage
+		*castStr(dest[9], 9) = p.AvatarURL
+		*castStr(dest[10], 10) = p.Timezone
+		*castStr(dest[11], 11) = p.Bio
+		*castTime(dest[12], 12) = p.CreatedAt
+		*castTime(dest[13], 13) = p.UpdatedAt
 		return nil
 	}
 }

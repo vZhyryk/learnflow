@@ -84,7 +84,7 @@ type UserSession struct {
 	IPAddress           *string
 	ExpiresAt           time.Time
 	RevokedAt           *time.Time
-	RevokeReason        *string
+	RevokeReason        *RevokeReason
 	RevokedByUserID     *string
 	CreatedAt           time.Time
 	FailedAttemptCount  int
