@@ -4,23 +4,63 @@ import (
 	"context"
 	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/testutil"
 	"testing"
 	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+func validChangeEmailToken(_ context.Context, _ string) (*authdomain.EmailChangeToken, error) {
+	return &authdomain.EmailChangeToken{
+		TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
+		NewEmail:  "new@example.com",
+	}, nil
+}
+
+func validChangeEmailUserRepo() *mockUserRepo {
+	return &mockUserRepo{
+		getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) { return nil, authdomain.ErrUserNotFound },
+		updateEmail:    testutil.AlwaysNil2,
+	}
+}
+
+func validTokenRepo() *mockTokenRepo {
+	return &mockTokenRepo{
+		getEmailChangeToken:      validChangeEmailToken,
+		markEmailChangeTokenUsed: testutil.AlwaysNil,
+	}
+}
+
+func validGetUserByEmail(_ context.Context, _ string) (*authdomain.User, error) {
+	return nil, authdomain.ErrUserNotFound
+}
+
+// initiateEmailChangeGetUserByID returns the "current user" fixture shared by
+// InitiateEmailChange tests that need a resolvable owner of the email-change request.
+func initiateEmailChangeGetUserByID(_ context.Context, _ string) (*authdomain.User, error) {
+	return &authdomain.User{ID: "user-123", Email: "old@example.com"}, nil
+}
+
+func validEmailChangeRequest() authdomain.EmailChangeRequest {
+	return authdomain.EmailChangeRequest{Token: "tok", UserID: "user-123"}
+}
+
+func validRequestEmailChangeRequest() authdomain.RequestEmailChangeRequest {
+	return authdomain.RequestEmailChangeRequest{UserID: "user-123", NewEmail: "new@example.com"}
+}
+
 func TestInitiateEmailChangeUserLookupFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When the user lookup fails", func() {
 			uRepo := &mockUserRepo{
 				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			err := srv.InitiateEmailChange(context.Background(), authdomain.RequestEmailChangeRequest{UserID: "user-123", NewEmail: "new@example.com"})
+			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "get user")
@@ -38,7 +78,7 @@ func TestInitiateEmailChangeSameEmail(t *testing.T) {
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			err := srv.InitiateEmailChange(context.Background(), authdomain.RequestEmailChangeRequest{UserID: "user-123", NewEmail: "new@example.com"})
+			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
 
 			So(errors.Is(err, authdomain.ErrEmailAlreadyInUse), ShouldBeTrue)
 		})
@@ -49,16 +89,14 @@ func TestInitiateEmailChangeAvailabilityCheck(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When checking whether the new email is taken fails unexpectedly", func() {
 			uRepo := &mockUserRepo{
-				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Email: "old@example.com"}, nil
-				},
+				getUserByID: initiateEmailChangeGetUserByID,
 				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			err := srv.InitiateEmailChange(context.Background(), authdomain.RequestEmailChangeRequest{UserID: "user-123", NewEmail: "new@example.com"})
+			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "check new email exists")
@@ -66,16 +104,14 @@ func TestInitiateEmailChangeAvailabilityCheck(t *testing.T) {
 
 		Convey("When the new email is already taken by another user", func() {
 			uRepo := &mockUserRepo{
-				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Email: "old@example.com"}, nil
-				},
+				getUserByID: initiateEmailChangeGetUserByID,
 				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
 					return &authdomain.User{ID: "someone-else"}, nil
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			err := srv.InitiateEmailChange(context.Background(), authdomain.RequestEmailChangeRequest{UserID: "user-123", NewEmail: "new@example.com"})
+			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
 
 			So(errors.Is(err, authdomain.ErrEmailAlreadyInUse), ShouldBeTrue)
 		})
@@ -86,19 +122,15 @@ func TestInitiateEmailChangeProfileLookup(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When fetching the user profile fails unexpectedly", func() {
 			uRepo := &mockUserRepo{
-				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Email: "old@example.com"}, nil
-				},
-				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return nil, authdomain.ErrUserNotFound
-				},
+				getUserByID:    initiateEmailChangeGetUserByID,
+				getUserByEmail: validGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			err := srv.InitiateEmailChange(context.Background(), authdomain.RequestEmailChangeRequest{UserID: "user-123", NewEmail: "new@example.com"})
+			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "get user profile")
@@ -106,19 +138,15 @@ func TestInitiateEmailChangeProfileLookup(t *testing.T) {
 
 		Convey("When the user profile does not exist", func() {
 			uRepo := &mockUserRepo{
-				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Email: "old@example.com"}, nil
-				},
-				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return nil, authdomain.ErrUserNotFound
-				},
+				getUserByID:    initiateEmailChangeGetUserByID,
+				getUserByEmail: validGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
 					return nil, authdomain.ErrUserNotFound
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			err := srv.InitiateEmailChange(context.Background(), authdomain.RequestEmailChangeRequest{UserID: "user-123", NewEmail: "new@example.com"})
+			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
 
 			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
 		})
@@ -130,12 +158,8 @@ func TestInitiateEmailChangeTokenIssued(t *testing.T) {
 		Convey("When the token is issued successfully", func() {
 			var captured []any
 			uRepo := &mockUserRepo{
-				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Email: "old@example.com"}, nil
-				},
-				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return nil, authdomain.ErrUserNotFound
-				},
+				getUserByID:    initiateEmailChangeGetUserByID,
+				getUserByEmail: validGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
 					return &authdomain.UserProfile{UserID: "user-123", FirstName: "Alice"}, nil
 				},
@@ -147,7 +171,7 @@ func TestInitiateEmailChangeTokenIssued(t *testing.T) {
 			}
 			srv := newTestService(uRepo, nil, tRepo, newCapturingOutbox(&captured), nil)
 
-			err := srv.InitiateEmailChange(context.Background(), authdomain.RequestEmailChangeRequest{UserID: "user-123", NewEmail: "new@example.com"})
+			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
 
 			So(err, ShouldBeNil)
 			So(captured, ShouldNotBeEmpty)
@@ -161,24 +185,20 @@ func TestInitiateEmailChangeTokenCreationFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When creating the token fails", func() {
 			uRepo := &mockUserRepo{
-				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Email: "old@example.com"}, nil
-				},
-				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return nil, authdomain.ErrUserNotFound
-				},
+				getUserByID:    initiateEmailChangeGetUserByID,
+				getUserByEmail: validGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
 					return &authdomain.UserProfile{UserID: "user-123"}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
 				createEmailChangeToken: func(_ context.Context, _ *authdomain.EmailChangeToken) (*authdomain.EmailChangeToken, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, tRepo, newNoopOutbox(), nil)
 
-			err := srv.InitiateEmailChange(context.Background(), authdomain.RequestEmailChangeRequest{UserID: "user-123", NewEmail: "new@example.com"})
+			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "create token")
@@ -187,7 +207,7 @@ func TestInitiateEmailChangeTokenCreationFails(t *testing.T) {
 }
 
 func TestChangeEmailTokenLookup(t *testing.T) {
-	req := authdomain.EmailChangeRequest{Token: "tok", UserID: "user-123"}
+	req := validEmailChangeRequest()
 
 	Convey("Given an auth service", t, func() {
 		Convey("When the token lookup fails", func() {
@@ -236,17 +256,12 @@ func TestChangeEmailTokenLookup(t *testing.T) {
 }
 
 func TestChangeEmailNewEmailAvailability(t *testing.T) {
-	req := authdomain.EmailChangeRequest{Token: "tok", UserID: "user-123"}
+	req := validEmailChangeRequest()
 
 	Convey("Given an auth service", t, func() {
 		Convey("When the new email became taken meanwhile", func() {
 			tRepo := &mockTokenRepo{
-				getEmailChangeToken: func(_ context.Context, _ string) (*authdomain.EmailChangeToken, error) {
-					return &authdomain.EmailChangeToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
-						NewEmail:  "new@example.com",
-					}, nil
-				},
+				getEmailChangeToken: validChangeEmailToken,
 			}
 			uRepo := &mockUserRepo{
 				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
@@ -262,16 +277,11 @@ func TestChangeEmailNewEmailAvailability(t *testing.T) {
 
 		Convey("When checking new email availability fails unexpectedly", func() {
 			tRepo := &mockTokenRepo{
-				getEmailChangeToken: func(_ context.Context, _ string) (*authdomain.EmailChangeToken, error) {
-					return &authdomain.EmailChangeToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
-						NewEmail:  "new@example.com",
-					}, nil
-				},
+				getEmailChangeToken: validChangeEmailToken,
 			}
 			uRepo := &mockUserRepo{
 				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
@@ -284,22 +294,15 @@ func TestChangeEmailNewEmailAvailability(t *testing.T) {
 	})
 }
 
-func validChangeEmailToken(_ context.Context, _ string) (*authdomain.EmailChangeToken, error) {
-	return &authdomain.EmailChangeToken{
-		TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
-		NewEmail:  "new@example.com",
-	}, nil
-}
-
 func TestChangeEmailApplyFailures(t *testing.T) {
-	req := authdomain.EmailChangeRequest{Token: "tok", UserID: "user-123"}
+	req := validEmailChangeRequest()
 
 	Convey("Given an auth service", t, func() {
 		Convey("When updating the email fails", func() {
 			tRepo := &mockTokenRepo{getEmailChangeToken: validChangeEmailToken}
 			uRepo := &mockUserRepo{
 				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) { return nil, authdomain.ErrUserNotFound },
-				updateEmail:    func(_ context.Context, _, _ string) error { return errors.New("db connection lost") },
+				updateEmail:    testutil.AlwaysFailsDB2,
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
 
@@ -313,13 +316,10 @@ func TestChangeEmailApplyFailures(t *testing.T) {
 			tRepo := &mockTokenRepo{
 				getEmailChangeToken: validChangeEmailToken,
 				markEmailChangeTokenUsed: func(_ context.Context, _ string) error {
-					return errors.New("db connection lost")
+					return testutil.ErrDBUnexpected
 				},
 			}
-			uRepo := &mockUserRepo{
-				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) { return nil, authdomain.ErrUserNotFound },
-				updateEmail:    func(_ context.Context, _, _ string) error { return nil },
-			}
+			uRepo := validChangeEmailUserRepo()
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
 
 			err := srv.ChangeEmail(context.Background(), req)
@@ -334,19 +334,8 @@ func TestChangeEmailWithoutSessionLogout(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When IsAllSessionsLogout is false", func() {
 			var revokeCalled bool
-			tRepo := &mockTokenRepo{
-				getEmailChangeToken: func(_ context.Context, _ string) (*authdomain.EmailChangeToken, error) {
-					return &authdomain.EmailChangeToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
-						NewEmail:  "new@example.com",
-					}, nil
-				},
-				markEmailChangeTokenUsed: func(_ context.Context, _ string) error { return nil },
-			}
-			uRepo := &mockUserRepo{
-				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) { return nil, authdomain.ErrUserNotFound },
-				updateEmail:    func(_ context.Context, _, _ string) error { return nil },
-			}
+			tRepo := validTokenRepo()
+			uRepo := validChangeEmailUserRepo()
 			sRepo := &mockSessionRepo{
 				revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error {
 					revokeCalled = true
@@ -355,7 +344,7 @@ func TestChangeEmailWithoutSessionLogout(t *testing.T) {
 			}
 			srv := newTestService(uRepo, sRepo, tRepo, nil, nil)
 
-			err := srv.ChangeEmail(context.Background(), authdomain.EmailChangeRequest{Token: "tok", UserID: "user-123"})
+			err := srv.ChangeEmail(context.Background(), validEmailChangeRequest())
 
 			So(err, ShouldBeNil)
 			So(revokeCalled, ShouldBeFalse)
@@ -368,19 +357,8 @@ func TestChangeEmailWithSessionLogout(t *testing.T) {
 		Convey("When IsAllSessionsLogout is true and revocation succeeds", func() {
 			var gotUserID string
 			var gotReason authdomain.RevokeReason
-			tRepo := &mockTokenRepo{
-				getEmailChangeToken: func(_ context.Context, _ string) (*authdomain.EmailChangeToken, error) {
-					return &authdomain.EmailChangeToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
-						NewEmail:  "new@example.com",
-					}, nil
-				},
-				markEmailChangeTokenUsed: func(_ context.Context, _ string) error { return nil },
-			}
-			uRepo := &mockUserRepo{
-				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) { return nil, authdomain.ErrUserNotFound },
-				updateEmail:    func(_ context.Context, _, _ string) error { return nil },
-			}
+			tRepo := validTokenRepo()
+			uRepo := validChangeEmailUserRepo()
 			sRepo := &mockSessionRepo{
 				revokeAllUserSessions: func(_ context.Context, userID string, _ *string, reason authdomain.RevokeReason) error {
 					gotUserID, gotReason = userID, reason
@@ -390,8 +368,11 @@ func TestChangeEmailWithSessionLogout(t *testing.T) {
 			srv := newTestService(uRepo, sRepo, tRepo, nil, newSuccessfulMockRedis())
 
 			err := srv.ChangeEmail(context.Background(), authdomain.EmailChangeRequest{
-				Token: "tok", UserID: "user-123", IsAllSessionsLogout: true,
-				JTI: "jti-123", AccessTokenExpiresAt: time.Now().UTC().Add(15 * time.Minute),
+				Token:                "tok",
+				UserID:               "user-123",
+				IsAllSessionsLogout:  true,
+				JTI:                  "jti-123",
+				AccessTokenExpiresAt: time.Now().UTC().Add(15 * time.Minute),
 			})
 
 			So(err, ShouldBeNil)
@@ -404,22 +385,11 @@ func TestChangeEmailWithSessionLogout(t *testing.T) {
 func TestChangeEmailSessionLogoutFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When IsAllSessionsLogout is true and revocation fails", func() {
-			tRepo := &mockTokenRepo{
-				getEmailChangeToken: func(_ context.Context, _ string) (*authdomain.EmailChangeToken, error) {
-					return &authdomain.EmailChangeToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
-						NewEmail:  "new@example.com",
-					}, nil
-				},
-				markEmailChangeTokenUsed: func(_ context.Context, _ string) error { return nil },
-			}
-			uRepo := &mockUserRepo{
-				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) { return nil, authdomain.ErrUserNotFound },
-				updateEmail:    func(_ context.Context, _, _ string) error { return nil },
-			}
+			tRepo := validTokenRepo()
+			uRepo := validChangeEmailUserRepo()
 			sRepo := &mockSessionRepo{
 				revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error {
-					return errors.New("db connection lost")
+					return testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, sRepo, tRepo, nil, newSuccessfulMockRedis())

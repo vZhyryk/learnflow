@@ -37,7 +37,8 @@ func WriteJSON(w http.ResponseWriter, status int, data Envelope, headers http.He
 	return nil
 }
 
-// ReadJSON decodes a JSON request body into dst, enforcing a 1 MB size limit and rejecting unknown fields.
+// ReadJSON decodes a JSON request body into dst, enforcing a 1 MB size limit, rejecting
+// unknown fields, and rejecting bodies that contain more than one JSON value.
 func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	r.Body = http.MaxBytesReader(w, r.Body, 1_048_576)
 

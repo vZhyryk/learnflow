@@ -15,7 +15,7 @@ func NewPasswordResetWorker(
 	queryRunner db.QueryRunner,
 	redisClient *redis.Client,
 	jsonLogger *logger.Logger,
-	m *mailer.Mailer,
+	m Mailer,
 	baseURL string,
 ) *EmailWorker[events.InitPasswordResetToken] {
 	return NewEmailWorker(queryRunner, redisClient, jsonLogger, m, baseURL, Config[events.InitPasswordResetToken]{
@@ -36,7 +36,7 @@ func ValidatePasswordResetPayload(p events.InitPasswordResetToken) error {
 }
 
 // HandlePasswordResetProcess sends the password reset email for the given payload.
-func HandlePasswordResetProcess(p events.InitPasswordResetToken, baseURL string, m *mailer.Mailer) error {
+func HandlePasswordResetProcess(p events.InitPasswordResetToken, baseURL string, m Mailer) error {
 	data := map[string]string{
 		"name":           p.UserName,
 		"resetUrl":       fmt.Sprintf("%s/api/v1/users/auth/password/reset?token=%s", baseURL, p.RawToken),

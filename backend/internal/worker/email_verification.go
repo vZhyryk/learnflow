@@ -15,7 +15,7 @@ func NewEmailVerificationWorker(
 	queryRunner db.QueryRunner,
 	redisClient *redis.Client,
 	jsonLogger *logger.Logger,
-	m *mailer.Mailer,
+	m Mailer,
 	baseURL string,
 ) *EmailWorker[events.UserRegisteredPayload] {
 	return NewEmailWorker(queryRunner, redisClient, jsonLogger, m, baseURL, Config[events.UserRegisteredPayload]{
@@ -36,7 +36,7 @@ func ValidateEmailVerificationPayload(p events.UserRegisteredPayload) error {
 }
 
 // HandleEmailVerificationProcess sends the email verification email for the given payload.
-func HandleEmailVerificationProcess(p events.UserRegisteredPayload, baseURL string, m *mailer.Mailer) error {
+func HandleEmailVerificationProcess(p events.UserRegisteredPayload, baseURL string, m Mailer) error {
 	data := map[string]string{
 		"name":            p.UserName,
 		"verificationUrl": fmt.Sprintf("%s/api/v1/users/auth/email/verify?token=%s", baseURL, p.RawToken),

@@ -2,7 +2,6 @@ package authhttp_test
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +9,7 @@ import (
 
 	authdomain "learnflow_backend/internal/auth/domain"
 	authhttp "learnflow_backend/internal/auth/transport/http"
+	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -28,7 +28,7 @@ func newLogoutFixture() *logoutFixture {
 			return f.svcResult, f.svcErr
 		},
 	}
-	handler := authhttp.NewHTTPHandler(svc, newTestLogger())
+	handler := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
 	f.mux = http.NewServeMux()
 	handler.RegisterRoutes(f.mux, authhttp.AuthRouteChains{})
 	f.patch = func(body string) *http.Request {
@@ -42,26 +42,22 @@ func TestLogoutRequestValidation(t *testing.T) {
 		f := newLogoutFixture()
 
 		Convey("Empty request body", func() {
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.patch(``))
+			w := testutil.ServeHTTP(f.mux, f.patch(``))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Invalid JSON", func() {
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.patch(`{bad json`))
+			w := testutil.ServeHTTP(f.mux, f.patch(`{bad json`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Wrong type for refresh_token", func() {
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.patch(`{"refresh_token":1}`))
+			w := testutil.ServeHTTP(f.mux, f.patch(`{"refresh_token":1}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Empty refresh_token fails validation", func() {
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.patch(`{"refresh_token":""}`))
+			w := testutil.ServeHTTP(f.mux, f.patch(`{"refresh_token":""}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 	})
@@ -73,46 +69,45 @@ func TestLogoutServiceOutcomes(t *testing.T) {
 
 		Convey("Service returns ErrUserNotFound", func() {
 			f.svcErr = authdomain.ErrUserNotFound
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.patch(`{"refresh_token": "ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.patch(`{"refresh_token": "ref"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Service returns ErrInvalidCredentials", func() {
 			f.svcErr = authdomain.ErrInvalidCredentials
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.patch(`{"refresh_token": "ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.patch(`{"refresh_token": "ref"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Service returns ErrSessionNotFound", func() {
 			f.svcErr = authdomain.ErrSessionNotFound
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.patch(`{"refresh_token": "ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.patch(`{"refresh_token": "ref"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Account blocked returns 403", func() {
 			f.svcErr = authdomain.ErrAccountBlocked
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.patch(`{"refresh_token": "ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.patch(`{"refresh_token": "ref"}`))
 			So(w.Code, ShouldEqual, http.StatusForbidden)
 		})
 
 		Convey("Unexpected service error returns 500", func() {
-			f.svcErr = errors.New("database unavailable")
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.patch(`{"refresh_token": "ref"}`))
+			f.svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(f.mux, f.patch(`{"refresh_token": "ref"}`))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid request returns 200 with ok body", func() {
 			f.svcResult = "user-123"
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.patch(`{"refresh_token": "ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.patch(`{"refresh_token": "ref"}`))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["ok"], ShouldEqual, true)
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			f.svcResult = "user-123"
+			So(func() { f.mux.ServeHTTP(&errWriter{}, f.patch(`{"refresh_token": "ref"}`)) }, ShouldNotPanic)
 		})
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"learnflow_backend/internal/shared/testutil"
 	usersdomain "learnflow_backend/internal/users/domain"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -50,7 +51,7 @@ func TestGetUserProfile(t *testing.T) {
 		})
 
 		Convey("When the repository returns an unexpected error", func() {
-			repoErr = errors.New("db connection lost")
+			repoErr = testutil.ErrDBUnexpected
 			_, err := svc.GetUserProfile(context.Background(), "user-123")
 			Convey("Then it wraps and propagates the error", func() {
 				So(err, ShouldNotBeNil)

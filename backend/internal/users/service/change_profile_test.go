@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"learnflow_backend/internal/shared/testutil"
 	usersdomain "learnflow_backend/internal/users/domain"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -66,7 +67,7 @@ func TestChangeUserProfile(t *testing.T) {
 
 		Convey("When the repository update fails", func() {
 			getResult = &usersdomain.UserProfile{UserID: "user-123"}
-			updateErr = errors.New("db timeout")
+			updateErr = testutil.ErrDBTimeout
 			userID := "user-123"
 			err := svc.ChangeUserProfile(context.Background(), usersdomain.ChangeUserProfileRequest{
 				UserID: &userID,

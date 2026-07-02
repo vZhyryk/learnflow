@@ -35,6 +35,9 @@ func parseConfigs(dsn, maxIdleTime, maxLifetime string, maxOpenConns, minOpenCon
 		return nil, fmt.Errorf("db: failed to parse config: %w", err)
 	}
 
+	// 100 caps a single app instance at PostgreSQL's default max_connections, leaving
+	// headroom for other clients (migrations, admin sessions, other instances) rather
+	// than letting misconfiguration exhaust the server's entire connection budget.
 	if maxOpenConns <= 0 || maxOpenConns > 100 {
 		return nil, fmt.Errorf("db: maxOpenConns must be between 1 and 100, got %d", maxOpenConns)
 	}

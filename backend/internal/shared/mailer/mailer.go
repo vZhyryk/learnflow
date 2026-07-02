@@ -34,7 +34,8 @@ type CCuser struct {
 	Username string `json:"username"`
 }
 
-// Send renders the given email template and delivers it to ccUser via SMTP (3 attempts).
+// Send renders the given email template and delivers it to ccUser via SMTP in a single attempt.
+// Callers that need retry semantics (e.g. EmailWorker) wrap this call with their own retry logic.
 func (m Mailer) Send(templateFile string, data any, ccUser CCuser, attachmentList []string) error {
 	if ccUser.Mail == "" || !validator.MatchesEmail(ccUser.Mail) {
 		return fmt.Errorf("mailer.Send: invalid recipient address")

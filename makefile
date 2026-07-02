@@ -201,11 +201,27 @@ run_test_coverage_frontend: run_test_coverage_once_frontend
 
 lint: lint_backend lint_frontend
 
-lint_backend:
+lint_backend: lint_repo_interfaces
 	cd $(BACKEND_DIR) && golangci-lint run ./...
 
 lint_verify:
 	cd $(BACKEND_DIR) && golangci-lint config verify
+
+# lint_repo_interfaces: golangci-lint has no linter for *missing* compile-time interface
+# assertions (it catches bad patterns, not absent enforcement). Every repository.go must
+# assert `var _ domain.XRepository = (*Repository)(nil)` so a method added to a domain
+# interface without a matching Repository implementation fails at compile time, not at
+# runtime via a type assertion panic. This grep-based check fills that gap until a real
+# linter rule exists.
+lint_repo_interfaces:
+	@fail=0; \
+	for f in $$(find $(BACKEND_DIR)/internal -path "*/repository/repository.go"); do \
+		if ! grep -qE '_ [A-Za-z0-9_.]*Repository = \(\*Repository\)\(nil\)' "$$f"; then \
+			echo "missing compile-time interface check: $$f"; \
+			fail=1; \
+		fi; \
+	done; \
+	exit $$fail
 
 lint_frontend:
 	cd $(FRONTEND_DIR) && npm run lint

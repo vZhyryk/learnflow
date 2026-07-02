@@ -15,7 +15,7 @@ func NewAccountRecoveryWorker(
 	queryRunner db.QueryRunner,
 	redisClient *redis.Client,
 	jsonLogger *logger.Logger,
-	m *mailer.Mailer,
+	m Mailer,
 	baseURL string,
 ) *EmailWorker[events.InitAccountRecoveryToken] {
 	return NewEmailWorker(queryRunner, redisClient, jsonLogger, m, baseURL, Config[events.InitAccountRecoveryToken]{
@@ -36,7 +36,7 @@ func ValidateAccountRecoveryPayload(p events.InitAccountRecoveryToken) error {
 }
 
 // HandleInitAccountRecoveryProcess sends the account recovery email for the given payload.
-func HandleInitAccountRecoveryProcess(p events.InitAccountRecoveryToken, baseURL string, m *mailer.Mailer) error {
+func HandleInitAccountRecoveryProcess(p events.InitAccountRecoveryToken, baseURL string, m Mailer) error {
 	data := map[string]string{
 		"name":           p.UserName,
 		"recoveryUrl":    fmt.Sprintf("%s/api/v1/users/auth/account/recover?token=%s", baseURL, p.RawToken),

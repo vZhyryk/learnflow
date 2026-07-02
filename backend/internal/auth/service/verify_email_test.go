@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/testutil"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func TestVerifyEmailUserUpdateFailures(t *testing.T) {
 		Convey("When marking the email verified fails", func() {
 			uRepo := &mockUserRepo{
 				updateEmailVerifiedAt: func(_ context.Context, _ string) error {
-					return errors.New("db connection lost")
+					return testutil.ErrDBUnexpected
 				},
 			}
 			tRepo := &mockTokenRepo{getEmailVerificationToken: validVerifyEmailToken}
@@ -67,9 +68,9 @@ func TestVerifyEmailUserUpdateFailures(t *testing.T) {
 
 		Convey("When activating the account status fails", func() {
 			uRepo := &mockUserRepo{
-				updateEmailVerifiedAt: func(_ context.Context, _ string) error { return nil },
+				updateEmailVerifiedAt: testutil.AlwaysNil,
 				updateStatus: func(_ context.Context, _ string, _ authdomain.UserStatus) error {
-					return errors.New("db connection lost")
+					return testutil.ErrDBUnexpected
 				},
 			}
 			tRepo := &mockTokenRepo{getEmailVerificationToken: validVerifyEmailToken}
@@ -87,13 +88,13 @@ func TestVerifyEmailMarkTokenUsedFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When marking the token as used fails", func() {
 			uRepo := &mockUserRepo{
-				updateEmailVerifiedAt: func(_ context.Context, _ string) error { return nil },
+				updateEmailVerifiedAt: testutil.AlwaysNil,
 				updateStatus:          func(_ context.Context, _ string, _ authdomain.UserStatus) error { return nil },
 			}
 			tRepo := &mockTokenRepo{
 				getEmailVerificationToken: validVerifyEmailToken,
 				markEmailVerificationTokenUsed: func(_ context.Context, _ string) error {
-					return errors.New("db connection lost")
+					return testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
@@ -112,7 +113,7 @@ func TestVerifyEmailSuccess(t *testing.T) {
 			var gotUpdatedStatusUserID string
 			var gotMarkedUsedHash string
 			uRepo := &mockUserRepo{
-				updateEmailVerifiedAt: func(_ context.Context, _ string) error { return nil },
+				updateEmailVerifiedAt: testutil.AlwaysNil,
 				updateStatus: func(_ context.Context, userID string, status authdomain.UserStatus) error {
 					gotUpdatedStatusUserID = userID
 					So(status, ShouldEqual, authdomain.StatusActive)
@@ -120,11 +121,7 @@ func TestVerifyEmailSuccess(t *testing.T) {
 				},
 			}
 			tRepo := &mockTokenRepo{
-				getEmailVerificationToken: func(_ context.Context, _ string) (*authdomain.EmailVerificationToken, error) {
-					return &authdomain.EmailVerificationToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
-					}, nil
-				},
+				getEmailVerificationToken: validVerifyEmailToken,
 				markEmailVerificationTokenUsed: func(_ context.Context, hash string) error {
 					gotMarkedUsedHash = hash
 					return nil

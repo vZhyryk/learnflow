@@ -45,7 +45,11 @@ func redisRateLimit(ctx context.Context, rdb *redis.Client, key string, rps floa
 
 	result, err := rateLimitScript.Run(ctx, rdb, []string{key}, now, rps, burst, ttl).Int()
 	if err != nil {
-		return true, fmt.Errorf("redisRateLimit: %w", err)
+		// Fail closed: on Redis error, deny the request rather than allowing it through.
+		// The caller currently discards `allowed` when err != nil and returns 500 directly,
+		// but that must not be the only thing keeping this fail-closed — the function's own
+		// return value has to be safe by default for any future caller.
+		return false, fmt.Errorf("redisRateLimit: %w", err)
 	}
 
 	return result == 1, nil

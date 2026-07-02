@@ -8,7 +8,6 @@ import (
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/logger"
 	"learnflow_backend/internal/infrastructure/retry"
-	"learnflow_backend/internal/shared/mailer"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -20,14 +19,14 @@ type Config[T any] struct {
 	AggregationType string
 	IdempotencyKey  func(T) string
 	Validate        func(T) error
-	Process         func(payload T, baseURL string, m *mailer.Mailer) error
+	Process         func(payload T, baseURL string, m Mailer) error
 }
 
 // EmailWorker is a generic Redis BLPop consumer that validates, deduplicates, and processes email events.
 type EmailWorker[T any] struct {
 	redisClient *redis.Client
 	logger      *logger.Logger
-	mailer      *mailer.Mailer
+	mailer      Mailer
 	dlq         *DLQWriter
 	baseURL     string
 	cfg         Config[T]
@@ -38,7 +37,7 @@ func NewEmailWorker[T any](
 	queryRunner db.QueryRunner,
 	redisClient *redis.Client,
 	jsonLogger *logger.Logger,
-	m *mailer.Mailer,
+	m Mailer,
 	baseURL string,
 	cfg Config[T],
 ) *EmailWorker[T] {

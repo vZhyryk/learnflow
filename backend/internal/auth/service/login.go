@@ -13,10 +13,18 @@ import (
 
 const (
 	loginLockInterval = "15 minutes"
-	// loginFailLimit: max consecutive failed password attempts before the account is temporarily locked.
-	// Distinct from loginCountLimit (session-level): this operates at the user level.
+	// loginFailLimit: max consecutive failed password attempts (tracked per user via
+	// IncrementFailedLogin) before the account is temporarily locked. The repository also
+	// exposes a session-level counter (UpdateFailedLoginAttempts) but no service code
+	// currently calls it — see .planning/STATE.md Deferred Items (sarch-14).
 	loginFailLimit = 5
 )
+
+// bcryptCompareHashAndPassword is a package-level indirection over bcrypt.CompareHashAndPassword.
+// Tests substitute this var with a call-counting spy to assert the dummy-hash comparison in
+// loginGetUser actually executes (the constant-time, user-enumeration-prevention guarantee),
+// without relying on flaky wall-clock timing assertions.
+var bcryptCompareHashAndPassword = bcrypt.CompareHashAndPassword
 
 // Login authenticates a user and returns access/refresh tokens.
 //
@@ -49,7 +57,7 @@ func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*auth
 		return nil, &authdomain.ErrAccountLockedError{LockedUntil: *user.LoginLockedUntil}
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
+	err = bcryptCompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
 	if err != nil {
 		incErr := s.userRepo.IncrementFailedLogin(ctx, user.ID, loginLockInterval, loginFailLimit)
 		if incErr != nil && !errors.Is(incErr, authdomain.ErrUserNotFound) {
@@ -86,7 +94,7 @@ func (s *Service) loginGetUser(ctx context.Context, req authdomain.LoginRequest)
 	// Dummy bcrypt: keeps response time constant whether the email exists or not.
 	// dummyPasswordHash is precomputed at startup — never generate it per-request
 	// (GenerateFromPassword is slow by design and would invert the timing signature).
-	bcrypt.CompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck // error is intentionally discarded — call exists only to consume constant time and prevent user enumeration via timing
+	bcryptCompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck // error is intentionally discarded — call exists only to consume constant time and prevent user enumeration via timing
 	return nil, authdomain.ErrInvalidCredentials
 }
 

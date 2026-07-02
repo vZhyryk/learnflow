@@ -3,16 +3,24 @@ package authhttp_test
 import (
 	"context"
 	"encoding/json"
-	"io"
+	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
-	"learnflow_backend/internal/infrastructure/logger"
-	"learnflow_backend/internal/infrastructure/sanitizer"
 	appcontext "learnflow_backend/internal/shared/context"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
-// func noopChain() alice.Chain { return alice.New() }
+// errWriter is an http.ResponseWriter whose Write always fails — used to
+// exercise the "response write failed" branches after a handler has already
+// decided what to respond with.
+type errWriter struct {
+	httptest.ResponseRecorder
+}
+
+func (e *errWriter) Write(_ []byte) (int, error) {
+	return 0, errors.New("write failed")
+}
 
 type mockService struct {
 	login                 func(ctx context.Context, req authdomain.LoginRequest) (*authdomain.AuthTokens, error)
@@ -73,10 +81,6 @@ func decodeBody(t *testing.T, body []byte) map[string]any {
 		t.Fatalf("failed to decode response body: %v", err)
 	}
 	return m
-}
-
-func newTestLogger() *logger.Logger {
-	return logger.New(io.Discard, sanitizer.NewSanitizer("***", 100, nil), logger.LevelFatal)
 }
 
 func withUser(r *http.Request) *http.Request {

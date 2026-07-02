@@ -19,6 +19,10 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{db: pool}
 }
 
+// queryRunner returns the active transaction from ctx if one was started by the
+// caller (see db.ExtractTx), otherwise falls back to the connection pool. This lets
+// service-layer code wrap multiple repository calls in a single transaction
+// transparently, without every method taking an explicit tx parameter.
 func (rep *Repository) queryRunner(ctx context.Context) db.QueryRunner {
 	if tx, ok := db.ExtractTx(ctx); ok {
 		return tx

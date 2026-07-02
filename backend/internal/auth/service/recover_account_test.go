@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/testutil"
 	"testing"
 	"time"
 
@@ -15,7 +16,7 @@ func TestInitRecoverAccountUserLookup(t *testing.T) {
 		Convey("When the user lookup fails unexpectedly", func() {
 			uRepo := &mockUserRepo{
 				getDeletedUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
@@ -54,8 +55,12 @@ func TestInitRecoverAccountUserLookup(t *testing.T) {
 	})
 }
 
+func recoverAccountDeletedUser() *authdomain.User {
+	return &authdomain.User{ID: "user-123", Email: "user@example.com", Status: authdomain.StatusDeleted}
+}
+
 func TestInitRecoverAccountProfileLookup(t *testing.T) {
-	deletedUser := &authdomain.User{ID: "user-123", Email: "user@example.com", Status: authdomain.StatusDeleted}
+	deletedUser := recoverAccountDeletedUser()
 
 	Convey("Given an auth service", t, func() {
 		Convey("When fetching the user profile fails", func() {
@@ -64,7 +69,7 @@ func TestInitRecoverAccountProfileLookup(t *testing.T) {
 					return deletedUser, nil
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
@@ -86,7 +91,7 @@ func TestInitRecoverAccountProfileLookup(t *testing.T) {
 			}
 			tRepo := &mockTokenRepo{
 				createAccountRecoveryToken: func(_ context.Context, _ *authdomain.AccountRecoveryToken) (*authdomain.AccountRecoveryToken, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, tRepo, newNoopOutbox(), nil)
@@ -100,7 +105,7 @@ func TestInitRecoverAccountProfileLookup(t *testing.T) {
 }
 
 func TestInitRecoverAccountTokenIssued(t *testing.T) {
-	deletedUser := &authdomain.User{ID: "user-123", Email: "user@example.com", Status: authdomain.StatusDeleted}
+	deletedUser := recoverAccountDeletedUser()
 
 	Convey("Given an auth service", t, func() {
 		Convey("When the token is issued successfully", func() {
@@ -168,13 +173,17 @@ func validRecoverAccountToken(_ context.Context, _ string) (*authdomain.AccountR
 	}, nil
 }
 
+func recoverAccountGetDeletedUserByID(_ context.Context, _ string) (*authdomain.User, error) {
+	return &authdomain.User{ID: "user-123", Status: authdomain.StatusDeleted}, nil
+}
+
 func TestRecoverAccountUserLookup(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When fetching the deleted user fails", func() {
 			tRepo := &mockTokenRepo{getAccountRecoveryToken: validRecoverAccountToken}
 			uRepo := &mockUserRepo{
 				getDeletedUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
@@ -206,11 +215,9 @@ func TestRecoverAccountRestoreFailures(t *testing.T) {
 		Convey("When restoring the user fails", func() {
 			tRepo := &mockTokenRepo{getAccountRecoveryToken: validRecoverAccountToken}
 			uRepo := &mockUserRepo{
-				getDeletedUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Status: authdomain.StatusDeleted}, nil
-				},
+				getDeletedUserByID: recoverAccountGetDeletedUserByID,
 				restoreUser: func(_ context.Context, _ string) error {
-					return errors.New("db connection lost")
+					return testutil.ErrDBUnexpected
 				},
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
@@ -225,14 +232,12 @@ func TestRecoverAccountRestoreFailures(t *testing.T) {
 			tRepo := &mockTokenRepo{
 				getAccountRecoveryToken: validRecoverAccountToken,
 				markAccountRecoveryTokenUsed: func(_ context.Context, _ string) error {
-					return errors.New("db connection lost")
+					return testutil.ErrDBUnexpected
 				},
 			}
 			uRepo := &mockUserRepo{
-				getDeletedUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Status: authdomain.StatusDeleted}, nil
-				},
-				restoreUser: func(_ context.Context, _ string) error { return nil },
+				getDeletedUserByID: recoverAccountGetDeletedUserByID,
+				restoreUser:        testutil.AlwaysNil,
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
 
@@ -249,17 +254,11 @@ func TestRecoverAccountSuccess(t *testing.T) {
 		Convey("When the token is valid and the account is restored", func() {
 			var gotRestoredUserID string
 			tRepo := &mockTokenRepo{
-				getAccountRecoveryToken: func(_ context.Context, _ string) (*authdomain.AccountRecoveryToken, error) {
-					return &authdomain.AccountRecoveryToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
-					}, nil
-				},
-				markAccountRecoveryTokenUsed: func(_ context.Context, _ string) error { return nil },
+				getAccountRecoveryToken:      validRecoverAccountToken,
+				markAccountRecoveryTokenUsed: testutil.AlwaysNil,
 			}
 			uRepo := &mockUserRepo{
-				getDeletedUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Status: authdomain.StatusDeleted}, nil
-				},
+				getDeletedUserByID: recoverAccountGetDeletedUserByID,
 				restoreUser: func(_ context.Context, userID string) error {
 					gotRestoredUserID = userID
 					return nil

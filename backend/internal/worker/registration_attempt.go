@@ -15,12 +15,12 @@ func NewRegistrationAttemptsWorker(
 	queryRunner db.QueryRunner,
 	redisClient *redis.Client,
 	jsonLogger *logger.Logger,
-	m *mailer.Mailer,
+	m Mailer,
 	baseURL string,
 ) *EmailWorker[events.RegistrationAttemptPayload] {
 	return NewEmailWorker(queryRunner, redisClient, jsonLogger, m, baseURL, Config[events.RegistrationAttemptPayload]{
-		EventType:       string(events.EventEmailChange),
-		AggregationType: string(events.AggregationTypeEmail),
+		EventType:       string(events.EventRegistrationAttemptOnExistingEmail),
+		AggregationType: string(events.AggregationTypeUser),
 		IdempotencyKey:  GenerateRegistrationAttemptsIdempotencyKey,
 		Validate:        ValidateRegistrationAttemptsPayload,
 		Process:         HandleRegistrationAttemptsProcess,
@@ -36,7 +36,7 @@ func ValidateRegistrationAttemptsPayload(p events.RegistrationAttemptPayload) er
 }
 
 // HandleRegistrationAttemptsProcess sends the registration attempt notification email for the given payload.
-func HandleRegistrationAttemptsProcess(p events.RegistrationAttemptPayload, _ string, m *mailer.Mailer) error {
+func HandleRegistrationAttemptsProcess(p events.RegistrationAttemptPayload, _ string, m Mailer) error {
 	data := map[string]string{
 		"name": p.UserName,
 	}

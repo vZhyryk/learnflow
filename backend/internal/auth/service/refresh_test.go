@@ -4,24 +4,12 @@ import (
 	"context"
 	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
-	"learnflow_backend/internal/shared/tokens"
+	"learnflow_backend/internal/shared/testutil"
 	"testing"
 	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
-
-func newRefreshTestService(sRepo *mockSessionRepo, uRepo *mockUserRepo) *Service {
-	srv, err := New(
-		Repos{UserRepo: uRepo, SessionRepo: sRepo, TokenRepo: &mockTokenRepo{}, Transactor: &mockTransactor{}},
-		Utils{Token: tokens.NewTokens("test-secret", "", "learnflow", "learnflow-users")},
-		Options{BcryptCost: 4},
-	)
-	if err != nil {
-		panic(err)
-	}
-	return srv
-}
 
 func newRefreshTestFixtures() (authdomain.RefreshRequest, *authdomain.User, *authdomain.UserSession) {
 	now := time.Now().UTC().Truncate(time.Second)
@@ -56,7 +44,7 @@ func TestRefreshSuccess(t *testing.T) {
 					return activeUser, nil
 				},
 			}
-			srv := newRefreshTestService(sRepo, uRepo)
+			srv := newTestService(uRepo, sRepo, nil, nil, nil)
 
 			got, err := srv.Refresh(context.Background(), validReq)
 
@@ -83,7 +71,7 @@ func TestRefreshNoReuseWhenSessionNotFound(t *testing.T) {
 					return nil, authdomain.ErrSessionNotFound
 				},
 			}
-			srv := newRefreshTestService(sRepo, &mockUserRepo{})
+			srv := newTestService(&mockUserRepo{}, sRepo, nil, nil, nil)
 
 			_, err := srv.Refresh(context.Background(), validReq)
 
@@ -112,7 +100,7 @@ func TestRefreshReuseBeforeUserFetch(t *testing.T) {
 					return nil
 				},
 			}
-			srv := newRefreshTestService(sRepo, &mockUserRepo{})
+			srv := newTestService(&mockUserRepo{}, sRepo, nil, nil, nil)
 
 			_, err := srv.Refresh(context.Background(), validReq)
 
@@ -147,7 +135,7 @@ func TestRefreshReuseAfterUserFetch(t *testing.T) {
 					return activeUser, nil
 				},
 			}
-			srv := newRefreshTestService(sRepo, uRepo)
+			srv := newTestService(uRepo, sRepo, nil, nil, nil)
 
 			_, err := srv.Refresh(context.Background(), validReq)
 
@@ -170,10 +158,10 @@ func TestRefreshTokenReuseErrors(t *testing.T) {
 					return activeSession, nil
 				},
 				revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error {
-					return errors.New("db connection lost")
+					return testutil.ErrDBUnexpected
 				},
 			}
-			srv := newRefreshTestService(sRepo, &mockUserRepo{})
+			srv := newTestService(&mockUserRepo{}, sRepo, nil, nil, nil)
 
 			_, err := srv.Refresh(context.Background(), validReq)
 
@@ -187,10 +175,10 @@ func TestRefreshTokenReuseErrors(t *testing.T) {
 					return nil, authdomain.ErrSessionNotFound
 				},
 				getSessionByPrevHash: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
-			srv := newRefreshTestService(sRepo, &mockUserRepo{})
+			srv := newTestService(&mockUserRepo{}, sRepo, nil, nil, nil)
 
 			_, err := srv.Refresh(context.Background(), validReq)
 
@@ -200,22 +188,28 @@ func TestRefreshTokenReuseErrors(t *testing.T) {
 	})
 }
 
+// refreshActiveSessionRepo returns a mockSessionRepo whose lookup by refresh token
+// always resolves to session, for tests that only exercise the post-lookup path.
+func refreshActiveSessionRepo(session *authdomain.UserSession) *mockSessionRepo {
+	return &mockSessionRepo{
+		getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
+			return session, nil
+		},
+	}
+}
+
 func TestRefreshUserStatus(t *testing.T) {
 	validReq, _, activeSession := newRefreshTestFixtures()
 
 	Convey("Given an auth service", t, func() {
 		Convey("When the user lookup fails unexpectedly", func() {
-			sRepo := &mockSessionRepo{
-				getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
-					return activeSession, nil
-				},
-			}
+			sRepo := refreshActiveSessionRepo(activeSession)
 			uRepo := &mockUserRepo{
 				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return nil, errors.New("db connection lost")
+					return nil, testutil.ErrDBUnexpected
 				},
 			}
-			srv := newRefreshTestService(sRepo, uRepo)
+			srv := newTestService(uRepo, sRepo, nil, nil, nil)
 
 			_, err := srv.Refresh(context.Background(), validReq)
 
@@ -224,17 +218,13 @@ func TestRefreshUserStatus(t *testing.T) {
 		})
 
 		Convey("When the account is blocked", func() {
-			sRepo := &mockSessionRepo{
-				getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
-					return activeSession, nil
-				},
-			}
+			sRepo := refreshActiveSessionRepo(activeSession)
 			uRepo := &mockUserRepo{
 				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
 					return &authdomain.User{ID: "user-123", Status: authdomain.StatusBlocked}, nil
 				},
 			}
-			srv := newRefreshTestService(sRepo, uRepo)
+			srv := newTestService(uRepo, sRepo, nil, nil, nil)
 
 			_, err := srv.Refresh(context.Background(), validReq)
 
@@ -242,17 +232,13 @@ func TestRefreshUserStatus(t *testing.T) {
 		})
 
 		Convey("When the account is deleted", func() {
-			sRepo := &mockSessionRepo{
-				getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
-					return activeSession, nil
-				},
-			}
+			sRepo := refreshActiveSessionRepo(activeSession)
 			uRepo := &mockUserRepo{
 				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
 					return &authdomain.User{ID: "user-123", Status: authdomain.StatusDeleted}, nil
 				},
 			}
-			srv := newRefreshTestService(sRepo, uRepo)
+			srv := newTestService(uRepo, sRepo, nil, nil, nil)
 
 			_, err := srv.Refresh(context.Background(), validReq)
 
@@ -274,7 +260,7 @@ func TestRefreshSessionPersistence(t *testing.T) {
 					return nil, authdomain.ErrSessionNotFound
 				},
 				updateSessionToken: func(_ context.Context, _, _, _, _ string) error {
-					return errors.New("db connection lost")
+					return testutil.ErrDBUnexpected
 				},
 			}
 			uRepo := &mockUserRepo{
@@ -282,7 +268,7 @@ func TestRefreshSessionPersistence(t *testing.T) {
 					return activeUser, nil
 				},
 			}
-			srv := newRefreshTestService(sRepo, uRepo)
+			srv := newTestService(uRepo, sRepo, nil, nil, nil)
 
 			_, err := srv.Refresh(context.Background(), validReq)
 

@@ -2,7 +2,6 @@ package authhttp_test
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +9,7 @@ import (
 
 	authdomain "learnflow_backend/internal/auth/domain"
 	authhttp "learnflow_backend/internal/auth/transport/http"
+	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -28,7 +28,7 @@ func newRegisterFixture() *registerFixture {
 			return f.svcResult, f.svcErr
 		},
 	}
-	h := authhttp.NewHTTPHandler(svc, newTestLogger())
+	h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
 	f.mux = http.NewServeMux()
 	h.RegisterRoutes(f.mux, authhttp.AuthRouteChains{})
 	f.newReq = func(body string) *http.Request {
@@ -37,43 +37,44 @@ func newRegisterFixture() *registerFixture {
 	return f
 }
 
+// doRequest fires body through f.mux and returns the recorded response.
+func (f *registerFixture) doRequest(body string) *httptest.ResponseRecorder {
+	return testutil.ServeHTTP(f.mux, f.newReq(body))
+}
+
+const validRegisterBody = `{"Email":"user@example.com","Password":"password123"}`
+
 func TestRegisterRequestValidation(t *testing.T) {
 	Convey("POST /api/v1/auth/register — request validation", t, func() {
 		f := newRegisterFixture()
 
 		Convey("Empty body → 400", func() {
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.newReq(""))
+			w := f.doRequest("")
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Invalid JSON → 400", func() {
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.newReq("{invalid"))
+			w := f.doRequest("{invalid")
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Invalid email format → 400", func() {
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.newReq(`{"Email":"notanemail","Password":"password123"}`))
+			w := f.doRequest(`{"Email":"notanemail","Password":"password123"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Email too short → 400", func() {
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.newReq(`{"Email":"a@","Password":"password123"}`))
+			w := f.doRequest(`{"Email":"a@","Password":"password123"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Password too short → 400", func() {
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.newReq(`{"Email":"user@example.com","Password":"short"}`))
+			w := f.doRequest(`{"Email":"user@example.com","Password":"short"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Password too long → 400", func() {
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.newReq(`{"Email":"user@example.com","Password":"`+strings.Repeat("a", 73)+`"}`))
+			w := f.doRequest(`{"Email":"user@example.com","Password":"` + strings.Repeat("a", 73) + `"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 	})
@@ -85,25 +86,27 @@ func TestRegisterServiceOutcomes(t *testing.T) {
 
 		Convey("Service ErrUserAlreadyExists → 202 (email enumeration guard)", func() {
 			f.svcErr = authdomain.ErrUserAlreadyExists
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.newReq(`{"Email":"user@example.com","Password":"password123"}`))
+			w := f.doRequest(validRegisterBody)
 			So(w.Code, ShouldEqual, http.StatusAccepted)
 		})
 
 		Convey("Unexpected service error → 500", func() {
-			f.svcErr = errors.New("database failure")
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.newReq(`{"Email":"user@example.com","Password":"password123"}`))
+			f.svcErr = testutil.ErrDBUnexpected
+			w := f.doRequest(validRegisterBody)
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid request → 201 with message", func() {
 			f.svcResult = "user-123"
-			w := httptest.NewRecorder()
-			f.mux.ServeHTTP(w, f.newReq(`{"Email":"user@example.com","Password":"password123"}`))
+			w := f.doRequest(validRegisterBody)
 			So(w.Code, ShouldEqual, http.StatusCreated)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["message"], ShouldNotBeNil)
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			f.svcResult = "user-123"
+			So(func() { f.mux.ServeHTTP(&errWriter{}, f.newReq(validRegisterBody)) }, ShouldNotPanic)
 		})
 	})
 }

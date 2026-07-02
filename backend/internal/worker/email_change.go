@@ -15,7 +15,7 @@ func NewEmailChangeWorker(
 	queryRunner db.QueryRunner,
 	redisClient *redis.Client,
 	jsonLogger *logger.Logger,
-	m *mailer.Mailer,
+	m Mailer,
 	baseURL string,
 ) *EmailWorker[events.InitEmailChangeToken] {
 	return NewEmailWorker(queryRunner, redisClient, jsonLogger, m, baseURL, Config[events.InitEmailChangeToken]{
@@ -36,7 +36,7 @@ func ValidateInitEmailChangePayload(p events.InitEmailChangeToken) error {
 }
 
 // HandleInitEmailChangeProcess sends the email change confirmation email for the given payload.
-func HandleInitEmailChangeProcess(p events.InitEmailChangeToken, baseURL string, m *mailer.Mailer) error {
+func HandleInitEmailChangeProcess(p events.InitEmailChangeToken, baseURL string, m Mailer) error {
 	data := map[string]string{
 		"name":            p.UserName,
 		"newEmail":        p.Email,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/testutil"
 	"testing"
 	"time"
 
@@ -16,15 +17,15 @@ func TestCreateEmailVerificationToken(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a tokens repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When creation succeeds", func() {
-			row = &fakeRow{scanFn: fakeScanToken(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanToken(now)}
 			got, err := repo.CreateEmailVerificationToken(context.Background(), &authdomain.EmailVerificationToken{
 				TokenBase: authdomain.TokenBase{UserID: "user-123", TokenHash: "hash-abc", ExpiresAt: now},
 			})
@@ -35,10 +36,9 @@ func TestCreateEmailVerificationToken(t *testing.T) {
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreateEmailVerificationToken(context.Background(), &authdomain.EmailVerificationToken{})
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -47,31 +47,30 @@ func TestGetEmailVerificationToken(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a tokens repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When token exists", func() {
-			row = &fakeRow{scanFn: fakeScanToken(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanToken(now)}
 			got, err := repo.GetEmailVerificationToken(context.Background(), "hash-abc")
 			So(err, ShouldBeNil)
 			So(got.ID, ShouldEqual, "session_123")
 		})
 
 		Convey("When token not found", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetEmailVerificationToken(context.Background(), "unknown")
 			So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetEmailVerificationToken(context.Background(), "hash-abc")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -80,17 +79,16 @@ func TestMarkEmailVerificationTokenUsed(t *testing.T) {
 	Convey("Given a tokens repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.MarkEmailVerificationTokenUsed(context.Background(), "hash-abc")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When token is already used (0 rows affected)", func() {
@@ -110,15 +108,15 @@ func TestCreatePasswordResetToken(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a tokens repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When creation succeeds", func() {
-			row = &fakeRow{scanFn: fakeScanToken(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanToken(now)}
 			got, err := repo.CreatePasswordResetToken(context.Background(), &authdomain.PasswordResetToken{
 				TokenBase: authdomain.TokenBase{UserID: "user-123", TokenHash: "hash-abc", ExpiresAt: now},
 			})
@@ -127,10 +125,9 @@ func TestCreatePasswordResetToken(t *testing.T) {
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreatePasswordResetToken(context.Background(), &authdomain.PasswordResetToken{})
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -139,31 +136,30 @@ func TestGetPasswordResetToken(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a tokens repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When token exists", func() {
-			row = &fakeRow{scanFn: fakeScanToken(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanToken(now)}
 			got, err := repo.GetPasswordResetToken(context.Background(), "hash-abc")
 			So(err, ShouldBeNil)
 			So(got.ID, ShouldEqual, "session_123")
 		})
 
 		Convey("When token not found", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetPasswordResetToken(context.Background(), "unknown")
 			So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetPasswordResetToken(context.Background(), "hash-abc")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -172,17 +168,16 @@ func TestMarkPasswordResetTokenUsed(t *testing.T) {
 	Convey("Given a tokens repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.MarkPasswordResetTokenUsed(context.Background(), "hash-abc")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When token is already used", func() {
@@ -202,15 +197,15 @@ func TestCreateEmailChangeToken(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a tokens repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When creation succeeds", func() {
-			row = &fakeRow{scanFn: fakeScanEmailChangeToken(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanEmailChangeToken(now)}
 			got, err := repo.CreateEmailChangeToken(context.Background(), &authdomain.EmailChangeToken{
 				TokenBase: authdomain.TokenBase{UserID: "user-123", TokenHash: "hash-abc", ExpiresAt: now},
 				NewEmail:  "new@example.com",
@@ -221,10 +216,9 @@ func TestCreateEmailChangeToken(t *testing.T) {
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreateEmailChangeToken(context.Background(), &authdomain.EmailChangeToken{})
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -233,15 +227,15 @@ func TestGetEmailChangeToken(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a tokens repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When token exists", func() {
-			row = &fakeRow{scanFn: fakeScanEmailChangeToken(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanEmailChangeToken(now)}
 			got, err := repo.GetEmailChangeToken(context.Background(), "hash-abc")
 			So(err, ShouldBeNil)
 			So(got.ID, ShouldEqual, "session_123")
@@ -249,16 +243,15 @@ func TestGetEmailChangeToken(t *testing.T) {
 		})
 
 		Convey("When token not found", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetEmailChangeToken(context.Background(), "unknown")
 			So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetEmailChangeToken(context.Background(), "hash-abc")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -267,17 +260,16 @@ func TestMarkEmailChangeTokenUsed(t *testing.T) {
 	Convey("Given a tokens repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.MarkEmailChangeTokenUsed(context.Background(), "hash-abc")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When token is already used", func() {
@@ -297,15 +289,15 @@ func TestCreateAccountRecoveryToken(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a tokens repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When creation succeeds", func() {
-			row = &fakeRow{scanFn: fakeScanToken(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanToken(now)}
 			got, err := repo.CreateAccountRecoveryToken(context.Background(), &authdomain.AccountRecoveryToken{
 				TokenBase: authdomain.TokenBase{UserID: "user-123", TokenHash: "hash-abc", ExpiresAt: now},
 			})
@@ -314,10 +306,9 @@ func TestCreateAccountRecoveryToken(t *testing.T) {
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreateAccountRecoveryToken(context.Background(), &authdomain.AccountRecoveryToken{})
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -326,31 +317,30 @@ func TestGetAccountRecoveryToken(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a tokens repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When token exists", func() {
-			row = &fakeRow{scanFn: fakeScanToken(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanToken(now)}
 			got, err := repo.GetAccountRecoveryToken(context.Background(), "hash-abc")
 			So(err, ShouldBeNil)
 			So(got.ID, ShouldEqual, "session_123")
 		})
 
 		Convey("When token not found", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetAccountRecoveryToken(context.Background(), "unknown")
 			So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetAccountRecoveryToken(context.Background(), "hash-abc")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -359,17 +349,16 @@ func TestMarkAccountRecoveryTokenUsed(t *testing.T) {
 	Convey("Given a tokens repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.MarkAccountRecoveryTokenUsed(context.Background(), "hash-abc")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When token is already used", func() {
@@ -388,9 +377,9 @@ func TestMarkAccountRecoveryTokenUsed(t *testing.T) {
 func TestDeleteExpiredTokens(t *testing.T) {
 	Convey("Given a tokens repository", t, func() {
 		var fakeErr error
-		callCount := 0
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		var callCount int
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				callCount++
 				return pgconn.NewCommandTag("DELETE 2"), fakeErr
 			},
@@ -405,10 +394,9 @@ func TestDeleteExpiredTokens(t *testing.T) {
 
 		Convey("When a query fails mid-way", func() {
 			callCount = 0
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			_, err := repo.DeleteExpiredTokens(context.Background())
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 			So(callCount, ShouldEqual, 1)
 		})
 	})

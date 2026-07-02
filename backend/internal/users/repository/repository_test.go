@@ -3,10 +3,10 @@ package usersrepository
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
+	"learnflow_backend/internal/shared/testutil"
 	usersdomain "learnflow_backend/internal/users/domain"
 
 	"github.com/jackc/pgx/v5"
@@ -15,62 +15,15 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// mockQueryRunner implements db.QueryRunner via function fields.
-type mockQueryRunner struct {
-	queryRowFn func(ctx context.Context, sql string, args ...any) pgx.Row
-	execFn     func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-}
-
-func (m *mockQueryRunner) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
-	return m.queryRowFn(ctx, sql, args...)
-}
-
-func (m *mockQueryRunner) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
-	return m.execFn(ctx, sql, args...)
-}
-
-func (m *mockQueryRunner) Query(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
-	panic("Query not expected in users repository tests")
-}
-
-// fakeRow implements pgx.Row for controlled Scan injection.
-type fakeRow struct {
-	scanFn func(dest ...any) error
-}
-
-func (r *fakeRow) Scan(dest ...any) error { return r.scanFn(dest...) }
-
-func newTestRepo(runner *mockQueryRunner) *Repository {
+func newTestRepo(runner *testutil.MockQueryRunner) *Repository {
 	return &Repository{db: runner}
 }
 
-// castStr safely type-asserts a scan destination to *string, panicking with context on failure.
-func castStr(v any, idx int) *string {
-	s, ok := v.(*string)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *string, got %T", idx, v))
-	}
-	return s
-}
-
-// castPtrStr safely type-asserts a scan destination to **string.
-func castPtrStr(v any, idx int) **string {
-	s, ok := v.(**string)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected **string, got %T", idx, v))
-	}
-	return s
-}
-
-// castTime safely type-asserts a scan destination to *time.Time.
-func castTime(v any, idx int) *time.Time {
-	s, ok := v.(*time.Time)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *time.Time, got %T", idx, v))
-	}
-	return s
-}
-
+// fakeProfile/fakeScanProfile mirror internal/auth/repository/mock_test.go's fixture
+// of the same name. Not shared via testutil on purpose: usersdomain.UserProfile and
+// authdomain.UserProfile are separate types by design (auth and users are independent
+// bounded contexts per Clean Architecture layering), so a generic helper here would
+// either need generics (forbidden in domain-adjacent code) or reflection.
 func fakeProfile(now time.Time) *usersdomain.UserProfile {
 	return &usersdomain.UserProfile{
 		UserID:      "user-123",
@@ -93,20 +46,20 @@ func fakeProfile(now time.Time) *usersdomain.UserProfile {
 func fakeScanProfile(now time.Time) func(dest ...any) error {
 	p := fakeProfile(now)
 	return func(dest ...any) error {
-		*castStr(dest[0], 0) = p.UserID
-		*castStr(dest[1], 1) = p.FirstName
-		*castStr(dest[2], 2) = p.LastName
-		*castStr(dest[3], 3) = p.PhoneNumber
-		*castStr(dest[4], 4) = p.Country
-		*castStr(dest[5], 5) = p.City
-		*castPtrStr(dest[6], 6) = p.DateOfBirth
-		*castStr(dest[7], 7) = p.Gender
-		*castStr(dest[8], 8) = p.UILanguage
-		*castStr(dest[9], 9) = p.AvatarURL
-		*castStr(dest[10], 10) = p.Timezone
-		*castStr(dest[11], 11) = p.Bio
-		*castTime(dest[12], 12) = p.CreatedAt
-		*castTime(dest[13], 13) = p.UpdatedAt
+		*testutil.CastStr(dest[0], 0) = p.UserID
+		*testutil.CastStr(dest[1], 1) = p.FirstName
+		*testutil.CastStr(dest[2], 2) = p.LastName
+		*testutil.CastStr(dest[3], 3) = p.PhoneNumber
+		*testutil.CastStr(dest[4], 4) = p.Country
+		*testutil.CastStr(dest[5], 5) = p.City
+		*testutil.CastPtrStr(dest[6], 6) = p.DateOfBirth
+		*testutil.CastStr(dest[7], 7) = p.Gender
+		*testutil.CastStr(dest[8], 8) = p.UILanguage
+		*testutil.CastStr(dest[9], 9) = p.AvatarURL
+		*testutil.CastStr(dest[10], 10) = p.Timezone
+		*testutil.CastStr(dest[11], 11) = p.Bio
+		*testutil.CastTime(dest[12], 12) = p.CreatedAt
+		*testutil.CastTime(dest[13], 13) = p.UpdatedAt
 		return nil
 	}
 }
@@ -115,15 +68,15 @@ func TestGetUserProfileByID(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a users repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When the profile exists", func() {
-			row = &fakeRow{scanFn: fakeScanProfile(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanProfile(now)}
 			got, err := repo.GetUserProfileByID(context.Background(), "user-123")
 			So(err, ShouldBeNil)
 			So(got.UserID, ShouldEqual, "user-123")
@@ -135,13 +88,13 @@ func TestGetUserProfileByID(t *testing.T) {
 		})
 
 		Convey("When the profile does not exist", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetUserProfileByID(context.Background(), "unknown")
 			So(errors.Is(err, usersdomain.ErrUserNotFound), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db connection lost") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
 			_, err := repo.GetUserProfileByID(context.Background(), "user-123")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -153,8 +106,8 @@ func TestUpdateUserProfile(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var tag pgconn.CommandTag
 		var execErr error
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return tag, execErr
 			},
 		})
@@ -177,7 +130,7 @@ func TestUpdateUserProfile(t *testing.T) {
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			execErr = errors.New("db timeout")
+			execErr = testutil.ErrDBTimeout
 			err := repo.UpdateUserProfile(context.Background(), profile)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db timeout")

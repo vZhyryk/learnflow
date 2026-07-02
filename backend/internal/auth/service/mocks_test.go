@@ -5,8 +5,6 @@ import (
 	authdomain "learnflow_backend/internal/auth/domain"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -329,13 +327,6 @@ func (m *mockTokenRepo) MarkAccountRecoveryTokenUsed(ctx context.Context, tokenH
 	return m.markAccountRecoveryTokenUsed(ctx, tokenHash)
 }
 
-// mockTransactor calls fn(ctx) immediately — no real transaction.
-type mockTransactor struct{}
-
-func (m *mockTransactor) InTransaction(ctx context.Context, fn func(context.Context) error) error {
-	return fn(ctx)
-}
-
 // mockRedis implements RedisOps for JTI blocklist tests.
 type mockRedis struct {
 	setNX func(ctx context.Context, key string, value any, exp time.Duration) *redis.BoolCmd
@@ -348,23 +339,11 @@ func (m *mockRedis) SetNX(ctx context.Context, key string, value any, expiration
 	return m.setNX(ctx, key, value, expiration)
 }
 
-// mockQueryRunner implements db.QueryRunner — used to back a test events.OutboxWriter
-// via events.NewOutboxWriterWithRunner, so outbox.Emit can be exercised without a real DB.
-type mockQueryRunner struct {
-	execFn func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
-}
-
-func (m *mockQueryRunner) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
-	if m.execFn == nil {
-		panic("mockQueryRunner.execFn not set")
+// mockRedisSetNXError returns a mockRedis whose SetNX always fails with err.
+func mockRedisSetNXError(err error) *mockRedis {
+	return &mockRedis{
+		setNX: func(_ context.Context, _ string, _ any, _ time.Duration) *redis.BoolCmd {
+			return redis.NewBoolResult(false, err)
+		},
 	}
-	return m.execFn(ctx, sql, args...)
-}
-
-func (m *mockQueryRunner) QueryRow(_ context.Context, _ string, _ ...any) pgx.Row {
-	panic("mockQueryRunner.QueryRow not supported")
-}
-
-func (m *mockQueryRunner) Query(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
-	panic("mockQueryRunner.Query not supported")
 }

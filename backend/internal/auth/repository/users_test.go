@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/testutil"
 	"testing"
 	"time"
 
@@ -16,16 +17,16 @@ func TestCreateUser(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a users repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When creation succeeds", func() {
-			row = &fakeRow{scanFn: func(dest ...any) error {
-				*castStr(dest[0], 0) = "user-123"
+			row = &testutil.MockRow{ScanFn: func(dest ...any) error {
+				*testutil.CastStr(dest[0], 0) = "user-123"
 				return nil
 			}}
 			id, err := repo.CreateUser(context.Background(), &authdomain.User{
@@ -36,7 +37,7 @@ func TestCreateUser(t *testing.T) {
 		})
 
 		Convey("When email already exists (pg 23505)", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error {
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error {
 				return &pgconn.PgError{Code: "23505"}
 			}}
 			_, err := repo.CreateUser(context.Background(), &authdomain.User{})
@@ -44,10 +45,9 @@ func TestCreateUser(t *testing.T) {
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreateUser(context.Background(), &authdomain.User{})
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		_ = now
@@ -57,8 +57,8 @@ func TestCreateUser(t *testing.T) {
 func TestCreateUserProfile(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return pgconn.NewCommandTag("INSERT 1"), fakeErr
 			},
 		})
@@ -71,10 +71,9 @@ func TestCreateUserProfile(t *testing.T) {
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.CreateUserProfile(context.Background(), &authdomain.UserProfile{})
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -83,15 +82,15 @@ func TestGetUserByID(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a users repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When user exists", func() {
-			row = &fakeRow{scanFn: fakeScanUser(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanUser(now)}
 			got, err := repo.GetUserByID(context.Background(), "user-123")
 			So(err, ShouldBeNil)
 			So(got.ID, ShouldEqual, "user-123")
@@ -100,16 +99,15 @@ func TestGetUserByID(t *testing.T) {
 		})
 
 		Convey("When user not found", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetUserByID(context.Background(), "unknown")
 			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetUserByID(context.Background(), "user-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -118,31 +116,30 @@ func TestGetUserByEmail(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a users repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When user exists", func() {
-			row = &fakeRow{scanFn: fakeScanUser(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanUser(now)}
 			got, err := repo.GetUserByEmail(context.Background(), "john@gmail.com")
 			So(err, ShouldBeNil)
 			So(got.Email, ShouldEqual, "john@gmail.com")
 		})
 
 		Convey("When user not found", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetUserByEmail(context.Background(), "nobody@example.com")
 			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetUserByEmail(context.Background(), "john@gmail.com")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -151,31 +148,30 @@ func TestGetDeletedUserByID(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a users repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When deleted user exists", func() {
-			row = &fakeRow{scanFn: fakeScanUser(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanUser(now)}
 			got, err := repo.GetDeletedUserByID(context.Background(), "user-123")
 			So(err, ShouldBeNil)
 			So(got.ID, ShouldEqual, "user-123")
 		})
 
 		Convey("When user not found", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetDeletedUserByID(context.Background(), "unknown")
 			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetDeletedUserByID(context.Background(), "user-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -184,31 +180,30 @@ func TestGetDeletedUserByEmail(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a users repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When deleted user exists", func() {
-			row = &fakeRow{scanFn: fakeScanUser(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanUser(now)}
 			got, err := repo.GetDeletedUserByEmail(context.Background(), "john@gmail.com")
 			So(err, ShouldBeNil)
 			So(got.Email, ShouldEqual, "john@gmail.com")
 		})
 
 		Convey("When user not found", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetDeletedUserByEmail(context.Background(), "nobody@example.com")
 			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetDeletedUserByEmail(context.Background(), "john@gmail.com")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -217,15 +212,15 @@ func TestGetUserProfileByUserID(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	Convey("Given a users repository", t, func() {
-		var row *fakeRow
-		repo := newTestRepo(&mockQueryRunner{
-			queryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
 				return row
 			},
 		})
 
 		Convey("When profile exists", func() {
-			row = &fakeRow{scanFn: fakeScanProfile(now)}
+			row = &testutil.MockRow{ScanFn: fakeScanProfile(now)}
 			got, err := repo.GetUserProfileByUserID(context.Background(), "user-123")
 			So(err, ShouldBeNil)
 			So(got.UserID, ShouldEqual, "user-123")
@@ -234,16 +229,15 @@ func TestGetUserProfileByUserID(t *testing.T) {
 		})
 
 		Convey("When profile not found", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetUserProfileByUserID(context.Background(), "unknown")
 			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			row = &fakeRow{scanFn: func(_ ...any) error { return errors.New("db error") }}
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetUserProfileByUserID(context.Background(), "user-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -252,17 +246,16 @@ func TestRestoreUser(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.RestoreUser(context.Background(), "user-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found (0 rows affected)", func() {
@@ -282,17 +275,16 @@ func TestUpdateStatus(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.UpdateStatus(context.Background(), "user-123", authdomain.StatusBlocked)
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -312,17 +304,16 @@ func TestUpdateRole(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.UpdateRole(context.Background(), "user-123", authdomain.RoleAdmin)
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -342,17 +333,16 @@ func TestUpdateLastLoginAt(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.UpdateLastLoginAt(context.Background(), "user-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -372,17 +362,16 @@ func TestUpdatePasswordHash(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.UpdatePasswordHash(context.Background(), "user-123", "new-hash")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -402,17 +391,16 @@ func TestUpdateEmail(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.UpdateEmail(context.Background(), "user-123", "new@example.com")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -432,17 +420,16 @@ func TestUpdateEmailVerifiedAt(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.UpdateEmailVerifiedAt(context.Background(), "user-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -462,17 +449,16 @@ func TestDeleteUser(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.DeleteUser(context.Background(), "user-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -492,17 +478,16 @@ func TestIncrementFailedLogin(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.IncrementFailedLogin(context.Background(), "user-123", "15 minutes", 5)
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -522,17 +507,16 @@ func TestResetFailedLogin(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
 		var execTag pgconn.CommandTag
-		repo := newTestRepo(&mockQueryRunner{
-			execFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 				return execTag, fakeErr
 			},
 		})
 
 		Convey("When the database returns an unexpected error", func() {
-			fakeErr = errors.New("db error")
+			fakeErr = testutil.ErrDB
 			err := repo.ResetFailedLogin(context.Background(), "user-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db error")
+			assertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {

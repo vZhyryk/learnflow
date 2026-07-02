@@ -34,7 +34,7 @@ const (
 	RevokeReasonLogout             RevokeReason = "logout"
 	RevokeReasonPasswordChanged    RevokeReason = "password_changed"
 	RevokeReasonPasswordReset      RevokeReason = "password_reset"
-	RevokeReasonEmailChanged       RevokeReason = "email_changed"
+	RevokeReasonEmailChanged       RevokeReason = "email_change"
 	RevokeReasonAdmin              RevokeReason = "admin"
 	RevokeReasonSuspiciousActivity RevokeReason = "suspicious_activity"
 	RevokeReasonTokenExpired       RevokeReason = "token_expired"

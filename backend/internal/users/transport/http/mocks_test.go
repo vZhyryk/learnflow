@@ -3,19 +3,29 @@ package usershttp_test
 import (
 	"context"
 	"encoding/json"
-	"io"
+	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
-	"learnflow_backend/internal/infrastructure/logger"
-	"learnflow_backend/internal/infrastructure/sanitizer"
 	appcontext "learnflow_backend/internal/shared/context"
 	usersdomain "learnflow_backend/internal/users/domain"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/justinas/alice"
 )
 
 func noopChain() alice.Chain { return alice.New() }
+
+// errWriter is an http.ResponseWriter whose Write always fails — used to
+// exercise the "response write failed" branches after a handler has already
+// decided what to respond with.
+type errWriter struct {
+	httptest.ResponseRecorder
+}
+
+func (e *errWriter) Write(_ []byte) (int, error) {
+	return 0, errors.New("write failed")
+}
 
 // mockService implements usersdomain.Service via function fields.
 type mockService struct {
@@ -29,10 +39,6 @@ func (m *mockService) GetUserProfile(ctx context.Context, userID string) (*users
 
 func (m *mockService) ChangeUserProfile(ctx context.Context, req usersdomain.ChangeUserProfileRequest) error {
 	return m.changeUserProfile(ctx, req)
-}
-
-func newTestLogger() *logger.Logger {
-	return logger.New(io.Discard, sanitizer.NewSanitizer("***", 100, nil), logger.LevelFatal)
 }
 
 func withUser(r *http.Request) *http.Request {

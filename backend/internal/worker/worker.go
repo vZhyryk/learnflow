@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/logger"
+	"learnflow_backend/internal/shared/mailer"
 )
 
 // Transactor wraps a unit of work in a database transaction.
@@ -17,6 +18,11 @@ type Transactor interface {
 // Worker is the interface implemented by all background workers.
 type Worker interface {
 	Run(ctx context.Context)
+}
+
+// Mailer is the subset of *mailer.Mailer used by email workers to send templated emails.
+type Mailer interface {
+	Send(templateFile string, data any, ccUser mailer.CCuser, attachmentList []string) error
 }
 
 const (
