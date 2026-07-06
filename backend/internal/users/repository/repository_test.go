@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -25,19 +26,23 @@ func newTestRepo(runner *testutil.MockQueryRunner) *Repository {
 // bounded contexts per Clean Architecture layering), so a generic helper here would
 // either need generics (forbidden in domain-adjacent code) or reflection.
 func fakeProfile(now time.Time) *usersdomain.UserProfile {
+	firstName, lastName, phoneNumber := "John", "Doe", "+380991234567"
+	country, city, gender := "UA", "Kyiv", "male"
+	timezone, bio := "Europe/Kiev", "bio text"
+	avatarURL := ""
 	return &usersdomain.UserProfile{
 		UserID:      "user-123",
-		FirstName:   "John",
-		LastName:    "Doe",
-		PhoneNumber: "+380991234567",
-		Country:     "UA",
-		City:        "Kyiv",
+		FirstName:   &firstName,
+		LastName:    &lastName,
+		PhoneNumber: &phoneNumber,
+		Country:     &country,
+		City:        &city,
 		DateOfBirth: nil,
-		Gender:      "male",
+		Gender:      &gender,
 		UILanguage:  "uk",
-		AvatarURL:   "",
-		Timezone:    "Europe/Kiev",
-		Bio:         "bio text",
+		AvatarURL:   &avatarURL,
+		Timezone:    &timezone,
+		Bio:         &bio,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -47,17 +52,17 @@ func fakeScanProfile(now time.Time) func(dest ...any) error {
 	p := fakeProfile(now)
 	return func(dest ...any) error {
 		*testutil.CastStr(dest[0], 0) = p.UserID
-		*testutil.CastStr(dest[1], 1) = p.FirstName
-		*testutil.CastStr(dest[2], 2) = p.LastName
-		*testutil.CastStr(dest[3], 3) = p.PhoneNumber
-		*testutil.CastStr(dest[4], 4) = p.Country
-		*testutil.CastStr(dest[5], 5) = p.City
-		*testutil.CastPtrStr(dest[6], 6) = p.DateOfBirth
-		*testutil.CastStr(dest[7], 7) = p.Gender
+		*testutil.CastPtrStr(dest[1], 1) = p.FirstName
+		*testutil.CastPtrStr(dest[2], 2) = p.LastName
+		*testutil.CastPtrStr(dest[3], 3) = p.PhoneNumber
+		*testutil.CastPtrStr(dest[4], 4) = p.Country
+		*testutil.CastPtrStr(dest[5], 5) = p.City
+		*testutil.CastPgtypeDate(dest[6], 6) = pgtype.Date{}
+		*testutil.CastPtrStr(dest[7], 7) = p.Gender
 		*testutil.CastStr(dest[8], 8) = p.UILanguage
-		*testutil.CastStr(dest[9], 9) = p.AvatarURL
-		*testutil.CastStr(dest[10], 10) = p.Timezone
-		*testutil.CastStr(dest[11], 11) = p.Bio
+		*testutil.CastPtrStr(dest[9], 9) = p.AvatarURL
+		*testutil.CastPtrStr(dest[10], 10) = p.Timezone
+		*testutil.CastPtrStr(dest[11], 11) = p.Bio
 		*testutil.CastTime(dest[12], 12) = p.CreatedAt
 		*testutil.CastTime(dest[13], 13) = p.UpdatedAt
 		return nil
@@ -80,9 +85,9 @@ func TestGetUserProfileByID(t *testing.T) {
 			got, err := repo.GetUserProfileByID(context.Background(), "user-123")
 			So(err, ShouldBeNil)
 			So(got.UserID, ShouldEqual, "user-123")
-			So(got.FirstName, ShouldEqual, "John")
-			So(got.LastName, ShouldEqual, "Doe")
-			So(got.Country, ShouldEqual, "UA")
+			So(*got.FirstName, ShouldEqual, "John")
+			So(*got.LastName, ShouldEqual, "Doe")
+			So(*got.Country, ShouldEqual, "UA")
 			So(got.DateOfBirth, ShouldBeNil)
 			So(got.CreatedAt, ShouldEqual, now)
 		})
@@ -112,10 +117,11 @@ func TestUpdateUserProfile(t *testing.T) {
 			},
 		})
 
+		janeFirstName, janeLastName := "Jane", "Doe"
 		profile := &usersdomain.UserProfile{
 			UserID:    "user-123",
-			FirstName: "Jane",
-			LastName:  "Doe",
+			FirstName: &janeFirstName,
+			LastName:  &janeLastName,
 		}
 
 		Convey("When the profile exists and update succeeds", func() {

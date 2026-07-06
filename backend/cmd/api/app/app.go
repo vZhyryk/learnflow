@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"learnflow_backend/internal/infrastructure/bootstrap"
 	"learnflow_backend/internal/infrastructure/logger"
 	"net"
 	"sync"
@@ -13,42 +14,39 @@ import (
 )
 
 // Config holds all runtime configuration for the API server.
+//
+// Each field's doc comment names the env var (or CLI flag) it is sourced from —
+// see cmd/api/main.go's getAppConfig/getJWTConfig/getServerTimeout for the loading logic.
 type Config struct {
-	Port     int
-	Env      string
-	Database struct {
-		DSN          string
-		MaxIdleTime  string
-		MaxOpenConns int
-		MinOpenConns int
-		MaxLifetime  string
-	}
+	Port     int    // PORT
+	Env      string // ENVIRONMENT
+	Database bootstrap.DatabaseConfig
 
 	Cors struct {
-		TrustedOrigins map[string]struct{}
+		TrustedOrigins map[string]struct{} // CORS_TRUSTED_ORIGINS
 	}
 
-	TrustedProxies []net.IPNet
+	TrustedProxies []net.IPNet // TRUSTED_PROXIES
 
 	Limiter struct {
-		Rps     float64
-		Burst   int
-		Enabled bool
+		Rps     float64 // -limiter-rps flag, falls back to LIMITER_RPS
+		Burst   int     // -limiter-burst flag, falls back to LIMITER_BURST
+		Enabled bool    // -limiter-enabled flag
 	}
 
 	Secret struct {
-		JWTSecret     string
-		JWTSecretPrev string
-		JWTIssuer     string
-		JWTAudience   string
+		JWTSecret     string // JWT_SECRET
+		JWTSecretPrev string // JWT_SECRET_PREV
+		JWTIssuer     string // JWT_ISSUER
+		JWTAudience   string // JWT_AUDIENCE
 	}
 
 	Timeouts struct {
-		ReadHeaderTimeout time.Duration
-		ReadTimeout       time.Duration
-		WriteTimeout      time.Duration
-		IdleTimeout       time.Duration
-		RequestTimeout    time.Duration
+		ReadHeaderTimeout time.Duration // READ_HEADER_TIMEOUT
+		ReadTimeout       time.Duration // READ_TIMEOUT
+		WriteTimeout      time.Duration // WRITE_TIMEOUT
+		IdleTimeout       time.Duration // IDLE_TIMEOUT
+		RequestTimeout    time.Duration // REQUEST_TIMEOUT
 	}
 }
 

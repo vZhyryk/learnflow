@@ -26,10 +26,7 @@ func NewOutboxWriterWithRunner(runner db.QueryRunner) *OutboxWriter {
 }
 
 func (w *OutboxWriter) queryRunner(ctx context.Context) db.QueryRunner {
-	if tx, ok := db.ExtractTx(ctx); ok {
-		return tx
-	}
-	return w.db
+	return db.FallbackQueryRunner(ctx, w.db)
 }
 
 // Emit serializes payload and inserts a pending event into the outbox table.

@@ -109,6 +109,12 @@ CREATE TABLE users (
 --    (e.g., user deletes account, re-registers later). A full unique would block this.
 CREATE UNIQUE INDEX idx_users_email_active_unique ON users(LOWER(email)) WHERE deleted_at IS NULL;
 
+-- [LOWER(email) partial index, deleted side]: Speeds up lookups of soft-deleted users
+-- by email (e.g. account recovery). Deliberately NOT unique: a user can delete their
+-- account, someone else registers with the same (now-free) email, and that second user
+-- can also delete — two soft-deleted rows legitimately share the same LOWER(email).
+CREATE INDEX idx_users_email_deleted ON users(LOWER(email)) WHERE deleted_at IS NOT NULL;
+
 -- ---------------------------------------------------------------------------
 -- 2. USER PROFILES
 -- ---------------------------------------------------------------------------
@@ -209,6 +215,13 @@ CREATE TABLE email_verification_tokens (
 CREATE INDEX idx_email_verification_tokens_user_id_unused
     ON email_verification_tokens(user_id) WHERE used_at IS NULL;
 
+-- [Partial index WHERE used_at IS NULL, on expires_at]: Backs a scheduled cleanup job
+-- that prunes expired-but-never-used tokens (SELECT ... WHERE used_at IS NULL AND
+-- expires_at < now()). Without this, that scan falls back to a sequential scan as the
+-- table grows — every unverified signup leaves one row behind forever otherwise.
+CREATE INDEX idx_email_verification_tokens_expires_at_unused
+    ON email_verification_tokens(expires_at) WHERE used_at IS NULL;
+
 CREATE TABLE password_reset_tokens (
     id          uuid               PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     uuid               NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -225,6 +238,11 @@ CREATE TABLE password_reset_tokens (
 
 CREATE INDEX idx_password_reset_tokens_user_id_unused
     ON password_reset_tokens(user_id) WHERE used_at IS NULL;
+
+-- [Partial index WHERE used_at IS NULL, on expires_at]: Same cleanup-job rationale as
+-- email_verification_tokens above — backs pruning of expired, never-consumed tokens.
+CREATE INDEX idx_password_reset_tokens_expires_at_unused
+    ON password_reset_tokens(expires_at) WHERE used_at IS NULL;
 
 -- [email_change_tokens — dedicated table for email change flow]:
 -- Email change is security-sensitive: the user must confirm both old and new email.
@@ -255,6 +273,11 @@ CREATE TABLE email_change_tokens (
 -- only pending (unused) tokens are ever looked up by user_id.
 CREATE INDEX idx_email_change_tokens_user_id_unused
     ON email_change_tokens(user_id) WHERE used_at IS NULL;
+
+-- [Partial index WHERE used_at IS NULL, on expires_at]: Same cleanup-job rationale as
+-- the other auth token tables — backs pruning of expired, never-consumed tokens.
+CREATE INDEX idx_email_change_tokens_expires_at_unused
+    ON email_change_tokens(expires_at) WHERE used_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 4. COURSES
@@ -1558,6 +1581,11 @@ CREATE TABLE account_recovery_tokens (
 -- by user_id (to validate a recovery request). Used tokens are archived state.
 CREATE INDEX idx_account_recovery_tokens_user_id_unused
     ON account_recovery_tokens(user_id) WHERE used_at IS NULL;
+
+-- [Partial index WHERE used_at IS NULL, on expires_at]: Same cleanup-job rationale as
+-- the other auth token tables — backs pruning of expired, never-consumed tokens.
+CREATE INDEX idx_account_recovery_tokens_expires_at_unused
+    ON account_recovery_tokens(expires_at) WHERE used_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 26. ARTICLES

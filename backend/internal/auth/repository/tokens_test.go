@@ -91,7 +91,7 @@ func TestMarkEmailVerificationTokenUsed(t *testing.T) {
 			assertUnexpectedDBError(err, "db error")
 		})
 
-		Convey("When token is already used (0 rows affected)", func() {
+		Convey("When 0 rows are affected (token already used or never existed)", func() {
 			err := repo.MarkEmailVerificationTokenUsed(context.Background(), "hash-abc")
 			So(errors.Is(err, authdomain.ErrTokenUsed), ShouldBeTrue)
 		})
@@ -180,7 +180,7 @@ func TestMarkPasswordResetTokenUsed(t *testing.T) {
 			assertUnexpectedDBError(err, "db error")
 		})
 
-		Convey("When token is already used", func() {
+		Convey("When 0 rows are affected (token already used or never existed)", func() {
 			err := repo.MarkPasswordResetTokenUsed(context.Background(), "hash-abc")
 			So(errors.Is(err, authdomain.ErrTokenUsed), ShouldBeTrue)
 		})
@@ -272,7 +272,7 @@ func TestMarkEmailChangeTokenUsed(t *testing.T) {
 			assertUnexpectedDBError(err, "db error")
 		})
 
-		Convey("When token is already used", func() {
+		Convey("When 0 rows are affected (token already used or never existed)", func() {
 			err := repo.MarkEmailChangeTokenUsed(context.Background(), "hash-abc")
 			So(errors.Is(err, authdomain.ErrTokenUsed), ShouldBeTrue)
 		})
@@ -361,7 +361,7 @@ func TestMarkAccountRecoveryTokenUsed(t *testing.T) {
 			assertUnexpectedDBError(err, "db error")
 		})
 
-		Convey("When token is already used", func() {
+		Convey("When 0 rows are affected (token already used or never existed)", func() {
 			err := repo.MarkAccountRecoveryTokenUsed(context.Background(), "hash-abc")
 			So(errors.Is(err, authdomain.ErrTokenUsed), ShouldBeTrue)
 		})

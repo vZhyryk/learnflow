@@ -87,6 +87,71 @@ func TestRegisterRequestValidate(t *testing.T) {
 	})
 }
 
+func TestRegisterRequestValidateCountry(t *testing.T) {
+	Convey("Register request Country validation", t, func() {
+		Convey("empty is allowed (not provided)", func() {
+			So((&RegisterRequest{Email: "test@gmail.com", Password: "validpassword"}).Validate(), ShouldBeNil)
+		})
+		Convey("valid 2-char code is accepted", func() {
+			So((&RegisterRequest{Email: "test@gmail.com", Password: "validpassword", Country: "UA"}).Validate(), ShouldBeNil)
+		})
+		Convey("invalid code is rejected", func() {
+			err := (&RegisterRequest{Email: "test@gmail.com", Password: "validpassword", Country: "USA"}).Validate()
+			So(errors.Is(err, ErrInvalidCountryCode), ShouldBeTrue)
+		})
+	})
+}
+
+func TestRegisterRequestValidateGender(t *testing.T) {
+	Convey("Register request Gender validation", t, func() {
+		Convey("empty is allowed (not provided)", func() {
+			So((&RegisterRequest{Email: "test@gmail.com", Password: "validpassword"}).Validate(), ShouldBeNil)
+		})
+		Convey("valid value is accepted", func() {
+			So((&RegisterRequest{Email: "test@gmail.com", Password: "validpassword", Gender: "female"}).Validate(), ShouldBeNil)
+		})
+		Convey("unsupported value is rejected", func() {
+			err := (&RegisterRequest{Email: "test@gmail.com", Password: "validpassword", Gender: "unknown"}).Validate()
+			So(errors.Is(err, ErrInvalidGender), ShouldBeTrue)
+		})
+	})
+}
+
+func TestRegisterRequestValidateDateOfBirth(t *testing.T) {
+	Convey("Register request DateOfBirth validation", t, func() {
+		Convey("nil is allowed (not provided)", func() {
+			So((&RegisterRequest{Email: "test@gmail.com", Password: "validpassword"}).Validate(), ShouldBeNil)
+		})
+		Convey("valid past date is accepted", func() {
+			dob := "1990-06-15"
+			So((&RegisterRequest{Email: "test@gmail.com", Password: "validpassword", DateOfBirth: &dob}).Validate(), ShouldBeNil)
+		})
+		Convey("future date is rejected", func() {
+			dob := "2999-01-01"
+			err := (&RegisterRequest{Email: "test@gmail.com", Password: "validpassword", DateOfBirth: &dob}).Validate()
+			So(errors.Is(err, ErrInvalidDateOfBirth), ShouldBeTrue)
+		})
+	})
+}
+
+func TestRegisterRequestValidateUILanguage(t *testing.T) {
+	Convey("Register request UILanguage validation", t, func() {
+		Convey("empty is allowed (not provided, defaults downstream)", func() {
+			So((&RegisterRequest{Email: "test@gmail.com", Password: "validpassword"}).Validate(), ShouldBeNil)
+		})
+		for _, valid := range []string{"uk", "pl", "ru", "en"} {
+			v := valid
+			Convey(v+" is valid", func() {
+				So((&RegisterRequest{Email: "test@gmail.com", Password: "validpassword", UILanguage: v}).Validate(), ShouldBeNil)
+			})
+		}
+		Convey("unsupported code is rejected", func() {
+			err := (&RegisterRequest{Email: "test@gmail.com", Password: "validpassword", UILanguage: "de"}).Validate()
+			So(errors.Is(err, ErrInvalidUILanguage), ShouldBeTrue)
+		})
+	})
+}
+
 func TestLoginRequestValidate(t *testing.T) {
 	Convey("Login request validation", t, func() {
 		Convey("nil is not allowed", func() {

@@ -11,17 +11,17 @@ import (
 
 // CreateUserSession persists a new user session and returns it with DB-generated fields.
 func (rep *Repository) CreateUserSession(ctx context.Context, session *authdomain.UserSession) (*authdomain.UserSession, error) {
-	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, createUserSessionSQL, session.UserID, session.RefreshHash, session.UserAgent, session.IPAddress, session.ExpiresAt))
+	createdSession, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, createUserSessionSQL, session.UserID, session.RefreshHash, session.UserAgent, session.IPAddress, session.ExpiresAt))
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateUserSession: %w", err)
 	}
 
-	return session, nil
+	return createdSession, nil
 }
 
 // GetUserSessionByRefreshToken retrieves an active session by its refresh token hash.
-func (rep *Repository) GetUserSessionByRefreshToken(ctx context.Context, refreshToken string) (*authdomain.UserSession, error) {
-	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, getSessionByTokenSQL, refreshToken))
+func (rep *Repository) GetUserSessionByRefreshToken(ctx context.Context, refreshTokenHash string) (*authdomain.UserSession, error) {
+	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, getSessionByTokenSQL, refreshTokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrSessionNotFound
 	}
@@ -33,8 +33,8 @@ func (rep *Repository) GetUserSessionByRefreshToken(ctx context.Context, refresh
 }
 
 // GetSessionByPrevHash retrieves a session by its previous refresh token hash (rotation detection).
-func (rep *Repository) GetSessionByPrevHash(ctx context.Context, prevRefreshToken string) (*authdomain.UserSession, error) {
-	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, getSessionByPrevHashSQL, prevRefreshToken))
+func (rep *Repository) GetSessionByPrevHash(ctx context.Context, prevRefreshTokenHash string) (*authdomain.UserSession, error) {
+	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, getSessionByPrevHashSQL, prevRefreshTokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrSessionNotFound
 	}
@@ -123,4 +123,29 @@ func (rep *Repository) UpdateFailedLoginAttempts(ctx context.Context, sessionID,
 		return authdomain.ErrSessionNotFound
 	}
 	return nil
+}
+
+// GetAllSessionsByUserID returns all sessions belonging to the given user.
+func (rep *Repository) GetAllSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
+	rows, err := rep.queryRunner(ctx).Query(ctx, getAllUserSessionSQL, userID)
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetAllSessionsByUserID: %w", err)
+	}
+
+	defer rows.Close()
+
+	var sessions []*authdomain.UserSession
+	for rows.Next() {
+		session, err := scanUserSession(rows)
+		if err != nil {
+			return nil, fmt.Errorf("repository.GetAllSessionsByUserID scan: %w", err)
+		}
+		sessions = append(sessions, session)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repository.GetAllSessionsByUserID rows: %w", err)
+	}
+
+	return sessions, nil
 }

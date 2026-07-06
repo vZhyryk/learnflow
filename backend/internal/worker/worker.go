@@ -22,7 +22,7 @@ type Worker interface {
 
 // Mailer is the subset of *mailer.Mailer used by email workers to send templated emails.
 type Mailer interface {
-	Send(templateFile string, data any, ccUser mailer.CCuser, attachmentList []string) error
+	Send(templateFile string, data any, ccUser mailer.CCUser, attachmentList []string) error
 }
 
 const (

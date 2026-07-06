@@ -24,7 +24,7 @@ func TestGetUserSessionByRefreshToken(t *testing.T) {
 			},
 		})
 
-		Convey("When the profile exists", func() {
+		Convey("When the session exists", func() {
 			row = &testutil.MockRow{ScanFn: fakeScanUserSession(now)}
 			got, err := repo.GetUserSessionByRefreshToken(context.Background(), "refresh-token-hash")
 			userSession := fakeUserSession(now)
@@ -48,7 +48,7 @@ func TestGetUserSessionByRefreshToken(t *testing.T) {
 			So(got.LastSeenIP, ShouldEqual, userSession.LastSeenIP)
 		})
 
-		Convey("When the profile does not exist", func() {
+		Convey("When the session does not exist", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetUserSessionByRefreshToken(context.Background(), "unknown")
 			So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
@@ -73,7 +73,7 @@ func TestGetSessionByPrevHash(t *testing.T) {
 			},
 		})
 
-		Convey("When the profile exists", func() {
+		Convey("When the session exists", func() {
 			row = &testutil.MockRow{ScanFn: fakeScanUserSession(now)}
 			got, err := repo.GetSessionByPrevHash(context.Background(), "refresh-token-hash")
 			userSession := fakeUserSession(now)
@@ -97,7 +97,7 @@ func TestGetSessionByPrevHash(t *testing.T) {
 			So(got.LastSeenIP, ShouldEqual, userSession.LastSeenIP)
 		})
 
-		Convey("When the profile does not exist", func() {
+		Convey("When the session does not exist", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetSessionByPrevHash(context.Background(), "unknown")
 			So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
@@ -123,7 +123,7 @@ func TestGetActiveSessionsByUserID(t *testing.T) {
 			},
 		})
 
-		Convey("When the profile exists", func() {
+		Convey("When the session exists", func() {
 			row = &testutil.MockRow{ScanFn: fakeScanUserSession(now)}
 			got, err := repo.GetActiveSessionsByUserID(context.Background(), "user-123")
 			userSession := fakeUserSession(now)
@@ -149,7 +149,7 @@ func TestGetActiveSessionsByUserID(t *testing.T) {
 			}
 		})
 
-		Convey("When the profile does not exist", func() {
+		Convey("When the session does not exist", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			retErr = authdomain.ErrSessionNotFound
 			_, err := repo.GetActiveSessionsByUserID(context.Background(), "unknown")
@@ -186,7 +186,7 @@ func TestCreateUserSession(t *testing.T) {
 			},
 		})
 
-		Convey("When the profile exists", func() {
+		Convey("When the session exists", func() {
 			row = &testutil.MockRow{ScanFn: fakeScanUserSession(userSession.CreatedAt)}
 			got, err := repo.CreateUserSession(context.Background(), userSession)
 
@@ -244,7 +244,7 @@ func TestRevokeUserSession(t *testing.T) {
 			assertUnexpectedDBError(err, "db connection lost")
 		})
 
-		Convey("When the session is not found", func() {
+		Convey("When the session is missing or already revoked (idempotent double-revoke)", func() {
 			err := repo.RevokeUserSession(context.Background(), userSession.ID, *userSession.RevokedByUserID, *userSession.RevokeReason)
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
@@ -311,7 +311,7 @@ func TestUpdateSessionToken(t *testing.T) {
 			assertUnexpectedDBError(err, "db connection lost")
 		})
 
-		Convey("When the session is not found", func() {
+		Convey("When the session is missing, revoked, or expired (0 rows)", func() {
 			err := repo.UpdateSessionToken(context.Background(), userSession.ID, "new-refresh-hash", "Mozilla/5.0", "127.0.0.1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)

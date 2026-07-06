@@ -104,12 +104,12 @@ func (rep *Repository) MarkPasswordResetTokenUsed(ctx context.Context, tokenHash
 
 // CreateEmailChangeToken persists a new email change token and returns it with DB-generated fields.
 func (rep *Repository) CreateEmailChangeToken(ctx context.Context, token *authdomain.EmailChangeToken) (*authdomain.EmailChangeToken, error) {
-	token, err := scanEmailChangeToken(rep.queryRunner(ctx).QueryRow(ctx, createEmailChangeTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt, token.NewEmail))
+	scannedToken, err := scanEmailChangeToken(rep.queryRunner(ctx).QueryRow(ctx, createEmailChangeTokenSQL, token.UserID, token.TokenHash, token.ExpiresAt, token.NewEmail))
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateEmailChangeToken: %w", err)
 	}
 
-	return token, nil
+	return scannedToken, nil
 }
 
 // GetEmailChangeToken retrieves an email change token by its hash.

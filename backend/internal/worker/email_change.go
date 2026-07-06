@@ -44,7 +44,7 @@ func HandleInitEmailChangeProcess(p events.InitEmailChangeToken, baseURL string,
 		"expirationTime":  p.ExpiresAt.UTC().Format("2 Jan 2006, 15:04 UTC"),
 	}
 
-	return m.Send("email_change.html", data, mailer.CCuser{Mail: p.Email}, nil)
+	return m.Send("email_change.html", data, mailer.CCUser{Mail: p.Email}, nil)
 }
 
 // GenerateInitEmailChangeIdempotencyKey returns a Redis key used to deduplicate email change processing.

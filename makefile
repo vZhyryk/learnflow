@@ -20,7 +20,7 @@ CODE_REVIEW_GRAPH_BIN := code-review-graph
 REPO_ROOT := $(CURDIR)
 MIGRATE_DIRECTION ?= up
 
-.PHONY: help tidy_and_verify cleanup run run_obs run_full stop logs migrate migrate_up migrate_down migrate_docker run_no_docker run_with_graph_watch run_no_docker_with_graph_watch run_dev_all run_init_sonar run_sonar_backend run_sonar_frontend run_sonar_all run_test_sonar run_graph_build run_graph_watch run_graph_status push_code run_test_coverage_backend run_test_coverage_once_backend run_test_coverage_frontend run_test_coverage_once_frontend run_test_goconvey lint lint_backend lint_frontend backup backup_list restore
+.PHONY: help tidy_and_verify cleanup run run_obs run_full stop logs migrate migrate_up migrate_down migrate_docker run_no_docker run_with_graph_watch run_no_docker_with_graph_watch run_dev_all run_init_sonar run_sonar_backend run_sonar_frontend run_sonar_all run_test_sonar test_integration_up test_integration_migrate test_integration test_integration_down run_graph_build run_graph_watch run_graph_status push_code run_test_coverage_backend run_test_coverage_once_backend run_test_coverage_frontend run_test_coverage_once_frontend run_test_goconvey lint lint_backend lint_frontend backup backup_list restore
 
 help:
 	@printf '%s\n' \
@@ -44,6 +44,10 @@ help:
 		'  make run_sonar_frontend     - run frontend Sonar scan locally in docker' \
 		'  make run_sonar_all          - run backend and frontend Sonar scans' \
 		'  make run_test_sonar         - run docker compose for SonarQube stack' \
+		'  make test_integration_up    - start sonar_db + redis for integration tests (no sonarqube app)' \
+		'  make test_integration_migrate - apply migrations against the learnflow_test database' \
+		'  make test_integration       - run backend integration tests (-tags=integration) against real Postgres/Redis' \
+		'  make test_integration_down  - stop the integration test stack' \
 		'  make run_graph_build        - rebuild code-review-graph for the repo' \
 		'  make run_graph_watch        - watch repo changes and auto-update graph' \
 		'  make run_graph_status       - show current code-review-graph status' \
@@ -141,9 +145,13 @@ run_init_sonar:
 run_sonar_backend:
 	@test -n "$(SONAR_TOKEN)" || (echo "No SONAR_TOKEN in environment or .env"; exit 1)
 	@$(MAKE) run_test_coverage_once_backend
+	@set -e; \
+	envfile=$$(mktemp); \
+	chmod 600 "$$envfile"; \
+	trap 'rm -f "$$envfile"' EXIT INT TERM; \
+	printf 'SONAR_HOST_URL=%s\nSONAR_TOKEN=%s\n' "$(SONAR_HOST_URL)" "$(SONAR_TOKEN)" > "$$envfile"; \
 	docker run --rm \
-		-e SONAR_HOST_URL="$(SONAR_HOST_URL)" \
-		-e SONAR_TOKEN="$(SONAR_TOKEN)" \
+		--env-file "$$envfile" \
 		-v "$$(pwd):/usr/src" \
 		-w /usr/src/backend \
 		$(SONAR_SCANNER_IMAGE)
@@ -151,9 +159,13 @@ run_sonar_backend:
 run_sonar_frontend:
 	@test -n "$(SONAR_TOKEN)" || (echo "No SONAR_TOKEN in environment or .env"; exit 1)
 	cd $(FRONTEND_DIR) && npm run test:unit:coverage
+	@set -e; \
+	envfile=$$(mktemp); \
+	chmod 600 "$$envfile"; \
+	trap 'rm -f "$$envfile"' EXIT INT TERM; \
+	printf 'SONAR_HOST_URL=%s\nSONAR_TOKEN=%s\n' "$(SONAR_HOST_URL)" "$(SONAR_TOKEN)" > "$$envfile"; \
 	docker run --rm \
-		-e SONAR_HOST_URL="$(SONAR_HOST_URL)" \
-		-e SONAR_TOKEN="$(SONAR_TOKEN)" \
+		--env-file "$$envfile" \
 		-v "$$(pwd):/usr/src" \
 		-w /usr/src/frontend \
 		$(SONAR_SCANNER_IMAGE)
@@ -163,10 +175,24 @@ run_sonar_all: run_sonar_backend run_sonar_frontend
 run_test_sonar:
 	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' up --build
 
+test_integration_up:
+	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' up -d --wait sonar_db redis
+
+test_integration_migrate: test_integration_up
+	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' up --build 'migrate'
+
+test_integration: test_integration_migrate
+	cd $(BACKEND_DIR) && \
+		env $$(grep -v '^#' ../.env.test | xargs) DB_HOST=localhost DB_PORT=5433 \
+		go test -tags=integration ./...
+
+test_integration_down:
+	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' down
+
 push_code:
-	@test -n "$(MSG)" || (echo "No MSG. Use: make push_code MSG='description'"; exit 1)
+	@test -n "$$MSG" || (echo "No MSG. Use: make push_code MSG='description'"; exit 1)
 	git add .
-	git commit -m "$(MSG)" || true
+	git diff --cached --quiet && echo "Nothing to commit." || git commit -m "$$MSG"
 	git push -u origin HEAD
 
 # Example:
@@ -215,12 +241,12 @@ lint_verify:
 # linter rule exists.
 lint_repo_interfaces:
 	@fail=0; \
-	for f in $$(find $(BACKEND_DIR)/internal -path "*/repository/repository.go"); do \
+	while IFS= read -r -d '' f; do \
 		if ! grep -qE '_ [A-Za-z0-9_.]*Repository = \(\*Repository\)\(nil\)' "$$f"; then \
 			echo "missing compile-time interface check: $$f"; \
 			fail=1; \
 		fi; \
-	done; \
+	done < <(find $(BACKEND_DIR)/internal -path "*/repository/repository.go" -print0); \
 	exit $$fail
 
 lint_frontend:
@@ -233,5 +259,6 @@ backup_list:
 	docker exec learnflow_backup mc ls local/${BACKUP_BUCKET:-learnflow-backups}
 
 restore:
-	@test -n "$(FILE)" || (echo "No FILE. Use: make restore FILE=learnflow_20240101_120000.sql.gz"; exit 1)
-	docker exec learnflow_backup restore.sh $(FILE)
+	@test -n "$$FILE" || (echo "No FILE. Use: make restore FILE=learnflow_20240101_120000.sql.gz"; exit 1)
+	@echo "$$FILE" | grep -qE '^learnflow_[0-9]{8}_[0-9]{6}\.sql\.gz$$' || (echo "Invalid FILE: expected format learnflow_YYYYMMDD_HHMMSS.sql.gz, got: $$FILE"; exit 1)
+	docker exec learnflow_backup restore.sh "$$FILE"

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
+	"learnflow_backend/internal/shared/ptr"
 	"learnflow_backend/internal/shared/tokens"
 	"time"
 )
@@ -49,7 +50,7 @@ func (s *Service) InitRecoverAccount(ctx context.Context, req authdomain.Request
 					Email:     user.Email,
 					ExpiresAt: expiresAt,
 					RawToken:  rawToken,
-					UserName:  userProfile.FirstName,
+					UserName:  ptr.StringOrEmpty(userProfile.FirstName),
 				}, nil
 			},
 		)
@@ -65,7 +66,7 @@ func (s *Service) RecoverAccount(ctx context.Context, req authdomain.RecoverAcco
 			return fmt.Errorf("recover_account: get token: %w", err)
 		}
 
-		if token.ExpiresAt.Before(time.Now().UTC()) {
+		if token.IsExpired() {
 			return authdomain.ErrTokenExpired
 		}
 

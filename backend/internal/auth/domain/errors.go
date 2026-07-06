@@ -53,6 +53,15 @@ var (
 
 	// ErrInvalidAccountState is returned when the account is in an unexpected state.
 	ErrInvalidAccountState = errors.New("invalid account state")
+
+	// ErrInvalidCountryCode is returned when country is not a valid ISO 3166-1 alpha-2 code.
+	ErrInvalidCountryCode = errors.New("invalid country code")
+	// ErrInvalidGender is returned when gender is not one of the allowed values.
+	ErrInvalidGender = errors.New("invalid gender")
+	// ErrInvalidDateOfBirth is returned when date of birth is malformed, in the future, or before 1900.
+	ErrInvalidDateOfBirth = errors.New("invalid date of birth")
+	// ErrInvalidUILanguage is returned when UI language is not a supported language code.
+	ErrInvalidUILanguage = errors.New("invalid UI language")
 )
 
 // ErrAccountLockedError carries the unlock time when a brute-force lockout is in effect.

@@ -130,7 +130,7 @@ func TestHandleOutboxEntryUnknownEventType(t *testing.T) {
 
 func TestHandleOutboxEntryPublishFails(t *testing.T) {
 	Convey("Given an OutboxPoller", t, func() {
-		Convey("When Publish fails", func() {
+		Convey("When Publish fails, the entry is marked failed (no retry within this call)", func() {
 			var gotQuery string
 			var gotArgs []any
 			runner := &testutil.MockQueryRunner{

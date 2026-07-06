@@ -153,11 +153,11 @@ func (m *mockUserRepo) GetDeletedUserByEmail(ctx context.Context, email string) 
 // Only set the fields needed for each test case — unset fields panic with a clear message.
 type mockSessionRepo struct {
 	createUserSession            func(ctx context.Context, s *authdomain.UserSession) (*authdomain.UserSession, error)
-	getUserSessionByRefreshToken func(ctx context.Context, token string) (*authdomain.UserSession, error)
+	getUserSessionByRefreshToken func(ctx context.Context, refreshTokenHash string) (*authdomain.UserSession, error)
 	revokeUserSession            func(ctx context.Context, sessionID, revokedBy string, reason authdomain.RevokeReason) error
 	revokeAllUserSessions        func(ctx context.Context, userID string, revokedBy *string, reason authdomain.RevokeReason) error
 	getActiveSessionsByUserID    func(ctx context.Context, userID string) ([]*authdomain.UserSession, error)
-	getSessionByPrevHash         func(ctx context.Context, prevToken string) (*authdomain.UserSession, error)
+	getSessionByPrevHash         func(ctx context.Context, prevRefreshTokenHash string) (*authdomain.UserSession, error)
 	updateSessionToken           func(ctx context.Context, sessionID, hash, ua, ip string) error
 	updateFailedLoginAttempts    func(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error
 }
@@ -169,11 +169,11 @@ func (m *mockSessionRepo) CreateUserSession(ctx context.Context, s *authdomain.U
 	return m.createUserSession(ctx, s)
 }
 
-func (m *mockSessionRepo) GetUserSessionByRefreshToken(ctx context.Context, token string) (*authdomain.UserSession, error) {
+func (m *mockSessionRepo) GetUserSessionByRefreshToken(ctx context.Context, refreshTokenHash string) (*authdomain.UserSession, error) {
 	if m.getUserSessionByRefreshToken == nil {
 		panic("mockSessionRepo.getUserSessionByRefreshToken not set")
 	}
-	return m.getUserSessionByRefreshToken(ctx, token)
+	return m.getUserSessionByRefreshToken(ctx, refreshTokenHash)
 }
 
 func (m *mockSessionRepo) RevokeUserSession(ctx context.Context, sessionID, revokedByUserID string, revokeReason authdomain.RevokeReason) error {
@@ -211,11 +211,11 @@ func (m *mockSessionRepo) UpdateFailedLoginAttempts(ctx context.Context, session
 	return m.updateFailedLoginAttempts(ctx, sessionID, lockInterval, loginCountLimit)
 }
 
-func (m *mockSessionRepo) GetSessionByPrevHash(ctx context.Context, prevRefreshToken string) (*authdomain.UserSession, error) {
+func (m *mockSessionRepo) GetSessionByPrevHash(ctx context.Context, prevRefreshTokenHash string) (*authdomain.UserSession, error) {
 	if m.getSessionByPrevHash == nil {
 		panic("mockSessionRepo.getSessionByPrevHash not set")
 	}
-	return m.getSessionByPrevHash(ctx, prevRefreshToken)
+	return m.getSessionByPrevHash(ctx, prevRefreshTokenHash)
 }
 
 // mockTokenRepo implements authdomain.TokenRepository via function fields.

@@ -31,11 +31,8 @@ func NewOutboxPoller(queryRunner db.QueryRunner, publisher events.Publisher, jso
 	return &OutboxPoller{db: queryRunner, publisher: publisher, logger: jsonLogger, transactor: transactor}
 }
 
-func (rep *OutboxPoller) queryRunner(ctx context.Context) db.QueryRunner {
-	if tx, ok := db.ExtractTx(ctx); ok {
-		return tx
-	}
-	return rep.db
+func (p *OutboxPoller) queryRunner(ctx context.Context) db.QueryRunner {
+	return db.FallbackQueryRunner(ctx, p.db)
 }
 
 const (

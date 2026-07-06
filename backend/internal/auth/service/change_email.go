@@ -6,6 +6,7 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
+	"learnflow_backend/internal/shared/ptr"
 	"learnflow_backend/internal/shared/tokens"
 	"strings"
 	"time"
@@ -39,7 +40,7 @@ func (s *Service) InitiateEmailChange(ctx context.Context, req authdomain.Reques
 					Email:     req.NewEmail,
 					ExpiresAt: expiresAt,
 					RawToken:  rawToken,
-					UserName:  userProfile.FirstName,
+					UserName:  ptr.StringOrEmpty(userProfile.FirstName),
 				}, nil
 			},
 		)
@@ -55,12 +56,12 @@ func (s *Service) getExistsUserProfileChangeEmail(ctx context.Context, req authd
 		return nil, authdomain.ErrEmailAlreadyInUse
 	}
 
-	nUser, err := s.userRepo.GetUserByEmail(ctx, req.NewEmail)
+	existingUserAtNewEmail, err := s.userRepo.GetUserByEmail(ctx, req.NewEmail)
 	if err != nil && !errors.Is(err, authdomain.ErrUserNotFound) {
 		return nil, fmt.Errorf("init_email_change: check new email exists: %w", err)
 	}
 
-	if nUser != nil && nUser.ID != req.UserID {
+	if existingUserAtNewEmail != nil && existingUserAtNewEmail.ID != req.UserID {
 		return nil, authdomain.ErrEmailAlreadyInUse
 	}
 
@@ -111,7 +112,7 @@ func (s *Service) getTokenAndValidateUserChangeEmail(ctx context.Context, req au
 		return nil, fmt.Errorf("change_email: get token: %w", err)
 	}
 
-	if token.ExpiresAt.Before(time.Now().UTC()) {
+	if token.IsExpired() {
 		return nil, authdomain.ErrTokenExpired
 	}
 
@@ -119,8 +120,8 @@ func (s *Service) getTokenAndValidateUserChangeEmail(ctx context.Context, req au
 		return nil, authdomain.ErrInvalidToken
 	}
 
-	newMailUser, err := s.userRepo.GetUserByEmail(ctx, token.NewEmail)
-	if err == nil && newMailUser != nil {
+	existingUserAtNewEmail, err := s.userRepo.GetUserByEmail(ctx, token.NewEmail)
+	if err == nil && existingUserAtNewEmail != nil {
 		return nil, authdomain.ErrEmailAlreadyInUse
 	}
 

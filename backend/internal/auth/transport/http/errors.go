@@ -96,7 +96,5 @@ func setAccountLockHeader(err error) string {
 // response itself. The write error is only logged, never returned — by this point the
 // handler has already decided what to respond with, and callers have nothing left to do.
 func (h *Handler) handleErrorRespond(r *http.Request, caseName string, fn func() error) {
-	if err := fn(); err != nil {
-		h.jsonLogger.Error(err, map[string]any{"case": caseName, "path": r.URL.Path})
-	}
+	helpers.LogRespondError(h.jsonLogger, r, caseName, fn)
 }

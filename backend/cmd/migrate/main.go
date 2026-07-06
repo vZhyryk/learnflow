@@ -5,10 +5,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"learnflow_backend/internal/infrastructure/bootstrap"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
-	"os"
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -20,12 +20,8 @@ import (
 )
 
 func main() {
-	traceLevel := logger.LevelFatal
-	if env.GetStringEnv("ENVIRONMENT", "production") == "dev" {
-		traceLevel = logger.LevelError
-	}
-
-	jsonLogger := logger.New(os.Stdout, nil, traceLevel)
+	environment := env.GetStringEnv("ENVIRONMENT", "production")
+	jsonLogger := bootstrap.NewLogger(environment)
 
 	cfg := parseFlags()
 	cfg, err := resolveConfig(cfg)

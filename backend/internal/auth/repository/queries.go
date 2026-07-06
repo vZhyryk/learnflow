@@ -18,6 +18,14 @@ const (
 		ORDER BY created_at DESC
 		LIMIT 25
 	`
+
+	getAllUserSessionSQL = `
+		SELECT` + sessionColumns + `
+		FROM user_sessions WHERE user_id = $1
+		ORDER BY created_at DESC
+		LIMIT 25
+	`
+
 	getSessionByTokenSQL = `
 		SELECT` + sessionColumns + `
 		FROM user_sessions WHERE refresh_hash = $1 AND revoked_at IS NULL AND expires_at > now()

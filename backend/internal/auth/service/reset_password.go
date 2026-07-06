@@ -6,6 +6,7 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
+	"learnflow_backend/internal/shared/ptr"
 	"learnflow_backend/internal/shared/tokens"
 	"time"
 
@@ -49,7 +50,7 @@ func (s *Service) InitiatePasswordReset(ctx context.Context, req authdomain.Requ
 					Email:     user.Email,
 					ExpiresAt: expiresAt,
 					RawToken:  rawToken,
-					UserName:  userProfile.FirstName,
+					UserName:  ptr.StringOrEmpty(userProfile.FirstName),
 				}, nil
 			},
 		)
@@ -66,7 +67,7 @@ func (s *Service) ResetPassword(ctx context.Context, req authdomain.ResetPasswor
 			return fmt.Errorf("reset_password: get token: %w", err)
 		}
 
-		if token.ExpiresAt.Before(time.Now().UTC()) {
+		if token.IsExpired() {
 			return authdomain.ErrTokenExpired
 		}
 
@@ -75,12 +76,12 @@ func (s *Service) ResetPassword(ctx context.Context, req authdomain.ResetPasswor
 			return fmt.Errorf("reset_password: get user: %w", err)
 		}
 
-		hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), s.cost)
+		passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), s.cost)
 		if err != nil {
 			return fmt.Errorf("reset_password: hash password: %w", err)
 		}
 
-		err = s.userRepo.UpdatePasswordHash(ctx, user.ID, string(hash))
+		err = s.userRepo.UpdatePasswordHash(ctx, user.ID, string(passwordHash))
 		if err != nil {
 			return fmt.Errorf("reset_password: update hash: %w", err)
 		}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/shared/tokens"
-	"time"
 )
 
 // VerifyEmail confirms a user's email address using the provided token.
@@ -18,7 +17,7 @@ func (s *Service) VerifyEmail(ctx context.Context, req authdomain.VerifyEmailReq
 			return fmt.Errorf("verify_email.GetEmailVerificationToken: %w", err)
 		}
 
-		if token.ExpiresAt.Before(time.Now().UTC()) {
+		if token.IsExpired() {
 			return authdomain.ErrTokenExpired
 		}
 

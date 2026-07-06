@@ -108,6 +108,13 @@ type TokenBase struct {
 	InvalidatedByUserID *string
 }
 
+// IsExpired reports whether the token's expiry has passed. The repository query that
+// fetches the token already filters on expires_at, so this is a defense-in-depth check,
+// not the primary enforcement point.
+func (t TokenBase) IsExpired() bool {
+	return t.ExpiresAt.Before(time.Now().UTC())
+}
+
 // EmailVerificationToken is a single-use token for confirming a user's email address.
 type EmailVerificationToken struct {
 	TokenBase
@@ -137,20 +144,23 @@ type AuthTokens struct {
 	UserID       string
 }
 
-// UserProfile holds public profile data for a user.
+// UserProfile holds public profile data for a user. Fields backed by
+// nullable columns are *string: nil means the column is SQL NULL ("not
+// provided"), distinct from an empty string. UILanguage stays a plain string
+// because its column is NOT NULL DEFAULT 'uk'.
 type UserProfile struct {
 	UserID      string
-	FirstName   string
-	LastName    string
-	PhoneNumber string
-	Country     string
-	City        string
+	FirstName   *string
+	LastName    *string
+	PhoneNumber *string
+	Country     *string
+	City        *string
 	DateOfBirth *string
-	Gender      string
+	Gender      *string
 	UILanguage  string
-	AvatarURL   string
-	Timezone    string
-	Bio         string
+	AvatarURL   *string
+	Timezone    *string
+	Bio         *string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
@@ -172,15 +182,59 @@ type RegisterRequest struct {
 	Bio         string
 }
 
-// Validate checks that email and password meet format requirements.
+// Validate checks that email, password, and any provided optional profile
+// fields meet format requirements.
 func (r *RegisterRequest) Validate() error {
+	checks := []func() error{
+		r.validateCredentials,
+		r.validateCountry,
+		r.validateGender,
+		r.validateDateOfBirth,
+		r.validateUILanguage,
+	}
+	for _, check := range checks {
+		if err := check(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateCredentials() error {
 	if len(r.Email) < 3 || !validator.MatchesEmail(r.Email) {
 		return ErrInvalidCredentialFormat
 	}
 	if len(r.Password) < 8 || len(r.Password) > 72 {
 		return ErrInvalidCredentialFormat
 	}
+	return nil
+}
 
+func (r *RegisterRequest) validateCountry() error {
+	if r.Country != "" && !validator.IsValidCountryCode(r.Country) {
+		return ErrInvalidCountryCode
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateGender() error {
+	if r.Gender != "" && !validator.IsValidGender(r.Gender) {
+		return ErrInvalidGender
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateDateOfBirth() error {
+	if r.DateOfBirth != nil && !validator.IsValidDateOfBirth(*r.DateOfBirth) {
+		return ErrInvalidDateOfBirth
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateUILanguage() error {
+	if r.UILanguage != "" && !validator.IsValidUILanguage(r.UILanguage) {
+		return ErrInvalidUILanguage
+	}
 	return nil
 }
 
@@ -239,7 +293,7 @@ func (r *LogoutRequest) Validate() error {
 
 // VerifyEmailRequest carries the token submitted to confirm an email address.
 type VerifyEmailRequest struct {
-	Token string
+	Token string // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
 }
 
 // Validate checks that the token field is present.
@@ -266,7 +320,7 @@ func (r *RequestPasswordResetRequest) Validate() error {
 
 // ResetPasswordRequest carries the reset token and the new password.
 type ResetPasswordRequest struct {
-	Token       string
+	Token       string // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
 	NewPassword string
 }
 
@@ -322,7 +376,7 @@ func (r *RequestEmailChangeRequest) Validate() error {
 
 // EmailChangeRequest carries the token submitted to confirm an email address change.
 type EmailChangeRequest struct {
-	Token                string
+	Token                string // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
 	UserID               string
 	IsAllSessionsLogout  bool
 	JTI                  string
@@ -339,7 +393,7 @@ func (r *EmailChangeRequest) Validate() error {
 
 // RecoverAccountRequest carries the recovery token submitted to restore a deleted account.
 type RecoverAccountRequest struct {
-	Token string
+	Token string // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
 }
 
 // Validate checks that the recover account fields are valid.

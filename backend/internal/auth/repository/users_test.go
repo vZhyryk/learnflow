@@ -64,8 +64,9 @@ func TestCreateUserProfile(t *testing.T) {
 		})
 
 		Convey("When creation succeeds", func() {
+			firstName, lastName := "John", "Doe"
 			err := repo.CreateUserProfile(context.Background(), &authdomain.UserProfile{
-				UserID: "user-123", FirstName: "John", LastName: "Doe",
+				UserID: "user-123", FirstName: &firstName, LastName: &lastName,
 			})
 			So(err, ShouldBeNil)
 		})
@@ -224,8 +225,8 @@ func TestGetUserProfileByUserID(t *testing.T) {
 			got, err := repo.GetUserProfileByUserID(context.Background(), "user-123")
 			So(err, ShouldBeNil)
 			So(got.UserID, ShouldEqual, "user-123")
-			So(got.FirstName, ShouldEqual, "John")
-			So(got.LastName, ShouldEqual, "Doe")
+			So(*got.FirstName, ShouldEqual, "John")
+			So(*got.LastName, ShouldEqual, "Doe")
 		})
 
 		Convey("When profile not found", func() {

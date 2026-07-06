@@ -76,7 +76,7 @@ func TestLogoutSessionAlreadyGone(t *testing.T) {
 
 func TestLogoutSessionBelongsToAnotherUser(t *testing.T) {
 	Convey("Given an auth service", t, func() {
-		Convey("When the session belongs to a different user", func() {
+		Convey("When the session belongs to a different user (session-hijack/IDOR guard)", func() {
 			sRepo := &mockSessionRepo{
 				getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
 					return &authdomain.UserSession{ID: "session-123", UserID: "someone-else"}, nil

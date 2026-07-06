@@ -42,7 +42,7 @@ func HandlePasswordResetProcess(p events.InitPasswordResetToken, baseURL string,
 		"resetUrl":       fmt.Sprintf("%s/api/v1/users/auth/password/reset?token=%s", baseURL, p.RawToken),
 		"expirationTime": p.ExpiresAt.UTC().Format("2 Jan 2006, 15:04 UTC"),
 	}
-	return m.Send("password_reset.html", data, mailer.CCuser{Mail: p.Email}, nil)
+	return m.Send("password_reset.html", data, mailer.CCUser{Mail: p.Email}, nil)
 }
 
 // GeneratePasswordResetIdempotencyKey returns a Redis key used to deduplicate password reset processing.

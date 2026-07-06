@@ -28,29 +28,29 @@ type Service interface {
 // SessionRepository defines persistence operations for user sessions.
 type SessionRepository interface {
 	CreateUserSession(ctx context.Context, session *UserSession) (*UserSession, error)
-	GetUserSessionByRefreshToken(ctx context.Context, refreshToken string) (*UserSession, error)
+	GetUserSessionByRefreshToken(ctx context.Context, refreshTokenHash string) (*UserSession, error)
 	RevokeUserSession(ctx context.Context, sessionID, revokedByUserID string, revokeReason RevokeReason) error
 	RevokeAllUserSessions(ctx context.Context, userID string, revokedByUserID *string, revokeReason RevokeReason) error
 	GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*UserSession, error)
 	UpdateSessionToken(ctx context.Context, sessionID, tokenHash, userAgent, ipAddress string) error
 	UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error
-	GetSessionByPrevHash(ctx context.Context, prevRefreshToken string) (*UserSession, error)
+	GetSessionByPrevHash(ctx context.Context, prevRefreshTokenHash string) (*UserSession, error)
 }
 
 // TokenRepository defines persistence operations for single-use auth tokens.
 type TokenRepository interface {
 	DeleteExpiredTokens(ctx context.Context) (int, error)
 	CreateEmailVerificationToken(ctx context.Context, token *EmailVerificationToken) (*EmailVerificationToken, error)
-	GetEmailVerificationToken(ctx context.Context, token string) (*EmailVerificationToken, error)
+	GetEmailVerificationToken(ctx context.Context, tokenHash string) (*EmailVerificationToken, error)
 	MarkEmailVerificationTokenUsed(ctx context.Context, tokenHash string) error
 	CreatePasswordResetToken(ctx context.Context, token *PasswordResetToken) (*PasswordResetToken, error)
-	GetPasswordResetToken(ctx context.Context, token string) (*PasswordResetToken, error)
+	GetPasswordResetToken(ctx context.Context, tokenHash string) (*PasswordResetToken, error)
 	MarkPasswordResetTokenUsed(ctx context.Context, tokenHash string) error
 	CreateEmailChangeToken(ctx context.Context, token *EmailChangeToken) (*EmailChangeToken, error)
-	GetEmailChangeToken(ctx context.Context, token string) (*EmailChangeToken, error)
+	GetEmailChangeToken(ctx context.Context, tokenHash string) (*EmailChangeToken, error)
 	MarkEmailChangeTokenUsed(ctx context.Context, tokenHash string) error
 	CreateAccountRecoveryToken(ctx context.Context, token *AccountRecoveryToken) (*AccountRecoveryToken, error)
-	GetAccountRecoveryToken(ctx context.Context, token string) (*AccountRecoveryToken, error)
+	GetAccountRecoveryToken(ctx context.Context, tokenHash string) (*AccountRecoveryToken, error)
 	MarkAccountRecoveryTokenUsed(ctx context.Context, tokenHash string) error
 }
 

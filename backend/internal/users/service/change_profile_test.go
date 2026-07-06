@@ -32,10 +32,11 @@ func TestChangeUserProfile(t *testing.T) {
 		})
 
 		Convey("When valid partial fields are provided", func() {
+			existingFirstName, existingLastName := "John", "Doe"
 			getResult = &usersdomain.UserProfile{
 				UserID:    "user-123",
-				FirstName: "John",
-				LastName:  "Doe",
+				FirstName: &existingFirstName,
+				LastName:  &existingLastName,
 				CreatedAt: now,
 				UpdatedAt: now,
 			}
@@ -47,8 +48,8 @@ func TestChangeUserProfile(t *testing.T) {
 
 			Convey("Then it applies only non-nil fields and saves", func() {
 				So(err, ShouldBeNil)
-				So(capturedProfile.FirstName, ShouldEqual, "Jane")
-				So(capturedProfile.LastName, ShouldEqual, "Doe")
+				So(*capturedProfile.FirstName, ShouldEqual, "Jane")
+				So(*capturedProfile.LastName, ShouldEqual, "Doe")
 				So(capturedProfile.UserID, ShouldEqual, "user-123")
 			})
 		})

@@ -1,10 +1,19 @@
 package authrepository
 
-import authdomain "learnflow_backend/internal/auth/domain"
+import (
+	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/infrastructure/convert"
+
+	"github.com/jackc/pgx/v5/pgtype"
+)
 
 type rowScanner interface {
 	Scan(dest ...any) error
 }
+
+// dobLayout matches authdomain's DateOfBirth string format and the
+// validator.IsValidDateOfBirth parse layout.
+const dobLayout = "2006-01-02"
 
 func scanUser(row rowScanner) (*authdomain.User, error) {
 	user := &authdomain.User{}
@@ -33,6 +42,7 @@ func scanUser(row rowScanner) (*authdomain.User, error) {
 
 func scanUserProfile(row rowScanner) (*authdomain.UserProfile, error) {
 	userProfile := &authdomain.UserProfile{}
+	var dob pgtype.Date
 	err := row.Scan(
 		&userProfile.UserID,
 		&userProfile.FirstName,
@@ -40,7 +50,7 @@ func scanUserProfile(row rowScanner) (*authdomain.UserProfile, error) {
 		&userProfile.PhoneNumber,
 		&userProfile.Country,
 		&userProfile.City,
-		&userProfile.DateOfBirth,
+		&dob,
 		&userProfile.Gender,
 		&userProfile.UILanguage,
 		&userProfile.AvatarURL,
@@ -52,6 +62,7 @@ func scanUserProfile(row rowScanner) (*authdomain.UserProfile, error) {
 	if err != nil {
 		return nil, err
 	}
+	userProfile.DateOfBirth = convert.FormatNullableDate(dob, dobLayout)
 	return userProfile, nil
 }
 

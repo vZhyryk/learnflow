@@ -8,63 +8,31 @@ import (
 	"learnflow_backend/cmd/api/app"
 	"learnflow_backend/cmd/api/router"
 	"learnflow_backend/cmd/api/server"
-	"learnflow_backend/internal/infrastructure/db"
+	"learnflow_backend/internal/infrastructure/bootstrap"
 	"learnflow_backend/internal/infrastructure/env"
-	"learnflow_backend/internal/infrastructure/logger"
-	lredis "learnflow_backend/internal/infrastructure/redis"
 	"net"
 	"net/url"
-	"os"
-	"runtime"
 	"strings"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 func main() {
-	traceLevel := logger.LevelFatal
-
 	environment := env.GetStringEnv("ENVIRONMENT", "production")
-	if environment == "dev" {
-		traceLevel = logger.LevelError
-	}
+	jsonLogger := bootstrap.NewLogger(environment)
 
-	jsonLogger := logger.New(os.Stdout, nil, traceLevel)
-
-	appCfg, err := getAppConfig(environment)
+	appConfig, err := getAppConfig(environment)
 	if err != nil {
 		jsonLogger.Fatal(err, nil)
 	}
 
-	dbInstance, err := db.InitDatabase(appCfg.Database.DSN, appCfg.Database.MaxIdleTime, appCfg.Database.MaxLifetime, int32(appCfg.Database.MaxOpenConns), int32(appCfg.Database.MinOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
-	if err != nil {
-		jsonLogger.Fatal(err, nil)
-	}
-
-	defer dbInstance.Close()
-
-	redisClient, err := getRedis()
-	if err != nil {
-		jsonLogger.Fatal(err, nil)
-	}
-
-	defer func() {
-		if closeErr := redisClient.Close(); closeErr != nil {
-			jsonLogger.Fatal(closeErr, nil)
-		}
-	}()
+	dbInstance, redisClient, cleanup := bootstrap.MustInitInfra(appConfig.Database, jsonLogger)
+	defer cleanup()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	err = getServerTimeout(&appCfg)
-	if err != nil {
-		jsonLogger.Fatal(err, nil)
-	}
-
 	application := &app.App{
-		Config: appCfg,
+		Config: appConfig,
 		Logger: jsonLogger,
 		DB:     dbInstance,
 		Ctx:    ctx,
@@ -84,18 +52,18 @@ func main() {
 	}
 }
 
-func getServerTimeout(appCfg *app.Config) error {
+func getServerTimeout(appConfig *app.Config) error {
 	durations := []struct {
 		name     string
 		val      *time.Duration
 		envKey   string
 		fallback time.Duration
 	}{
-		{"READ_HEADER_TIMEOUT", &appCfg.Timeouts.ReadHeaderTimeout, "READ_HEADER_TIMEOUT", 5 * time.Second},
-		{"READ_TIMEOUT", &appCfg.Timeouts.ReadTimeout, "READ_TIMEOUT", 10 * time.Second},
-		{"WRITE_TIMEOUT", &appCfg.Timeouts.WriteTimeout, "WRITE_TIMEOUT", 30 * time.Second},
-		{"IDLE_TIMEOUT", &appCfg.Timeouts.IdleTimeout, "IDLE_TIMEOUT", 60 * time.Second},
-		{"REQUEST_TIMEOUT", &appCfg.Timeouts.RequestTimeout, "REQUEST_TIMEOUT", 30 * time.Second},
+		{"READ_HEADER_TIMEOUT", &appConfig.Timeouts.ReadHeaderTimeout, "READ_HEADER_TIMEOUT", 5 * time.Second},
+		{"READ_TIMEOUT", &appConfig.Timeouts.ReadTimeout, "READ_TIMEOUT", 10 * time.Second},
+		{"WRITE_TIMEOUT", &appConfig.Timeouts.WriteTimeout, "WRITE_TIMEOUT", 30 * time.Second},
+		{"IDLE_TIMEOUT", &appConfig.Timeouts.IdleTimeout, "IDLE_TIMEOUT", 60 * time.Second},
+		{"REQUEST_TIMEOUT", &appConfig.Timeouts.RequestTimeout, "REQUEST_TIMEOUT", 30 * time.Second},
 	}
 	for _, d := range durations {
 		*d.val = env.GetDurationEnv(d.envKey, d.fallback)
@@ -106,9 +74,30 @@ func getServerTimeout(appCfg *app.Config) error {
 	return nil
 }
 
+// getAppConfig loads the API server Config. Each block below is ordered to mirror
+// the field order of app.Config itself (Port, Env, Database, Cors, TrustedProxies,
+// Limiter, Secret, Timeouts) so the loading logic can be scanned side-by-side with the struct.
 func getAppConfig(environment string) (app.Config, error) {
 	cfg := app.Config{}
+
+	cfg.Port = env.GetIntEnv("PORT", 8080)
 	cfg.Env = environment
+
+	var err error
+	cfg.Database, err = bootstrap.LoadDatabaseConfig()
+	if err != nil {
+		return cfg, err
+	}
+
+	cfg.Cors.TrustedOrigins, err = getCorsTrustedOrigins()
+	if err != nil {
+		return cfg, fmt.Errorf("CORS config: %w", err)
+	}
+
+	cfg.TrustedProxies, err = parseTrustedProxies(env.GetStringEnv("TRUSTED_PROXIES", ""))
+	if err != nil {
+		return cfg, fmt.Errorf("TRUSTED_PROXIES config: %w", err)
+	}
 
 	flag.Float64Var(&cfg.Limiter.Rps, "limiter-rps", -1, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.Limiter.Burst, "limiter-burst", -1, "Rate limiter maximum burst")
@@ -126,33 +115,12 @@ func getAppConfig(environment string) (app.Config, error) {
 		cfg.Limiter.Burst = env.GetIntEnv("LIMITER_BURST", 10)
 	}
 
-	dsn, err := db.BuildDSNFromEnv()
-	if err != nil {
-		return cfg, fmt.Errorf("failed to resolve database DSN: %w", err)
-	}
-
-	cfg.Cors.TrustedOrigins, err = getCorsTrustedOrigins()
-	if err != nil {
-		return cfg, fmt.Errorf("CORS config: %w", err)
-	}
-
-	maxOpenConns, minOpenConns, maxIdleTime, maxLifetime := getDatabaseConfig()
-
-	cfg.Database.DSN = dsn
-	cfg.Database.MaxIdleTime = maxIdleTime
-	cfg.Database.MaxOpenConns = maxOpenConns
-	cfg.Database.MinOpenConns = minOpenConns
-	cfg.Database.MaxLifetime = maxLifetime
-
-	cfg.Port = env.GetIntEnv("PORT", 8080)
-
 	if jwtErr := getJWTConfig(&cfg); jwtErr != nil {
 		return cfg, jwtErr
 	}
 
-	cfg.TrustedProxies, err = parseTrustedProxies(env.GetStringEnv("TRUSTED_PROXIES", ""))
-	if err != nil {
-		return cfg, fmt.Errorf("TRUSTED_PROXIES config: %w", err)
+	if err := getServerTimeout(&cfg); err != nil {
+		return cfg, err
 	}
 
 	return cfg, nil
@@ -218,16 +186,4 @@ func getCorsTrustedOrigins() (map[string]struct{}, error) {
 		return nil, fmt.Errorf("CORS_TRUSTED_ORIGINS is empty — at least one origin is required")
 	}
 	return valid, nil
-}
-
-func getDatabaseConfig() (maxOpenConns, minOpenConns int, maxIdleTime, maxLifetime string) {
-	maxOpenConns = max(env.GetIntEnv("DB_OPEN_CONNECTION_LIMIT", 25), runtime.NumCPU()*4)
-	minOpenConns = env.GetIntEnv("DB_MIN_CONNECTION_LIMIT", 2)
-	maxIdleTime = env.GetStringEnv("DB_MAX_IDLE_TIME", "30m")
-	maxLifetime = env.GetStringEnv("DB_MAX_LIFETIME", "1h")
-	return maxOpenConns, minOpenConns, maxIdleTime, maxLifetime
-}
-
-func getRedis() (*redis.Client, error) {
-	return lredis.InitRedis(env.GetStringEnv("REDIS_ADDR", "redis:6379"), env.GetStringEnv("REDIS_PASSWORD", ""))
 }

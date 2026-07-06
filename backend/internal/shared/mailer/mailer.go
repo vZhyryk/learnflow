@@ -28,15 +28,15 @@ func New(port int, host, username, password, sender string) *Mailer {
 	}
 }
 
-// CCuser holds the recipient's email and display name for outgoing emails.
-type CCuser struct {
+// CCUser holds the recipient's email and display name for outgoing emails.
+type CCUser struct {
 	Mail     string `json:"email"`
 	Username string `json:"username"`
 }
 
 // Send renders the given email template and delivers it to ccUser via SMTP in a single attempt.
 // Callers that need retry semantics (e.g. EmailWorker) wrap this call with their own retry logic.
-func (m Mailer) Send(templateFile string, data any, ccUser CCuser, attachmentList []string) error {
+func (m Mailer) Send(templateFile string, data any, ccUser CCUser, attachmentList []string) error {
 	if ccUser.Mail == "" || !validator.MatchesEmail(ccUser.Mail) {
 		return fmt.Errorf("mailer.Send: invalid recipient address")
 	}

@@ -60,14 +60,14 @@ func TestMailerSendDialFailure(t *testing.T) {
 				"name":            "Alice",
 				"verificationUrl": "https://learnflow.dev/verify?token=abc",
 				"expirationTime":  "24 hours",
-			}, CCuser{Mail: "user@example.com", Username: "Alice"}, nil)
+			}, CCUser{Mail: "user@example.com", Username: "Alice"}, nil)
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "mailer.Send")
 		})
 
 		Convey("template render failure is returned before dialing", func() {
-			err := m.Send("does_not_exist.html", nil, CCuser{Mail: "user@example.com", Username: "Alice"}, nil)
+			err := m.Send("does_not_exist.html", nil, CCUser{Mail: "user@example.com", Username: "Alice"}, nil)
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "renderEmail parse template")

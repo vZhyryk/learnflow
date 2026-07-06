@@ -6,6 +6,7 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
+	"learnflow_backend/internal/shared/ptr"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -41,20 +42,7 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 			return fmt.Errorf("register: create user: %w", createErr)
 		}
 
-		userProfile := &authdomain.UserProfile{
-			UserID:      id,
-			FirstName:   req.FirstName,
-			LastName:    req.LastName,
-			PhoneNumber: req.PhoneNumber,
-			Country:     req.Country,
-			City:        req.City,
-			Gender:      req.Gender,
-			DateOfBirth: req.DateOfBirth,
-			UILanguage:  req.UILanguage,
-			AvatarURL:   req.AvatarURL,
-			Timezone:    req.Timezone,
-			Bio:         req.Bio,
-		}
+		userProfile := newUserProfileFromRegisterRequest(id, req)
 
 		err = s.userRepo.CreateUserProfile(ctx, userProfile)
 		if err != nil {
@@ -82,7 +70,7 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 				Email:     user.Email,
 				ExpiresAt: expiresAt,
 				RawToken:  rawToken,
-				UserName:  userProfile.FirstName,
+				UserName:  ptr.StringOrEmpty(userProfile.FirstName),
 			}, nil
 		})
 	})
@@ -103,10 +91,41 @@ func (s *Service) handleGetUserByEmailRegisterError(ctx context.Context, user *a
 	emitErr := s.outbox.Emit(ctx, events.AggregationTypeUser, user.ID, events.EventRegistrationAttemptOnExistingEmail, events.RegistrationAttemptPayload{
 		Email:    user.Email,
 		UserID:   user.ID,
-		UserName: userEmailUserProfile.FirstName,
+		UserName: ptr.StringOrEmpty(userEmailUserProfile.FirstName),
 	})
 	if emitErr != nil {
 		return fmt.Errorf("register: inform user: %w", emitErr)
 	}
 	return authdomain.ErrUserAlreadyExists
+}
+
+// defaultUILanguage matches user_profiles.ui_language's DB-level DEFAULT —
+// applied here, not in the repository, because "what a new profile defaults
+// to" is a business rule, not a persistence concern.
+const defaultUILanguage = "uk"
+
+// newUserProfileFromRegisterRequest maps the wire-level RegisterRequest
+// (plain strings, "" means "not provided") onto the domain UserProfile
+// (*string, nil means "not provided") for the fields that back nullable
+// user_profiles columns.
+func newUserProfileFromRegisterRequest(userID string, req authdomain.RegisterRequest) *authdomain.UserProfile {
+	uiLanguage := req.UILanguage
+	if uiLanguage == "" {
+		uiLanguage = defaultUILanguage
+	}
+
+	return &authdomain.UserProfile{
+		UserID:      userID,
+		FirstName:   ptr.StringOrNil(req.FirstName),
+		LastName:    ptr.StringOrNil(req.LastName),
+		PhoneNumber: ptr.StringOrNil(req.PhoneNumber),
+		Country:     ptr.StringOrNil(req.Country),
+		City:        ptr.StringOrNil(req.City),
+		Gender:      ptr.StringOrNil(req.Gender),
+		DateOfBirth: req.DateOfBirth,
+		UILanguage:  uiLanguage,
+		AvatarURL:   ptr.StringOrNil(req.AvatarURL),
+		Timezone:    ptr.StringOrNil(req.Timezone),
+		Bio:         ptr.StringOrNil(req.Bio),
+	}
 }

@@ -41,7 +41,7 @@ func HandleRegistrationAttemptsProcess(p events.RegistrationAttemptPayload, _ st
 		"name": p.UserName,
 	}
 
-	return m.Send("registration_attempt.html", data, mailer.CCuser{Mail: p.Email}, nil)
+	return m.Send("registration_attempt.html", data, mailer.CCUser{Mail: p.Email}, nil)
 }
 
 // GenerateRegistrationAttemptsIdempotencyKey returns a Redis key used to deduplicate registration attempt processing.

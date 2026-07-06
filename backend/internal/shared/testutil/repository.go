@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // MockQueryRunner implements db.QueryRunner (internal/infrastructure/db) via
@@ -84,6 +85,17 @@ func CastInt(v any, idx int) *int {
 		panic(fmt.Sprintf("dest[%d]: expected *int, got %T", idx, v))
 	}
 	return s
+}
+
+// CastPgtypeDate safely type-asserts a scan destination to *pgtype.Date —
+// the scan target repositories use for nullable `date` columns (pgx v5 has
+// no native scan support for `date` into *string/**string).
+func CastPgtypeDate(v any, idx int) *pgtype.Date {
+	d, ok := v.(*pgtype.Date)
+	if !ok {
+		panic(fmt.Sprintf("dest[%d]: expected *pgtype.Date, got %T", idx, v))
+	}
+	return d
 }
 
 // MockRows implements pgx.Rows for controlled multi-row Scan injection in

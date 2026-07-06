@@ -17,13 +17,13 @@ func TestSendValidatesRecipient(t *testing.T) {
 		m := newMailer()
 
 		Convey("empty email returns error", func() {
-			err := m.Send("email_verification.html", nil, mailer.CCuser{Mail: "", Username: "Alice"}, nil)
+			err := m.Send("email_verification.html", nil, mailer.CCUser{Mail: "", Username: "Alice"}, nil)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "invalid recipient address")
 		})
 
 		Convey("malformed email returns error", func() {
-			err := m.Send("email_verification.html", nil, mailer.CCuser{Mail: "notanemail", Username: "Alice"}, nil)
+			err := m.Send("email_verification.html", nil, mailer.CCUser{Mail: "notanemail", Username: "Alice"}, nil)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "invalid recipient address")
 		})

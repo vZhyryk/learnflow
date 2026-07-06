@@ -79,7 +79,8 @@ func TestRegisterExistingEmailNotifyGuard(t *testing.T) {
 					return registerExistingUser(), nil
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: "Alice"}, nil
+					aliceName := "Alice"
+					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, newCapturingOutbox(&captured), nil)
@@ -180,7 +181,7 @@ func TestRegisterSuccess(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(id, ShouldEqual, "user-123")
 			So(capturedProfile.UserID, ShouldEqual, "user-123")
-			So(capturedProfile.FirstName, ShouldEqual, "Alice")
+			So(*capturedProfile.FirstName, ShouldEqual, "Alice")
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "user")
 			So(captured[1], ShouldEqual, "user-123")

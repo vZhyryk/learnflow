@@ -94,12 +94,14 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	return route, nil
 }
 
-// getEmailFromBody reads the request body to extract an email for rate-limit keying,
-// then resets r.Body so downstream handlers (ReadJSON) receive the full body.
-// Do NOT add any body-reading middleware between this call and the handler.
-func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
-	var req authdomain.RequestPasswordResetRequest
-	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 4_096))
+const rateLimitBodyLimit = 4_096
+
+// bodyRateLimitKey reads a bounded JSON body and passes the raw bytes to extractField to pull
+// out the value to key the rate limiter on, then resets r.Body so downstream handlers
+// (ReadJSON) receive the full body. Do NOT add any body-reading middleware between this
+// call and the handler.
+func (route *RouteHandler) bodyRateLimitKey(r *http.Request, extractField func(bodyBytes []byte) (value string, ok bool)) string {
+	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, rateLimitBodyLimit))
 	if err != nil {
 		return ""
 	}
@@ -108,49 +110,38 @@ func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
 		route.App.Logger.Error(err, nil)
 	}
 
-	if len(bodyBytes) >= 4_096 {
+	if len(bodyBytes) >= rateLimitBodyLimit {
 		return "oversized-body"
 	}
 
 	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
-	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+	value, ok := extractField(bodyBytes)
+	if !ok || value == "" {
 		return appcontext.IPAddressFromContext(r.Context())
 	}
 
-	if req.Email == "" {
-		return appcontext.IPAddressFromContext(r.Context())
-	}
+	return tokens.MakeHash(value)
+}
 
-	return tokens.MakeHash(req.Email)
+func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
+	return route.bodyRateLimitKey(r, func(bodyBytes []byte) (string, bool) {
+		var req authdomain.RequestPasswordResetRequest
+		if err := json.Unmarshal(bodyBytes, &req); err != nil {
+			return "", false
+		}
+		return req.Email, true
+	})
 }
 
 func (route *RouteHandler) getTokenFromBody(r *http.Request) string {
-	var req authdomain.VerifyEmailRequest
-	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, 4_096))
-	if err != nil {
-		return ""
-	}
-
-	if err := r.Body.Close(); err != nil {
-		route.App.Logger.Error(err, nil)
-	}
-
-	if len(bodyBytes) >= 4_096 {
-		return "oversized-body"
-	}
-
-	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-
-	if err := json.Unmarshal(bodyBytes, &req); err != nil {
-		return appcontext.IPAddressFromContext(r.Context())
-	}
-
-	if req.Token == "" {
-		return appcontext.IPAddressFromContext(r.Context())
-	}
-
-	return tokens.MakeHash(req.Token)
+	return route.bodyRateLimitKey(r, func(bodyBytes []byte) (string, bool) {
+		var req authdomain.VerifyEmailRequest
+		if err := json.Unmarshal(bodyBytes, &req); err != nil {
+			return "", false
+		}
+		return req.Token, true
+	})
 }
 
 func (route *RouteHandler) buildChains() authhttp.AuthRouteChains {
@@ -158,40 +149,31 @@ func (route *RouteHandler) buildChains() authhttp.AuthRouteChains {
 		return appcontext.IPAddressFromContext(r.Context())
 	})
 
-	staticChain := alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, staticLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
+	staticChain := route.SetChain(staticLimiter)
 
 	loginLimiter := route.NewRouteRateLimiter(5, time.Minute, 1, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getEmailFromBody(r)
 	})
 
-	loginChain := alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, loginLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
-
 	registerLimiter := route.NewRouteRateLimiter(3, time.Hour, 1, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context())
 	})
 
-	registerChain := alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, registerLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
-
 	passResetLimiter := route.NewRouteRateLimiter(2, time.Hour, 1, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getEmailFromBody(r)
 	})
-	passResetChain := alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, passResetLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
 
 	emailVerifyLimiter := route.NewRouteRateLimiter(3, time.Hour, 1, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getTokenFromBody(r)
 	})
 
-	emailVerifyChain := alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, emailVerifyLimiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
-
-	staticWithAuth := staticChain.Append(route.AuthenticateUser)
-
 	return authhttp.AuthRouteChains{
 		Static:         staticChain,
-		Login:          loginChain,
-		Register:       registerChain,
-		PassReset:      passResetChain,
-		EmailVerify:    emailVerifyChain,
-		StaticWithAuth: staticWithAuth,
+		Login:          route.SetChain(loginLimiter),
+		Register:       route.SetChain(registerLimiter),
+		PassReset:      route.SetChain(passResetLimiter),
+		EmailVerify:    route.SetChain(emailVerifyLimiter),
+		StaticWithAuth: staticChain.Append(route.AuthenticateUser),
 	}
 }
 
@@ -224,4 +206,9 @@ func (h *RouteHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 			"envelop": helpers.Envelope{"status": "ready"},
 		})
 	}
+}
+
+// SetChain builds the standard middleware chain, inserting limiter for rate limiting.
+func (route *RouteHandler) SetChain(limiter func(http.Handler) http.Handler) alice.Chain {
+	return alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, limiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
 }

@@ -42,7 +42,7 @@ func HandleEmailVerificationProcess(p events.UserRegisteredPayload, baseURL stri
 		"verificationUrl": fmt.Sprintf("%s/api/v1/users/auth/email/verify?token=%s", baseURL, p.RawToken),
 		"expirationTime":  p.ExpiresAt.UTC().Format("2 Jan 2006, 15:04 UTC"),
 	}
-	return m.Send("email_verification.html", data, mailer.CCuser{Mail: p.Email}, nil)
+	return m.Send("email_verification.html", data, mailer.CCUser{Mail: p.Email}, nil)
 }
 
 // GenerateEmailVerificationIdempotencyKey returns a Redis key used to deduplicate email verification processing.

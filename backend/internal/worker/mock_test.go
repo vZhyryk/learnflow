@@ -8,10 +8,10 @@ import (
 )
 
 type mockMailer struct {
-	send func(templateFile string, data any, ccUser mailer.CCuser, attachmentList []string) error
+	send func(templateFile string, data any, ccUser mailer.CCUser, attachmentList []string) error
 }
 
-func (m *mockMailer) Send(templateFile string, data any, ccUser mailer.CCuser, attachmentList []string) error {
+func (m *mockMailer) Send(templateFile string, data any, ccUser mailer.CCUser, attachmentList []string) error {
 	if m.send != nil {
 		return m.send(templateFile, data, ccUser, attachmentList)
 	}

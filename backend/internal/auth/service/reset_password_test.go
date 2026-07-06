@@ -72,7 +72,8 @@ func TestInitiatePasswordResetSuccess(t *testing.T) {
 			uRepo := &mockUserRepo{
 				getUserByEmail: validInitiateResetGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: "Alice"}, nil
+					aliceName := "Alice"
+					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -89,7 +90,11 @@ func TestInitiatePasswordResetSuccess(t *testing.T) {
 			So(captured[0], ShouldEqual, "password")
 			So(captured[1], ShouldEqual, "user-123")
 		})
+	})
+}
 
+func TestInitiatePasswordResetTokenCreationFails(t *testing.T) {
+	Convey("Given an auth service", t, func() {
 		Convey("When creating the reset token fails", func() {
 			uRepo := &mockUserRepo{
 				getUserByEmail: validInitiateResetGetUserByEmail,

@@ -115,7 +115,8 @@ func TestInitRecoverAccountTokenIssued(t *testing.T) {
 					return deletedUser, nil
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: "Alice"}, nil
+					aliceName := "Alice"
+					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{

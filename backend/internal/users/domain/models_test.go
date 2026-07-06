@@ -153,7 +153,7 @@ func TestValidateUILanguage(t *testing.T) {
 		Convey("nil is allowed", func() {
 			So((&ChangeUserProfileRequest{}).Validate(), ShouldBeNil)
 		})
-		for _, valid := range []string{"uk", "pl", "en"} {
+		for _, valid := range []string{"uk", "pl", "ru", "en"} {
 			v := valid
 			Convey(v+" is valid", func() {
 				So((&ChangeUserProfileRequest{UILanguage: &v}).Validate(), ShouldBeNil)
@@ -236,32 +236,41 @@ func TestValidateBio(t *testing.T) {
 
 func TestApply(t *testing.T) {
 	Convey("Apply merges non-nil fields into UserProfile", t, func() {
+		baseFirstName, baseLastName, baseCountry, baseGender := "John", "Doe", "UA", "male"
 		base := &UserProfile{
 			UserID:    "user-123",
-			FirstName: "John",
-			LastName:  "Doe",
-			Country:   "UA",
-			Gender:    "male",
+			FirstName: &baseFirstName,
+			LastName:  &baseLastName,
+			Country:   &baseCountry,
+			Gender:    &baseGender,
 		}
 
 		Convey("non-nil fields are updated", func() {
 			firstName, country := "Jane", "PL"
 			ChangeUserProfileRequest{FirstName: &firstName, Country: &country}.Apply(base)
-			So(base.FirstName, ShouldEqual, "Jane")
-			So(base.Country, ShouldEqual, "PL")
+			So(*base.FirstName, ShouldEqual, "Jane")
+			So(*base.Country, ShouldEqual, "PL")
 		})
 
 		Convey("nil fields are left unchanged", func() {
 			firstName := "Jane"
 			ChangeUserProfileRequest{FirstName: &firstName}.Apply(base)
-			So(base.LastName, ShouldEqual, "Doe")
-			So(base.Gender, ShouldEqual, "male")
+			So(*base.LastName, ShouldEqual, "Doe")
+			So(*base.Gender, ShouldEqual, "male")
 		})
 
 		Convey("empty request changes nothing", func() {
 			ChangeUserProfileRequest{}.Apply(base)
-			So(base.FirstName, ShouldEqual, "John")
-			So(base.LastName, ShouldEqual, "Doe")
+			So(*base.FirstName, ShouldEqual, "John")
+			So(*base.LastName, ShouldEqual, "Doe")
+		})
+
+		Convey("setting DateOfBirth for the first time populates a previously nil pointer", func() {
+			dob := "1990-01-01"
+			So(func() {
+				ChangeUserProfileRequest{DateOfBirth: &dob}.Apply(base)
+			}, ShouldNotPanic)
+			So(*base.DateOfBirth, ShouldEqual, "1990-01-01")
 		})
 	})
 }

@@ -60,7 +60,7 @@ func TestHandleInitEmailChangeProcess(t *testing.T) {
 
 		Convey("When sending the email change email", func() {
 			m := &mockMailer{
-				send: func(templateFile string, data any, ccUser mailer.CCuser, _ []string) error {
+				send: func(templateFile string, data any, ccUser mailer.CCUser, _ []string) error {
 					So(templateFile, ShouldEqual, "email_change.html")
 					dataMap, ok := data.(map[string]string)
 					So(ok, ShouldBeTrue)

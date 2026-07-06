@@ -25,10 +25,11 @@ func TestGetUserProfile(t *testing.T) {
 		})
 
 		Convey("When the profile exists", func() {
+			firstName, lastName := "John", "Doe"
 			repoResult = &usersdomain.UserProfile{
 				UserID:    "user-123",
-				FirstName: "John",
-				LastName:  "Doe",
+				FirstName: &firstName,
+				LastName:  &lastName,
 				CreatedAt: now,
 				UpdatedAt: now,
 			}
@@ -37,8 +38,8 @@ func TestGetUserProfile(t *testing.T) {
 			Convey("Then it returns the profile without error", func() {
 				So(err, ShouldBeNil)
 				So(got.UserID, ShouldEqual, "user-123")
-				So(got.FirstName, ShouldEqual, "John")
-				So(got.LastName, ShouldEqual, "Doe")
+				So(*got.FirstName, ShouldEqual, "John")
+				So(*got.LastName, ShouldEqual, "Doe")
 			})
 		})
 

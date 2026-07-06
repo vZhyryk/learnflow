@@ -9,6 +9,10 @@ import (
 )
 
 // InitDatabase opens a PostgreSQL connection and configures pool settings.
+// Field/param names here (MaxOpenConns/MinOpenConns/MaxIdleTime/MaxLifetime) follow
+// pgxpool's own Config naming — see internal/infrastructure/redis.PoolConfig for the
+// equivalent Redis pool knobs, which intentionally use go-redis's own naming instead
+// (PoolSize/MinIdleConns/ConnMaxLifetime) since each wraps its own client library.
 func InitDatabase(dsn, maxIdleTime, maxLifetime string, maxOpenConns, minOpenConns int32) (*pgxpool.Pool, error) {
 	config, err := parseConfigs(dsn, maxIdleTime, maxLifetime, maxOpenConns, minOpenConns)
 	if err != nil {

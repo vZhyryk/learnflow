@@ -106,5 +106,5 @@ func (s *Service) getRefreshUserAndCheckStatusByID(ctx context.Context, userID s
 		return nil, authdomain.ErrInvalidCredentials
 	}
 
-	return user, err
+	return user, nil
 }

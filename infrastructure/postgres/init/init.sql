@@ -49,6 +49,11 @@ CREATE TABLE users (
 -- Unique email only among non-deleted users (case-insensitive)
 CREATE UNIQUE INDEX idx_users_email_active_unique ON users(LOWER(email)) WHERE deleted_at IS NULL;
 
+-- Non-unique lookup index for soft-deleted users by email (case-insensitive).
+-- Not UNIQUE: multiple soft-deleted rows can legitimately share an email
+-- (register -> delete -> someone else registers the same email -> delete).
+CREATE INDEX idx_users_email_deleted ON users(LOWER(email)) WHERE deleted_at IS NOT NULL;
+
 -- ---------------------------------------------------------------------------
 -- 2. USER PROFILES
 -- ---------------------------------------------------------------------------
@@ -94,6 +99,10 @@ CREATE TABLE email_verification_tokens (
 CREATE INDEX idx_email_verification_tokens_user_id_unused
     ON email_verification_tokens(user_id) WHERE used_at IS NULL;
 
+-- Cleanup job: find expired-but-unused tokens for pruning
+CREATE INDEX idx_email_verification_tokens_expires_at_unused
+    ON email_verification_tokens(expires_at) WHERE used_at IS NULL;
+
 CREATE TABLE password_reset_tokens (
     id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -110,6 +119,10 @@ CREATE TABLE password_reset_tokens (
 
 CREATE INDEX idx_password_reset_tokens_user_id_unused
     ON password_reset_tokens(user_id) WHERE used_at IS NULL;
+
+-- Cleanup job: find expired-but-unused tokens for pruning
+CREATE INDEX idx_password_reset_tokens_expires_at_unused
+    ON password_reset_tokens(expires_at) WHERE used_at IS NULL;
 
 CREATE TABLE email_change_tokens (
     id          uuid            PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -128,6 +141,10 @@ CREATE TABLE email_change_tokens (
 
 CREATE INDEX idx_email_change_tokens_user_id_unused
     ON email_change_tokens(user_id) WHERE used_at IS NULL;
+
+-- Cleanup job: find expired-but-unused tokens for pruning
+CREATE INDEX idx_email_change_tokens_expires_at_unused
+    ON email_change_tokens(expires_at) WHERE used_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 4. COURSES
@@ -833,6 +850,10 @@ CREATE TABLE account_recovery_tokens (
 
 CREATE INDEX idx_account_recovery_tokens_user_id_unused
     ON account_recovery_tokens(user_id) WHERE used_at IS NULL;
+
+-- Cleanup job: find expired-but-unused tokens for pruning
+CREATE INDEX idx_account_recovery_tokens_expires_at_unused
+    ON account_recovery_tokens(expires_at) WHERE used_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 26. ARTICLES

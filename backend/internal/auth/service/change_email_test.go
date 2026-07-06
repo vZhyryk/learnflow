@@ -161,7 +161,8 @@ func TestInitiateEmailChangeTokenIssued(t *testing.T) {
 				getUserByID:    initiateEmailChangeGetUserByID,
 				getUserByEmail: validGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: "Alice"}, nil
+					aliceName := "Alice"
+					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -332,7 +333,7 @@ func TestChangeEmailApplyFailures(t *testing.T) {
 
 func TestChangeEmailWithoutSessionLogout(t *testing.T) {
 	Convey("Given an auth service", t, func() {
-		Convey("When IsAllSessionsLogout is false", func() {
+		Convey("When IsAllSessionsLogout is not set (defaults to false)", func() {
 			var revokeCalled bool
 			tRepo := validTokenRepo()
 			uRepo := validChangeEmailUserRepo()
