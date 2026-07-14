@@ -27,7 +27,7 @@ The platform covers the full lifecycle of a learning product: course catalog, vi
 - Integrating real external services (Stripe, Resend, Cloudflare R2, Prometheus/Grafana)
 - SSR frontend with Nuxt 4, Pinia, and a strict layered architecture
 
-**Current status:** Phase 2 of 9 — Auth & Users complete (JWT sessions, email flows, event-driven workers, full unit + real-Postgres integration test coverage).
+**Current status:** Phase 3 of 9 in progress — Courses, Content, Admin & Observability. Phase 2 (Auth & Users) complete: JWT sessions, email flows, event-driven workers, full unit + real-Postgres integration test coverage.
 
 ---
 
@@ -326,8 +326,8 @@ cd frontend && npm run type-check
 | ----- | --------------------------------------------------------------- | -------------- |
 | 1     | Backend foundation — project structure, infrastructure, CI      | ✅ Complete    |
 | 1.1   | Spike — physical data model and database schema                 | ✅ Complete    |
-| **2** | **Auth & Users — JWT, registration, verification, profiles**    | ✅ Complete    |
-| 3     | Courses & Content — catalog, content items, completion tracking | ⬜ Planned     |
+| 2     | Auth & Users — JWT, registration, verification, profiles        | ✅ Complete    |
+| **3** | **Courses & Content — catalog, content items, completion tracking** | 🔄 In Progress |
 | 4     | Consultations — booking, availability, rescheduling             | ⬜ Planned     |
 | 4.1   | Spike — real-time support chat (WebSocket)                      | ⬜ Planned     |
 | 5     | Payments — Stripe, Przelewy24, access grants, coupons           | ⬜ Planned     |
@@ -370,8 +370,7 @@ learnflow/
 │   └── postgres/init/      # Annotated reference schema
 ├── docs/
 │   ├── adr/                # Architecture Decision Records
-│   ├── DATABASE_SCHEMA.dbml
-│   └── DATABASE_SCHEMA_GUIDE.md
+│   └── DATABASE_SCHEMA.dbml
 ├── prometheus/             # Prometheus scrape config
 ├── scripts/                # Utility scripts
 └── makefile
