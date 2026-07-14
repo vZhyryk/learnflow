@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -79,10 +80,62 @@ func TestRegisterRequestValidate(t *testing.T) {
 			So(errors.Is(err, ErrInvalidCredentialFormat), ShouldBeTrue)
 		})
 
+		Convey("password exactly 72 bytes is accepted (bcrypt's own limit)", func() {
+			email := "test@gmail.com"
+			password := strings.Repeat("a", 72)
+			err := (&RegisterRequest{Email: email, Password: password}).Validate()
+			So(err, ShouldBeNil)
+		})
+
+		Convey("password exactly 72 bytes built from multi-byte runes is accepted", func() {
+			// 36 Cyrillic runes * 2 bytes = 72 bytes — len() counts bytes, not
+			// runes, so this must be judged by the same byte-based limit bcrypt
+			// itself enforces, not by rune count.
+			email := "test@gmail.com"
+			password := strings.Repeat("я", 36)
+			So(len(password), ShouldEqual, 72)
+			err := (&RegisterRequest{Email: email, Password: password}).Validate()
+			So(err, ShouldBeNil)
+		})
+
+		Convey("password of 37 multi-byte runes (74 bytes) is rejected", func() {
+			// 37 Cyrillic runes * 2 bytes = 74 bytes, over the 72-byte bcrypt
+			// limit despite being only 37 runes long.
+			email := "test@gmail.com"
+			password := strings.Repeat("я", 37)
+			So(len(password), ShouldBeGreaterThan, 72)
+			err := (&RegisterRequest{Email: email, Password: password}).Validate()
+			So(errors.Is(err, ErrInvalidCredentialFormat), ShouldBeTrue)
+		})
+
 		Convey("valid request", func() {
 			email := "test@gmail.com"
 			password := "validpassword"
 			So((&RegisterRequest{Email: email, Password: password}).Validate(), ShouldBeNil)
+		})
+	})
+}
+
+func TestRegisterRequestValidatePasswordNormalization(t *testing.T) {
+	Convey("Register request password Unicode normalization", t, func() {
+		Convey("password in NFD form is normalized to NFC in place", func() {
+			// U+0439 (precomposed \u0439, NFC) vs. U+0438 + U+0306 (combining
+			// breve, NFD) render identically but are different byte sequences.
+			// Without normalization these would bcrypt-hash to different digests
+			// depending on which OS/keyboard produced the input. Written as
+			// explicit \u escapes so the two forms can't accidentally collapse
+			// into identical source bytes.
+			email := "test@gmail.com"
+			nfc := "pa\u0439ssword1"
+			nfd := "pa\u0438\u0306ssword1"
+			So(nfc, ShouldNotEqual, nfd)
+
+			reqNFC := &RegisterRequest{Email: email, Password: nfc}
+			reqNFD := &RegisterRequest{Email: email, Password: nfd}
+			So(reqNFC.Validate(), ShouldBeNil)
+			So(reqNFD.Validate(), ShouldBeNil)
+
+			So(reqNFC.Password, ShouldEqual, reqNFD.Password)
 		})
 	})
 }
@@ -453,6 +506,20 @@ func TestRequestRecoverAccountRequestValidate(t *testing.T) {
 		Convey("valid request", func() {
 			email := "test@gmail.com"
 			So((&RequestRecoverAccountRequest{Email: email}).Validate(), ShouldBeNil)
+		})
+	})
+}
+
+func TestTokenBaseIsExpired(t *testing.T) {
+	Convey("TokenBase.IsExpired", t, func() {
+		Convey("When ExpiresAt is in the past", func() {
+			tb := TokenBase{ExpiresAt: time.Now().UTC().Add(-time.Hour)}
+			So(tb.IsExpired(), ShouldBeTrue)
+		})
+
+		Convey("When ExpiresAt is in the future", func() {
+			tb := TokenBase{ExpiresAt: time.Now().UTC().Add(time.Hour)}
+			So(tb.IsExpired(), ShouldBeFalse)
 		})
 	})
 }

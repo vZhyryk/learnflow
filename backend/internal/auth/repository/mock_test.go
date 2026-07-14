@@ -11,8 +11,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// assertUnexpectedDBError verifies a repository call surfaced an unexpected DB
-// failure by wrapping it with the given context message.
 func assertUnexpectedDBError(err error, substr string) {
 	So(err, ShouldNotBeNil)
 	So(err.Error(), ShouldContainSubstring, substr)
@@ -22,7 +20,6 @@ func newTestRepo(runner *testutil.MockQueryRunner) *Repository {
 	return &Repository{db: runner}
 }
 
-// castPtrRevokeReason safely type-asserts a scan destination to **authdomain.RevokeReason.
 func castPtrRevokeReason(v any, idx int) **authdomain.RevokeReason {
 	s, ok := v.(**authdomain.RevokeReason)
 	if !ok {
@@ -39,11 +36,6 @@ func castPtrTime(v any, idx int) **time.Time {
 	return s
 }
 
-// fakeProfile/fakeScanProfile mirror internal/users/repository/repository_test.go's
-// fixture of the same name. Not shared via testutil on purpose: authdomain.UserProfile
-// and usersdomain.UserProfile are separate types by design (auth and users are
-// independent bounded contexts per Clean Architecture layering), so a generic helper
-// here would either need generics (forbidden in domain-adjacent code) or reflection.
 func fakeProfile(now time.Time) *authdomain.UserProfile {
 	firstName, lastName, phoneNumber := "John", "Doe", "+380991234567"
 	country, city, gender := "UA", "Kyiv", "male"

@@ -21,7 +21,7 @@ func TestChangeUserProfile(t *testing.T) {
 		var updateErr error
 		var capturedProfile *usersdomain.UserProfile
 
-		svc := New(&mockUserProfileRepo{
+		svc := newTestService(&mockUserProfileRepo{
 			getUserProfileByID: func(_ context.Context, _ string) (*usersdomain.UserProfile, error) {
 				return getResult, getErr
 			},

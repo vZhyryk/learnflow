@@ -1,11 +1,15 @@
 name: Build & Test
 
 permissions:
-    contents: write
+    contents: read
 
 on:
     pull_request:
         branches: [main]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
     backend:
@@ -19,7 +23,7 @@ jobs:
             - name: Set up Go
               uses: actions/setup-go@v6
               with:
-                  go-version: "1.26.2"
+                  go-version: "1.26.3"
                   cache-dependency-path: backend/go.sum
 
             - name: Vet
@@ -29,12 +33,16 @@ jobs:
             - name: golangci-lint
               uses: golangci/golangci-lint-action@v9
               with:
-                version: v2.12
-                working-directory: backend
+                  version: v2.12
+                  working-directory: backend
 
             - name: Test race conditions
               working-directory: backend
               run: go test ./... -race -count=1
+
+            - name: Test coverage
+              working-directory: backend
+              run: go test ./... -coverpkg=./... -coverprofile=../tests/coverage.out
 
             - name: Install Sonar
               run: npm install -g @sonar/scan
@@ -44,6 +52,37 @@ jobs:
               run: sonar-scanner
               env:
                   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    backend-integration:
+        name: backend integration
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - name: Set up Go
+              uses: actions/setup-go@v6
+              with:
+                  go-version: "1.26.3"
+                  cache-dependency-path: backend/go.sum
+
+            - name: Prepare test env
+              run: |
+                  touch .env
+                  cat > .env.test <<'EOF'
+                  DB_NAME=learnflow_test
+                  DB_USER=learnflow_test
+                  DB_PASSWORD=learnflow_test
+                  DB_SSLMODE=disable
+                  EOF
+
+            - name: Integration tests
+              run: make test_integration
+
+            - name: Cleanup integration stack
+              if: always()
+              run: docker compose -f ./infrastructure/docker/docker-compose.tests.yml down -v --remove-orphans
 
     frontend:
         name: frontend

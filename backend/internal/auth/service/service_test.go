@@ -36,9 +36,7 @@ func TestNew(t *testing.T) {
 	})
 }
 
-// newTestService assembles a Service from mocks. Any nil repo/outbox/redis argument
-// is replaced with a zero-value mock (fields left unset will panic if the code under
-// test actually calls them, which surfaces missing test setup immediately).
+// newTestService assembles a Service from mocks
 func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockTokenRepo, outbox *events.OutboxWriter, redisClient *mockRedis) *Service {
 	if uRepo == nil {
 		uRepo = &mockUserRepo{}

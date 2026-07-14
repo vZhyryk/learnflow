@@ -19,28 +19,43 @@ const (
 	envDBSSLMode  = "DB_SSLMODE"
 )
 
-func setRequiredEnv() {
-	So(os.Setenv(envDBName, "testdb"), ShouldBeNil)
-	So(os.Setenv(envDBUser, "testuser"), ShouldBeNil)
-	So(os.Setenv(envDBHost, "localhost"), ShouldBeNil)
-	So(os.Setenv(envDBPassword, "testpass"), ShouldBeNil)
+// setRequiredEnv sets the four vars BuildDSNFromEnv requires, plus resets the
+// two optional ones to unset. Everything goes through t.Setenv/unsetEnv so
+// each var is restored to its pre-test value once TestBuildDSNFromEnv
+// returns — a raw os.Setenv/Unsetenv leaks DB_* overrides for the rest of the
+// process, breaking any test running later in the same binary that needs the
+// real DB_* env (e.g. testutil.NewTestPool, used by other _test.go files in
+// this package for real-Postgres integration tests).
+func setRequiredEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv(envDBName, "testdb")
+	t.Setenv(envDBUser, "testuser")
+	t.Setenv(envDBHost, "localhost")
+	t.Setenv(envDBPassword, "testpass")
+	unsetEnv(t, envDBPort)
+	unsetEnv(t, envDBSSLMode)
 }
 
-func unsetAllEnv() {
-	So(os.Unsetenv(envDBName), ShouldBeNil)
-	So(os.Unsetenv(envDBUser), ShouldBeNil)
-	So(os.Unsetenv(envDBHost), ShouldBeNil)
-	So(os.Unsetenv(envDBPassword), ShouldBeNil)
-	So(os.Unsetenv(envDBPort), ShouldBeNil)
-	So(os.Unsetenv(envDBSSLMode), ShouldBeNil)
+// unsetEnv temporarily unsets key, restoring its prior value (set or unset)
+// once the current test returns.
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+
+	orig, wasSet := os.LookupEnv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("unsetEnv(%s): %v", key, err)
+	}
+	t.Cleanup(func() {
+		if wasSet {
+			os.Setenv(key, orig) //nolint:errcheck // best-effort env restore in test cleanup
+		}
+	})
 }
 
 func TestBuildDSNFromEnv(t *testing.T) {
 	Convey("BuildDSNFromEnv", t, func() {
-		Reset(unsetAllEnv)
-
 		Convey("When all required vars are set", func() {
-			setRequiredEnv()
+			setRequiredEnv(t)
 			dsn, err := db.BuildDSNFromEnv()
 			So(err, ShouldBeNil)
 			So(dsn, ShouldStartWith, "postgres://")
@@ -51,16 +66,16 @@ func TestBuildDSNFromEnv(t *testing.T) {
 		})
 
 		Convey("When DB_PORT is overridden", func() {
-			setRequiredEnv()
-			So(os.Setenv(envDBPort, "5433"), ShouldBeNil)
+			setRequiredEnv(t)
+			t.Setenv(envDBPort, "5433")
 			dsn, err := db.BuildDSNFromEnv()
 			So(err, ShouldBeNil)
 			So(dsn, ShouldContainSubstring, ":5433/")
 		})
 
 		Convey("When DB_SSLMODE is overridden", func() {
-			setRequiredEnv()
-			So(os.Setenv(envDBSSLMode, "require"), ShouldBeNil)
+			setRequiredEnv(t)
+			t.Setenv(envDBSSLMode, "require")
 			dsn, err := db.BuildDSNFromEnv()
 			So(err, ShouldBeNil)
 			So(dsn, ShouldContainSubstring, "sslmode=require")
@@ -78,8 +93,8 @@ func TestBuildDSNFromEnv(t *testing.T) {
 		}
 		for _, tc := range missing {
 			Convey("When "+tc.name, func() {
-				setRequiredEnv()
-				So(os.Unsetenv(tc.unset), ShouldBeNil)
+				setRequiredEnv(t)
+				unsetEnv(t, tc.unset)
 				_, err := db.BuildDSNFromEnv()
 				So(err, ShouldNotBeNil)
 				So(strings.Contains(err.Error(), tc.msg), ShouldBeTrue)

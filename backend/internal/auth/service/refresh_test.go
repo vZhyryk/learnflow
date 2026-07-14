@@ -116,7 +116,7 @@ func TestRefreshReuseAfterUserFetch(t *testing.T) {
 	validReq, activeUser, activeSession := newRefreshTestFixtures()
 
 	Convey("Given an auth service", t, func() {
-		Convey("When the same token rotates two sessions (reuse after user fetch)", func() {
+		Convey("When a rotated-out token is replayed and matches both current and previous hashes (reuse after user fetch)", func() {
 			revoked := false
 			sRepo := &mockSessionRepo{
 				getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
@@ -188,8 +188,6 @@ func TestRefreshTokenReuseErrors(t *testing.T) {
 	})
 }
 
-// refreshActiveSessionRepo returns a mockSessionRepo whose lookup by refresh token
-// always resolves to session, for tests that only exercise the post-lookup path.
 func refreshActiveSessionRepo(session *authdomain.UserSession) *mockSessionRepo {
 	return &mockSessionRepo{
 		getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {

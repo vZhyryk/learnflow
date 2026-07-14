@@ -9,17 +9,15 @@ import (
 	"time"
 
 	authdomain "learnflow_backend/internal/auth/domain"
-	authhttp "learnflow_backend/internal/auth/transport/http"
 	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 type loginFixture struct {
+	*httpFixture
 	svcResult *authdomain.AuthTokens
 	svcErr    error
-	mux       *http.ServeMux
-	newReq    func(body string) *http.Request
 }
 
 func newLoginFixture() *loginFixture {
@@ -29,26 +27,14 @@ func newLoginFixture() *loginFixture {
 			return f.svcResult, f.svcErr
 		},
 	}
-	h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-	f.mux = http.NewServeMux()
-	h.RegisterRoutes(f.mux, authhttp.AuthRouteChains{})
+	f.httpFixture = newHTTPFixture(svc, http.MethodPost, "/api/v1/auth/login")
+	baseReq := f.newReq
 	f.newReq = func(body string) *http.Request {
-		r := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/login", strings.NewReader(body))
+		r := baseReq(body)
 		r.Header.Set("User-Agent", "test-agent/1.0")
 		return r
 	}
 	return f
-}
-
-// doRequest fires body through f.mux and returns the recorded response.
-func (f *loginFixture) doRequest(body string) *httptest.ResponseRecorder {
-	return testutil.ServeHTTP(f.mux, f.newReq(body))
-}
-
-// doRequestWithWriter fires body through f.mux against an arbitrary
-// http.ResponseWriter (e.g. errWriter, to exercise response-write-failure branches).
-func (f *loginFixture) doRequestWithWriter(w http.ResponseWriter, body string) {
-	f.mux.ServeHTTP(w, f.newReq(body))
 }
 
 const validLoginBody = `{"Email":"user@example.com","Password":"password123"}`

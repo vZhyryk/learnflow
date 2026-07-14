@@ -3,22 +3,19 @@ package authhttp_test
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	authdomain "learnflow_backend/internal/auth/domain"
-	authhttp "learnflow_backend/internal/auth/transport/http"
 	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 type registerFixture struct {
+	*httpFixture
 	svcResult string
 	svcErr    error
-	mux       *http.ServeMux
-	newReq    func(body string) *http.Request
 }
 
 func newRegisterFixture() *registerFixture {
@@ -28,18 +25,8 @@ func newRegisterFixture() *registerFixture {
 			return f.svcResult, f.svcErr
 		},
 	}
-	h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-	f.mux = http.NewServeMux()
-	h.RegisterRoutes(f.mux, authhttp.AuthRouteChains{})
-	f.newReq = func(body string) *http.Request {
-		return httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/register", strings.NewReader(body))
-	}
+	f.httpFixture = newHTTPFixture(svc, http.MethodPost, "/api/v1/auth/register")
 	return f
-}
-
-// doRequest fires body through f.mux and returns the recorded response.
-func (f *registerFixture) doRequest(body string) *httptest.ResponseRecorder {
-	return testutil.ServeHTTP(f.mux, f.newReq(body))
 }
 
 const validRegisterBody = `{"Email":"user@example.com","Password":"password123"}`
@@ -106,7 +93,7 @@ func TestRegisterServiceOutcomes(t *testing.T) {
 
 		Convey("Valid request and the success response write fails → does not panic", func() {
 			f.svcResult = "user-123"
-			So(func() { f.mux.ServeHTTP(&errWriter{}, f.newReq(validRegisterBody)) }, ShouldNotPanic)
+			So(func() { f.doRequestWithWriter(&errWriter{}, validRegisterBody) }, ShouldNotPanic)
 		})
 	})
 }

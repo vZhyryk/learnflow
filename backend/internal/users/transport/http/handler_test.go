@@ -78,8 +78,6 @@ func TestGetProfile(t *testing.T) {
 	})
 }
 
-// --- PATCH /api/v1/users/profile ---
-
 type changeProfileFixture struct {
 	svcErr error
 	mux    *http.ServeMux

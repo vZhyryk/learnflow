@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
+	// Registers the pgx/v5 database driver with golang-migrate's driver registry.
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 
 	"learnflow_backend/migrations"

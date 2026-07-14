@@ -3,24 +3,20 @@ package authhttp_test
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	authdomain "learnflow_backend/internal/auth/domain"
-	authhttp "learnflow_backend/internal/auth/transport/http"
 	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// validChangePasswordBody includes UserID matching the user injected by withUser.
 const validChangePasswordBody = `{"UserID":"user-123","OldPassword":"oldpass12","NewPassword":"newpass12"}`
 
 type changePasswordFixture struct {
+	*httpFixture
 	svcErr error
-	mux    *http.ServeMux
-	newReq func(body string) *http.Request
 }
 
 func newChangePasswordFixture() *changePasswordFixture {
@@ -30,12 +26,7 @@ func newChangePasswordFixture() *changePasswordFixture {
 			return f.svcErr
 		},
 	}
-	h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-	f.mux = http.NewServeMux()
-	h.RegisterRoutes(f.mux, authhttp.AuthRouteChains{})
-	f.newReq = func(body string) *http.Request {
-		return httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/api/v1/users/auth/password/change", strings.NewReader(body))
-	}
+	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/users/auth/password/change")
 	return f
 }
 

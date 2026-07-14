@@ -250,6 +250,29 @@ func TestLoginAccountStatus(t *testing.T) {
 
 			So(errors.Is(err, authdomain.ErrInvalidCredentials), ShouldBeTrue)
 		})
+
+		// Regression test for the security invariant documented on Login: status checks run
+		// after bcrypt, so a blocked account with a WRONG password must still fail as
+		// ErrInvalidCredentials, not ErrAccountBlocked — reordering the checks in login.go
+		// would turn account status into a timing/response oracle.
+		Convey("When the account is blocked and the password is also wrong, bcrypt failure wins over status", func() {
+			user := newLoginTestUser("actual-password", authdomain.StatusBlocked)
+			var incremented bool
+			uRepo := &mockUserRepo{
+				getUserByEmail: loginGetUserByEmail(user),
+				incrementFailedLogin: func(_ context.Context, _, _ string, _ int) error {
+					incremented = true
+					return nil
+				},
+			}
+			srv := newTestService(uRepo, nil, nil, nil, nil)
+
+			_, err := srv.Login(context.Background(), validLoginReq())
+
+			So(errors.Is(err, authdomain.ErrInvalidCredentials), ShouldBeTrue)
+			So(errors.Is(err, authdomain.ErrAccountBlocked), ShouldBeFalse)
+			So(incremented, ShouldBeTrue)
+		})
 	})
 }
 

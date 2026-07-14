@@ -305,3 +305,35 @@ func TestMaskAllWithMarker(t *testing.T) {
 		})
 	})
 }
+
+// --- SanitizePath ---
+
+func TestSanitizePath(t *testing.T) {
+	s := newS()
+
+	Convey("SanitizePath", t, func() {
+		Convey("Opaque token segment is redacted", func() {
+			result := s.SanitizePath("/auth/reset-password/eyJhbGciOiJIUzI1NiJ9.super-secret-token")
+			So(result, ShouldEqual, "/auth/reset-password/***")
+		})
+
+		Convey("UUID resource ID segment is left untouched", func() {
+			path := "/users/550e8400-e29b-41d4-a716-446655440000/profile"
+			So(s.SanitizePath(path), ShouldEqual, path)
+		})
+
+		Convey("Short segments (route names, ordinary slugs) are left untouched", func() {
+			path := "/auth/reset-password"
+			So(s.SanitizePath(path), ShouldEqual, path)
+		})
+
+		Convey("Multiple opaque segments in one path are each redacted", func() {
+			result := s.SanitizePath("/a/aaaaaaaaaaaaaaaaaaaaaaaa/b/bbbbbbbbbbbbbbbbbbbbbbbb")
+			So(result, ShouldEqual, "/a/***/b/***")
+		})
+
+		Convey("Empty path is left untouched", func() {
+			So(s.SanitizePath(""), ShouldEqual, "")
+		})
+	})
+}

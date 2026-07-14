@@ -52,6 +52,11 @@ type Config struct {
 
 // App is the shared application container injected into every handler and worker.
 // App must not be copied after first use — always pass as *App.
+//
+// Ctx/Cancel are the process-lifetime shutdown signal, not a per-request context — every
+// request still gets its own context from net/http, passed explicitly through the call
+// chain as usual. Storing this pair here is the standard root-container pattern for fanning
+// out graceful shutdown to workers and background goroutines that outlive any single request.
 type App struct {
 	_      noCopy
 	Config Config

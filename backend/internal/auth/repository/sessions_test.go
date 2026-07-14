@@ -186,7 +186,7 @@ func TestCreateUserSession(t *testing.T) {
 			},
 		})
 
-		Convey("When the session exists", func() {
+		Convey("When creation succeeds", func() {
 			row = &testutil.MockRow{ScanFn: fakeScanUserSession(userSession.CreatedAt)}
 			got, err := repo.CreateUserSession(context.Background(), userSession)
 
@@ -244,7 +244,7 @@ func TestRevokeUserSession(t *testing.T) {
 			assertUnexpectedDBError(err, "db connection lost")
 		})
 
-		Convey("When the session is missing or already revoked (idempotent double-revoke)", func() {
+		Convey("When no active session matches (already revoked or nonexistent)", func() {
 			err := repo.RevokeUserSession(context.Background(), userSession.ID, *userSession.RevokedByUserID, *userSession.RevokeReason)
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
@@ -354,6 +354,123 @@ func TestUpdateFailedLoginAttempts(t *testing.T) {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
 			err := repo.UpdateFailedLoginAttempts(context.Background(), userSession.ID, "15 minutes", 5)
 			So(err, ShouldBeNil)
+		})
+	})
+}
+
+// user_sessions has no deleted_at column and is not in the soft-deletable
+// table list (.claude/rules/db-conventions.md). Its own analog of a
+// soft-delete filter is revoked_at IS NULL. These tests are a regression
+// guard on that filter so a revoked session can never be used to
+// authenticate again.
+
+func TestGetUserSessionByRefreshTokenFiltersRevokedAndExpiredSessions(t *testing.T) {
+	Convey("Given a users repository", t, func() {
+		var gotQuery string
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, sql string, _ ...any) pgx.Row {
+				gotQuery = sql
+				return &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			},
+		})
+
+		Convey("When looking up a session by its refresh token hash", func() {
+			_, err := repo.GetUserSessionByRefreshToken(context.Background(), "refresh-token-hash")
+			So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
+			So(gotQuery, ShouldContainSubstring, "revoked_at IS NULL")
+			So(gotQuery, ShouldContainSubstring, "expires_at > now()")
+		})
+	})
+}
+
+func TestGetSessionByPrevHashIntentionallyIncludesRevokedSessions(t *testing.T) {
+	Convey("Given a users repository", t, func() {
+		var gotQuery string
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, sql string, _ ...any) pgx.Row {
+				gotQuery = sql
+				return &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			},
+		})
+
+		Convey("When looking up a session by its previous refresh hash (rotation reuse detection)", func() {
+			_, err := repo.GetSessionByPrevHash(context.Background(), "prev-refresh-hash")
+			So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
+			So(gotQuery, ShouldNotContainSubstring, "revoked_at IS NULL")
+		})
+	})
+}
+
+func TestGetActiveSessionsByUserIDFiltersRevokedSessions(t *testing.T) {
+	Convey("Given a users repository", t, func() {
+		var gotQuery string
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryFn: func(_ context.Context, sql string, _ ...any) (pgx.Rows, error) {
+				gotQuery = sql
+				return pgx.Rows(&testutil.MockRows{}), nil
+			},
+		})
+
+		Convey("When listing active sessions for a user", func() {
+			_, err := repo.GetActiveSessionsByUserID(context.Background(), "user-123")
+			So(err, ShouldBeNil)
+			So(gotQuery, ShouldContainSubstring, "revoked_at IS NULL")
+		})
+	})
+}
+
+func TestRevokeUserSessionOnlyTargetsActiveSessions(t *testing.T) {
+	Convey("Given a users repository", t, func() {
+		var gotQuery string
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, sql string, _ ...any) (pgconn.CommandTag, error) {
+				gotQuery = sql
+				return pgconn.NewCommandTag("UPDATE 1"), nil
+			},
+		})
+
+		Convey("When revoking a single session", func() {
+			err := repo.RevokeUserSession(context.Background(), "session-123", "user-456", authdomain.RevokeReasonLogout)
+			So(err, ShouldBeNil)
+			So(gotQuery, ShouldContainSubstring, "revoked_at IS NULL")
+		})
+	})
+}
+
+func TestRevokeAllUserSessionsOnlyTargetsActiveSessions(t *testing.T) {
+	Convey("Given a users repository", t, func() {
+		var gotQuery string
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, sql string, _ ...any) (pgconn.CommandTag, error) {
+				gotQuery = sql
+				return pgconn.NewCommandTag("UPDATE 3"), nil
+			},
+		})
+
+		Convey("When revoking all sessions for a user", func() {
+			revokedByUserID := "user-456"
+			err := repo.RevokeAllUserSessions(context.Background(), "user-123", &revokedByUserID, authdomain.RevokeReasonAdmin)
+			So(err, ShouldBeNil)
+			So(gotQuery, ShouldContainSubstring, "revoked_at IS NULL")
+		})
+	})
+}
+
+func TestUpdateSessionTokenOnlyTargetsActiveUnexpiredSessions(t *testing.T) {
+	Convey("Given a users repository", t, func() {
+		var gotQuery string
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, sql string, _ ...any) (pgconn.CommandTag, error) {
+				gotQuery = sql
+				return pgconn.NewCommandTag("UPDATE 1"), nil
+			},
+		})
+
+		Convey("When rotating a session's refresh token", func() {
+			err := repo.UpdateSessionToken(context.Background(), "session-123", "new-refresh-hash", "Mozilla/5.0", "127.0.0.1")
+			So(err, ShouldBeNil)
+			So(gotQuery, ShouldContainSubstring, "revoked_at IS NULL")
+			So(gotQuery, ShouldContainSubstring, "expires_at > now()")
 		})
 	})
 }

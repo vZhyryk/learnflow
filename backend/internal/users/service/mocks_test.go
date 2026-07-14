@@ -25,3 +25,7 @@ func (m *mockUserProfileRepo) UpdateUserProfile(ctx context.Context, userProfile
 	}
 	return m.updateUserProfile(ctx, userProfile)
 }
+
+func newTestService(repo *mockUserProfileRepo) *Service {
+	return New(repo)
+}

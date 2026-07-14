@@ -5,6 +5,7 @@ import (
 	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/shared/testutil"
+	"strings"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -185,6 +186,89 @@ func TestRegisterSuccess(t *testing.T) {
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "user")
 			So(captured[1], ShouldEqual, "user-123")
+		})
+	})
+}
+
+func TestRegisterMaxLengthPasswordHashing(t *testing.T) {
+	Convey("Given an auth service", t, func() {
+		Convey("When the password is exactly 72 bytes of multi-byte runes (Validate's own limit)", func() {
+			uRepo := newRegisterNewUserRepo()
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error { return nil }
+			tRepo := &mockTokenRepo{
+				createEmailVerificationToken: func(_ context.Context, t *authdomain.EmailVerificationToken) (*authdomain.EmailVerificationToken, error) {
+					return t, nil
+				},
+			}
+			srv := newTestService(uRepo, nil, tRepo, newNoopOutbox(), nil)
+
+			// 36 Cyrillic runes * 2 bytes = 72 bytes, at bcrypt's own byte limit,
+			// so GenerateFromPassword must not return bcrypt.ErrPasswordTooLong.
+			password := strings.Repeat("я", 36)
+			id, err := srv.Register(context.Background(), authdomain.RegisterRequest{
+				Email: "user@example.com", Password: password,
+			})
+
+			So(err, ShouldBeNil)
+			So(id, ShouldEqual, "user-123")
+		})
+	})
+}
+
+func TestNewUserProfileFromRegisterRequest(t *testing.T) {
+	Convey("newUserProfileFromRegisterRequest", t, func() {
+		Convey("When optional fields are empty", func() {
+			req := authdomain.RegisterRequest{Email: "user@example.com", Password: "password123"}
+
+			p := newUserProfileFromRegisterRequest("user-123", req)
+
+			So(p.UserID, ShouldEqual, "user-123")
+			So(p.FirstName, ShouldBeNil)
+			So(p.LastName, ShouldBeNil)
+			So(p.PhoneNumber, ShouldBeNil)
+			So(p.Country, ShouldBeNil)
+			So(p.City, ShouldBeNil)
+			So(p.Gender, ShouldBeNil)
+			So(p.DateOfBirth, ShouldBeNil)
+			So(p.AvatarURL, ShouldBeNil)
+			So(p.Timezone, ShouldBeNil)
+			So(p.Bio, ShouldBeNil)
+			So(p.UILanguage, ShouldEqual, defaultUILanguage)
+		})
+
+		Convey("When optional fields are provided", func() {
+			dob := "1990-01-01"
+			req := authdomain.RegisterRequest{
+				Email:       "user@example.com",
+				Password:    "password123",
+				FirstName:   "Alice",
+				LastName:    "Doe",
+				PhoneNumber: "+48123456789",
+				Country:     "PL",
+				City:        "Warsaw",
+				Gender:      "female",
+				DateOfBirth: &dob,
+				UILanguage:  "pl",
+				AvatarURL:   "https://example.com/avatar.png",
+				Timezone:    "Europe/Warsaw",
+				Bio:         "hello",
+			}
+
+			p := newUserProfileFromRegisterRequest("user-456", req)
+
+			So(p.UserID, ShouldEqual, "user-456")
+			So(*p.FirstName, ShouldEqual, "Alice")
+			So(*p.LastName, ShouldEqual, "Doe")
+			So(*p.PhoneNumber, ShouldEqual, "+48123456789")
+			So(*p.Country, ShouldEqual, "PL")
+			So(*p.City, ShouldEqual, "Warsaw")
+			So(*p.Gender, ShouldEqual, "female")
+			So(p.DateOfBirth, ShouldEqual, &dob)
+			So(*p.AvatarURL, ShouldEqual, "https://example.com/avatar.png")
+			So(*p.Timezone, ShouldEqual, "Europe/Warsaw")
+			So(*p.Bio, ShouldEqual, "hello")
+			So(p.UILanguage, ShouldEqual, "pl")
 		})
 	})
 }

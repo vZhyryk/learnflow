@@ -11,14 +11,11 @@ import (
 )
 
 // FailedJob represents a dead-letter queue entry that failed all retry attempts.
-// PayloadJSON is *string because failed_jobs.payload_json is a nullable jsonb
-// column — no current writer inserts NULL there, but the scan must not panic
-// if one ever does.
 type FailedJob struct {
 	ID           string
 	EventType    events.EventType
 	QueueName    string
-	PayloadJSON  *string
+	PayloadJSON  string
 	AttemptCount int
 }
 
@@ -135,12 +132,7 @@ func (p *DLQRetryWorker) handleFailedJobEntry(ctx context.Context, entry FailedJ
 		return
 	}
 
-	if entry.PayloadJSON == nil {
-		p.markEntryFailed(ctx, fmt.Errorf("failedJobs: payload_json is NULL"), entry.ID)
-		return
-	}
-
-	if err := p.publisher.Publish(ctx, entry.EventType, json.RawMessage(*entry.PayloadJSON)); err != nil {
+	if err := p.publisher.Publish(ctx, entry.EventType, json.RawMessage(entry.PayloadJSON)); err != nil {
 		p.markEntryFailed(ctx, fmt.Errorf("failedJobs.poll publish: %w", err), entry.ID)
 		return
 	}

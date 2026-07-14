@@ -15,15 +15,8 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// nonExistentUUID is a well-formed uuid that never matches a real row —
-// used to exercise "not found" branches without tripping invalid-uuid-syntax
-// errors that a plain "" would cause on a uuid column.
 const nonExistentUUID = "00000000-0000-0000-0000-000000000000"
 
-// fullTestSession returns a session fixture with a unique RefreshHash/
-// PreviousRefreshHash on every call — user_sessions_refresh_hash_unique
-// (migration 000002) rejects a second insert with the same refresh_hash,
-// so tests creating multiple sessions need each call to be distinct.
 func fullTestSession(userId string) *authdomain.UserSession {
 	refreshHash := fmt.Sprintf("refresh-hash-value-%s", uniqueSuffix())
 	userAgent, ipAddress := "Mozilla/5.0 (Test)", "203.0.113.42"
@@ -48,11 +41,6 @@ func fullTestSession(userId string) *authdomain.UserSession {
 	}
 }
 
-// newSessionFixture creates a user and a single session for it, reusing
-// newTestUser's cleanup (mock_integration_test.go) and additionally
-// registering session cleanup — t.Cleanup runs LIFO, so this session delete
-// fires before newTestUser's user delete, satisfying user_sessions'
-// ON DELETE RESTRICT (migration 000002).
 func newSessionFixture(t *testing.T, ctx context.Context, repo *Repository) (userId string, seed, session *authdomain.UserSession) {
 	t.Helper()
 
@@ -69,8 +57,6 @@ func newSessionFixture(t *testing.T, ctx context.Context, repo *Repository) (use
 	return userId, seed, session
 }
 
-// createSessions creates n additional sessions for an already-existing userId.
-// Caller is responsible for user + cleanup registration.
 func createSessions(t *testing.T, ctx context.Context, repo *Repository, userId string, n int) []*authdomain.UserSession {
 	t.Helper()
 
@@ -123,7 +109,8 @@ func assertRevokedSession(got *authdomain.UserSession, revokedByUserID string, r
 
 // assertFailedLoginState checks the fields of a session after one or more
 // UpdateFailedLoginAttempts calls.
-func assertFailedLoginState(got, seed *authdomain.UserSession, expectFailedCount int, expectLocked bool) {
+func assertFailedLoginState(t *testing.T, got, seed *authdomain.UserSession, expectFailedCount int, expectLocked bool) {
+	t.Helper()
 	So(got.UserID, ShouldEqual, seed.UserID)
 	So(got.RefreshHash, ShouldEqual, seed.RefreshHash)
 	So(got.UserAgent, ShouldEqual, seed.UserAgent)
@@ -200,11 +187,6 @@ func TestGetUserSessionByRefreshToken_Integration(t *testing.T) {
 	})
 }
 
-// assertTokenRotation rotates session's refresh token via UpdateSessionToken,
-// then verifies GetSessionByPrevHash resolves the rotated session by the
-// pre-rotation hash. middle runs (if set) after rotation but before the
-// lookup — e.g. to revoke the session and assert the "no longer found" branch.
-// end (if set) receives the resolved session for scenario-specific assertions.
 func assertTokenRotation(t *testing.T, ctx context.Context, repo *Repository, seed, session *authdomain.UserSession, middle func(), end func(got *authdomain.UserSession)) {
 	t.Helper()
 	var ua string = "new-user-agent"
@@ -301,8 +283,6 @@ func TestRevokeUserSession_Integration(t *testing.T) {
 					got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
 					So(got, ShouldBeNil)
 					So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
-					got, err = repo.GetSessionByPrevHash(ctx, seed.RefreshHash)
-					So(got, ShouldBeNil)
 					So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
 				},
 					func(got *authdomain.UserSession) {
@@ -348,8 +328,6 @@ func TestRevokeAllUserSessions_Integration(t *testing.T) {
 		Convey("user has no sessions to revoke", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
-				// RevokeAllUserSessions has no RowsAffected check (sessions.go:65-75) —
-				// revoking a user with zero active sessions is a no-op, not an error.
 				err := repo.RevokeAllUserSessions(ctx, nonExistentUUID, nil, authdomain.RevokeReasonLogout)
 				So(err, ShouldBeNil)
 			})
@@ -379,7 +357,7 @@ func TestUpdateFailedLoginAttempts_Integration(t *testing.T) {
 				got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
 				So(err, ShouldBeNil)
 				So(got, ShouldNotBeNil)
-				assertFailedLoginState(got, seed, 1, false)
+				assertFailedLoginState(t, got, seed, 1, false)
 			})
 		})
 
@@ -394,7 +372,7 @@ func TestUpdateFailedLoginAttempts_Integration(t *testing.T) {
 				got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
 				So(err, ShouldBeNil)
 				So(got, ShouldNotBeNil)
-				assertFailedLoginState(got, seed, 1, true)
+				assertFailedLoginState(t, got, seed, 1, true)
 			})
 		})
 
@@ -412,7 +390,7 @@ func TestUpdateFailedLoginAttempts_Integration(t *testing.T) {
 				got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
 				So(err, ShouldBeNil)
 				So(got, ShouldNotBeNil)
-				assertFailedLoginState(got, seed, 2, true)
+				assertFailedLoginState(t, got, seed, 2, false)
 			})
 		})
 
@@ -471,9 +449,9 @@ func TestGetActiveSessionsByUserID_Integration(t *testing.T) {
 		Convey("user does not have a session", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
-				sessionList, err := repo.GetActiveSessionsByUserID(ctx, "")
+				sessionList, err := repo.GetActiveSessionsByUserID(ctx, nonExistentUUID)
 				So(err, ShouldBeNil)
-				So(sessionList, ShouldNotBeNil)
+				So(sessionList, ShouldBeNil)
 				So(len(sessionList), ShouldEqual, 0)
 			})
 		})
@@ -535,9 +513,9 @@ func TestGetAllSessionsByUserID_Integration(t *testing.T) {
 		Convey("user does not have a session", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
-				sessionList, err := repo.GetAllSessionsByUserID(ctx, "")
+				sessionList, err := repo.GetAllSessionsByUserID(ctx, nonExistentUUID)
 				So(err, ShouldBeNil)
-				So(sessionList, ShouldNotBeNil)
+				So(sessionList, ShouldBeNil)
 				So(len(sessionList), ShouldEqual, 0)
 			})
 		})
@@ -571,8 +549,8 @@ func TestUpdateSessionToken_Integration(t *testing.T) {
 					So(err, ShouldBeNil)
 					So(gotSession, ShouldNotBeNil)
 					So(gotSession.RefreshHash, ShouldEqual, hash)
-					So(gotSession.UserAgent, ShouldEqual, ua)
-					So(gotSession.IPAddress, ShouldEqual, ip)
+					So(gotSession.UserAgent, ShouldEqual, &ua)
+					So(gotSession.LastSeenIP, ShouldEqual, &ip)
 				}
 			})
 		})

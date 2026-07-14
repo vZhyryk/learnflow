@@ -3,22 +3,18 @@ package authhttp_test
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	authdomain "learnflow_backend/internal/auth/domain"
-	authhttp "learnflow_backend/internal/auth/transport/http"
 	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 type verifyEmailFixture struct {
+	*httpFixture
 	svcResult string
 	svcErr    error
-	mux       *http.ServeMux
-	newReq    func(body string) *http.Request
 }
 
 func newVerifyEmailFixture() *verifyEmailFixture {
@@ -28,12 +24,7 @@ func newVerifyEmailFixture() *verifyEmailFixture {
 			return f.svcResult, f.svcErr
 		},
 	}
-	h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-	f.mux = http.NewServeMux()
-	h.RegisterRoutes(f.mux, authhttp.AuthRouteChains{})
-	f.newReq = func(body string) *http.Request {
-		return httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/users/auth/email/verify", strings.NewReader(body))
-	}
+	f.httpFixture = newHTTPFixture(svc, http.MethodPost, "/api/v1/users/auth/email/verify")
 	return f
 }
 

@@ -7,6 +7,7 @@ import (
 )
 
 const validDSN = "postgres://user:pass@localhost:5432/testdb"
+const unreachableDSN = "postgres://user:pass@127.0.0.1:1/testdb"
 
 func TestParseConfigs(t *testing.T) {
 	Convey("parseConfigs", t, func() {
@@ -83,6 +84,18 @@ func TestParseConfigs(t *testing.T) {
 			So(cfg.MinConns, ShouldEqual, int32(2))
 			So(cfg.MaxConnIdleTime.String(), ShouldEqual, "5m0s")
 			So(cfg.MaxConnLifetime.String(), ShouldEqual, "1h0m0s")
+		})
+	})
+}
+
+func TestInitDatabase(t *testing.T) {
+	Convey("InitDatabase", t, func() {
+		Convey("When the address is unreachable", func() {
+			pool, err := InitDatabase(unreachableDSN, "5m", "1h", 10, 2)
+
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "failed to ping")
+			So(pool, ShouldBeNil)
 		})
 	})
 }

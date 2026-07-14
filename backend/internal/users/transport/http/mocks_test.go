@@ -2,30 +2,20 @@ package usershttp_test
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	authdomain "learnflow_backend/internal/auth/domain"
-	appcontext "learnflow_backend/internal/shared/context"
+	"learnflow_backend/internal/shared/testutil"
 	usersdomain "learnflow_backend/internal/users/domain"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 
 	"github.com/justinas/alice"
 )
 
 func noopChain() alice.Chain { return alice.New() }
 
-// errWriter is an http.ResponseWriter whose Write always fails — used to
-// exercise the "response write failed" branches after a handler has already
-// decided what to respond with.
-type errWriter struct {
-	httptest.ResponseRecorder
-}
+// errWriter, decodeBody, and withUser are shared test helpers defined once in testutil.
+type errWriter = testutil.ErrWriter
 
-func (e *errWriter) Write(_ []byte) (int, error) {
-	return 0, errors.New("write failed")
-}
+var decodeBody = testutil.DecodeBody
+
+var withUser = testutil.WithUser
 
 // mockService implements usersdomain.Service via function fields.
 type mockService struct {
@@ -39,18 +29,4 @@ func (m *mockService) GetUserProfile(ctx context.Context, userID string) (*users
 
 func (m *mockService) ChangeUserProfile(ctx context.Context, req usersdomain.ChangeUserProfileRequest) error {
 	return m.changeUserProfile(ctx, req)
-}
-
-func withUser(r *http.Request) *http.Request {
-	user := &authdomain.User{ID: "user-123"}
-	return r.WithContext(appcontext.WithUser(r.Context(), user))
-}
-
-func decodeBody(t *testing.T, body []byte) map[string]any {
-	t.Helper()
-	var m map[string]any
-	if err := json.Unmarshal(body, &m); err != nil {
-		t.Fatalf("failed to decode response body: %v", err)
-	}
-	return m
 }

@@ -504,6 +504,42 @@ func TestIncrementFailedLogin(t *testing.T) {
 	})
 }
 
+func TestUserFetchQueriesFilterSoftDeleted(t *testing.T) {
+	Convey("Given user fetch queries", t, func() {
+		var gotQuery string
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, query string, _ ...any) pgx.Row {
+				gotQuery = query
+				return &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+			},
+		})
+
+		Convey("GetUserByID excludes soft-deleted users", func() {
+			_, err := repo.GetUserByID(context.Background(), "user-123")
+			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
+			So(gotQuery, ShouldContainSubstring, "deleted_at IS NULL")
+		})
+
+		Convey("GetUserByEmail excludes soft-deleted users", func() {
+			_, err := repo.GetUserByEmail(context.Background(), "john@gmail.com")
+			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
+			So(gotQuery, ShouldContainSubstring, "deleted_at IS NULL")
+		})
+
+		Convey("GetDeletedUserByID targets only soft-deleted users", func() {
+			_, err := repo.GetDeletedUserByID(context.Background(), "user-123")
+			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
+			So(gotQuery, ShouldContainSubstring, "deleted_at IS NOT NULL")
+		})
+
+		Convey("GetDeletedUserByEmail targets only soft-deleted users", func() {
+			_, err := repo.GetDeletedUserByEmail(context.Background(), "john@gmail.com")
+			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
+			So(gotQuery, ShouldContainSubstring, "deleted_at IS NOT NULL")
+		})
+	})
+}
+
 func TestResetFailedLogin(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error

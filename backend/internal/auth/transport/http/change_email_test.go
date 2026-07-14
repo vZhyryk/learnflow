@@ -3,12 +3,9 @@ package authhttp_test
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	authdomain "learnflow_backend/internal/auth/domain"
-	authhttp "learnflow_backend/internal/auth/transport/http"
 	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -23,13 +20,8 @@ func TestInitiateEmailChange(t *testing.T) {
 				return svcErr
 			},
 		}
-		h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-		mux := http.NewServeMux()
-		h.RegisterRoutes(mux, authhttp.AuthRouteChains{})
-
-		newReq := func(body string) *http.Request {
-			return httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/users/auth/email/change", strings.NewReader(body))
-		}
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/users/auth/email/change")
+		mux, newReq := f.mux, f.newReq
 
 		Convey("Empty body → 400", func() {
 			w := testutil.ServeHTTP(mux, newReq(""))
@@ -74,9 +66,8 @@ func TestInitiateEmailChange(t *testing.T) {
 }
 
 type changeEmailFixture struct {
+	*httpFixture
 	svcErr error
-	mux    *http.ServeMux
-	newReq func(body string) *http.Request
 }
 
 func newChangeEmailFixture() *changeEmailFixture {
@@ -86,12 +77,7 @@ func newChangeEmailFixture() *changeEmailFixture {
 			return f.svcErr
 		},
 	}
-	h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-	f.mux = http.NewServeMux()
-	h.RegisterRoutes(f.mux, authhttp.AuthRouteChains{})
-	f.newReq = func(body string) *http.Request {
-		return httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/api/v1/users/auth/email/change", strings.NewReader(body))
-	}
+	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/users/auth/email/change")
 	return f
 }
 

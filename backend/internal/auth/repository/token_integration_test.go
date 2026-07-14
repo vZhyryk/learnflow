@@ -15,14 +15,10 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// uniqueTokenHash returns a token_hash unique on every call — all four token
-// tables have a UNIQUE(token_hash) constraint (migration 000001).
 func uniqueTokenHash(prefix string) string {
 	return fmt.Sprintf("%s-token-hash-%s", prefix, uniqueSuffix())
 }
 
-// assertFreshToken checks the fields of a token that was just created and
-// never used or invalidated.
 func assertFreshToken(base authdomain.TokenBase, userId, hash string) {
 	So(base.ID, ShouldNotBeEmpty)
 	So(base.UserID, ShouldEqual, userId)

@@ -16,16 +16,10 @@ import (
 
 var uniqueSeq atomic.Int64
 
-// uniqueSuffix returns a monotonically increasing, timestamp-salted suffix
-// for building collision-free integration-test fixtures (emails, refresh
-// hashes, token hashes) that must be unique within a single test run.
 func uniqueSuffix() string {
 	return fmt.Sprintf("%d-%d", time.Now().UnixNano(), uniqueSeq.Add(1))
 }
 
-// fakeUniqueUser returns a fakeUser with a distinct email/ID on every call,
-// for integration tests that insert multiple real rows into the same
-// unique-active-email index and need them not to collide.
 func fakeUniqueUser(now time.Time) *authdomain.User {
 	u := fakeUser(now)
 	u.ID = fmt.Sprintf("user-%s", uniqueSuffix())
@@ -33,10 +27,6 @@ func fakeUniqueUser(now time.Time) *authdomain.User {
 	return u
 }
 
-// newTestUser creates a real user row for integration tests and registers
-// cleanup for it and any token rows that might reference it, in FK-safe
-// order (tokens before users — three of the four token tables are
-// ON DELETE RESTRICT, migration 000001).
 func newTestUser(t *testing.T, ctx context.Context, repo *Repository) string {
 	t.Helper()
 

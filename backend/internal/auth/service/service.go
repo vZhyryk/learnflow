@@ -34,7 +34,7 @@ type Service struct {
 	dummyPasswordHash []byte
 	cost              int
 	token             *tokens.Tokens
-	redisClient       RedisOps
+	redisClient       NXSetter
 }
 
 // Repos groups the repository dependencies required by the auth Service.
@@ -49,7 +49,7 @@ type Repos struct {
 type Utils struct {
 	Outbox      *events.OutboxWriter
 	Token       *tokens.Tokens
-	RedisClient RedisOps
+	RedisClient NXSetter
 }
 
 // New returns a new auth Service with the given repositories and configuration.
@@ -62,6 +62,10 @@ func New(
 	if cost == 0 {
 		cost = hashDefaultCost
 	}
+	// "dummy" is a fixed placeholder password, not a credential: it only exists so
+	// Login always runs a real bcrypt comparison (against dummyPasswordHash) on the
+	// user-not-found path, keeping response timing indistinguishable from a wrong-password
+	// failure and preventing user-enumeration via timing (see TestLoginConstantTimeUserEnumeration).
 	dummyPasswordHash, err := bcrypt.GenerateFromPassword([]byte("dummy"), cost)
 	if err != nil {
 		return nil, fmt.Errorf("authservice.New: generate dummy hash: %w", err)
@@ -87,7 +91,7 @@ type Options struct {
 	BcryptCost int // default hashDefaultCost (12), bcrypt.MinCost (4) in tests
 }
 
-// RedisOps is the subset of redis.Client methods used by the auth Service.
-type RedisOps interface {
+// NXSetter is the subset of redis.Client methods used by the auth Service.
+type NXSetter interface {
 	SetNX(ctx context.Context, key string, value any, expiration time.Duration) *redis.BoolCmd
 }

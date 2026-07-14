@@ -61,10 +61,16 @@ func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 
 // LogRespondError runs fn (a response-writing call) and logs a failure to write the
 // response itself. The write error is only logged, never returned — by this point the
-// caller has already decided what to respond with, and has nothing left to do.
-func LogRespondError(jsonLogger *logger.Logger, r *http.Request, caseName string, fn func() error) {
+// caller has already decided what to respond with, and has nothing left to do. props is
+// merged into the logged properties alongside case/path, letting callers keep request
+// context (method, ip, request_id, ...) that doesn't fit the base shape; it may be nil.
+func LogRespondError(jsonLogger *logger.Logger, r *http.Request, caseName string, props map[string]any, fn func() error) {
 	if err := fn(); err != nil {
-		jsonLogger.Error(err, map[string]any{"case": caseName, "path": r.URL.Path})
+		merged := map[string]any{"case": caseName, "path": r.URL.Path}
+		for k, v := range props {
+			merged[k] = v
+		}
+		jsonLogger.Error(err, merged)
 	}
 }
 

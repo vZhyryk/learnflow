@@ -12,9 +12,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// newTestOutboxPoller assembles an OutboxPoller from a mock runner and publisher,
-// with a discard logger and a no-op transactor — the parts every test needs but none
-// varies on. A nil publisher is replaced with an empty mockPublisher.
 func newTestOutboxPoller(runner *testutil.MockQueryRunner, publisher *mockPublisher) *OutboxPoller {
 	if publisher == nil {
 		publisher = &mockPublisher{}

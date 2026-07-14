@@ -2,24 +2,54 @@ package authhttp_test
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	authdomain "learnflow_backend/internal/auth/domain"
-	appcontext "learnflow_backend/internal/shared/context"
 	"net/http"
 	"net/http/httptest"
-	"testing"
+	"strings"
+
+	authdomain "learnflow_backend/internal/auth/domain"
+	authhttp "learnflow_backend/internal/auth/transport/http"
+	"learnflow_backend/internal/shared/testutil"
 )
 
-// errWriter is an http.ResponseWriter whose Write always fails — used to
-// exercise the "response write failed" branches after a handler has already
-// decided what to respond with.
-type errWriter struct {
-	httptest.ResponseRecorder
+type errWriter = testutil.ErrWriter
+
+var decodeBody = testutil.DecodeBody
+var withUser = testutil.WithUser
+
+func newAuthMux(svc *mockService) *http.ServeMux {
+	h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
+	mux := http.NewServeMux()
+	h.RegisterRoutes(mux, authhttp.AuthRouteChains{})
+	return mux
 }
 
-func (e *errWriter) Write(_ []byte) (int, error) {
-	return 0, errors.New("write failed")
+// httpFixture wires a mockService-backed mux and a request builder for a single
+// route, shared by every per-handler fixture in this package (loginFixture,
+// registerFixture, ...). Embed it and add the handler-specific svcResult/svcErr
+// fields on top.
+type httpFixture struct {
+	mux    *http.ServeMux
+	newReq func(body string) *http.Request
+}
+
+func newHTTPFixture(svc *mockService, method, path string) *httpFixture {
+	return &httpFixture{
+		mux: newAuthMux(svc),
+		newReq: func(body string) *http.Request {
+			return httptest.NewRequestWithContext(context.Background(), method, path, strings.NewReader(body))
+		},
+	}
+}
+
+// doRequest fires body through f.mux and returns the recorded response.
+func (f *httpFixture) doRequest(body string) *httptest.ResponseRecorder {
+	return testutil.ServeHTTP(f.mux, f.newReq(body))
+}
+
+// doRequestWithWriter fires body through f.mux against an arbitrary
+// http.ResponseWriter (e.g. errWriter, to exercise response-write-failure branches).
+func (f *httpFixture) doRequestWithWriter(w http.ResponseWriter, body string) {
+	f.mux.ServeHTTP(w, f.newReq(body))
 }
 
 type mockService struct {
@@ -72,18 +102,4 @@ func (m *mockService) RecoverAccount(ctx context.Context, req authdomain.Recover
 }
 func (m *mockService) InitRecoverAccount(ctx context.Context, req authdomain.RequestRecoverAccountRequest) error {
 	return m.initRecoverAccount(ctx, req)
-}
-
-func decodeBody(t *testing.T, body []byte) map[string]any {
-	t.Helper()
-	var m map[string]any
-	if err := json.Unmarshal(body, &m); err != nil {
-		t.Fatalf("failed to decode response body: %v", err)
-	}
-	return m
-}
-
-func withUser(r *http.Request) *http.Request {
-	user := &authdomain.User{ID: "user-123"}
-	return r.WithContext(appcontext.WithUser(r.Context(), user))
 }

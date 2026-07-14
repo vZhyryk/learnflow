@@ -1,5 +1,4 @@
 // Package testutil provides shared test doubles for service/repository unit tests.
-// It is imported only from _test.go files and never ships in a production binary.
 package testutil
 
 import (
@@ -14,16 +13,13 @@ var ErrDBUnexpected = errors.New("db connection lost")
 
 // ErrDB is a stand-in for an unexpected persistence-layer failure whose literal
 // text is itself asserted on (repository-layer tests that check
-// err.Error() ShouldContainSubstring "db error").
 var ErrDB = errors.New("db error")
 
 // ErrDBTimeout is a stand-in for an unexpected persistence-layer failure whose
 // literal text is itself asserted on (tests that check
-// err.Error() ShouldContainSubstring "db timeout").
 var ErrDBTimeout = errors.New("db timeout")
 
 // ErrRedisUnavailable is a stand-in for an unexpected Redis-layer failure
-// (SetNX, LPush, Publish, etc.) — the Redis equivalent of ErrDBUnexpected.
 var ErrRedisUnavailable = errors.New("redis unavailable")
 
 // AlwaysNil satisfies any mock field shaped func(context.Context, string) error

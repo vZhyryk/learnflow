@@ -75,7 +75,7 @@ const (
 
 	/* Token */
 	tokenColumns = ` id, user_id, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id `
-	// Create Token
+
 	createAccountRecoveryTokenSQL = `
 		INSERT INTO account_recovery_tokens (user_id, token_hash, expires_at)
 		VALUES ($1, $2, $3)
@@ -96,7 +96,6 @@ const (
 		VALUES ($1, $2, $3)
 		RETURNING` + tokenColumns
 
-	// Get Token by Hash
 	getAccountRecoveryTokenByHashSQL = `
 		SELECT` + tokenColumns + `FROM account_recovery_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() AND invalidated_at IS NULL FOR UPDATE NOWAIT`
 	getEmailChangeTokenByHashSQL = `
@@ -106,7 +105,6 @@ const (
 	getPasswordResetTokenByHashSQL = `
 		SELECT` + tokenColumns + `FROM password_reset_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() AND invalidated_at IS NULL FOR UPDATE NOWAIT`
 
-	// Mark Token as Used
 	markAccountRecoveryTokenUsedSQL = `
 		UPDATE account_recovery_tokens
 		SET used_at = now()

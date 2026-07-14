@@ -3,12 +3,9 @@ package authhttp_test
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	authdomain "learnflow_backend/internal/auth/domain"
-	authhttp "learnflow_backend/internal/auth/transport/http"
 	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -17,19 +14,13 @@ import (
 func TestInitRecoverAccount(t *testing.T) {
 	Convey("POST /api/v1/users/auth/account/recover", t, func() {
 		var svcErr error
-
 		svc := &mockService{
 			initRecoverAccount: func(_ context.Context, _ authdomain.RequestRecoverAccountRequest) error {
 				return svcErr
 			},
 		}
-		h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-		mux := http.NewServeMux()
-		h.RegisterRoutes(mux, authhttp.AuthRouteChains{})
-
-		newReq := func(body string) *http.Request {
-			return httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/users/auth/account/recover", strings.NewReader(body))
-		}
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/users/auth/account/recover")
+		mux, newReq := f.mux, f.newReq
 
 		Convey("Empty body → 400", func() {
 			w := testutil.ServeHTTP(mux, newReq(""))
@@ -67,9 +58,8 @@ func TestInitRecoverAccount(t *testing.T) {
 }
 
 type recoverAccountFixture struct {
+	*httpFixture
 	svcErr error
-	mux    *http.ServeMux
-	newReq func(body string) *http.Request
 }
 
 func newRecoverAccountFixture() *recoverAccountFixture {
@@ -79,12 +69,7 @@ func newRecoverAccountFixture() *recoverAccountFixture {
 			return f.svcErr
 		},
 	}
-	h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-	f.mux = http.NewServeMux()
-	h.RegisterRoutes(f.mux, authhttp.AuthRouteChains{})
-	f.newReq = func(body string) *http.Request {
-		return httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/api/v1/users/auth/account/recover", strings.NewReader(body))
-	}
+	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/users/auth/account/recover")
 	return f
 }
 

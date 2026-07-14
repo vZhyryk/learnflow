@@ -3,12 +3,10 @@ package authhttp_test
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
 	authdomain "learnflow_backend/internal/auth/domain"
-	authhttp "learnflow_backend/internal/auth/transport/http"
 	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -23,13 +21,8 @@ func TestInitiatePasswordReset(t *testing.T) {
 				return svcErr
 			},
 		}
-		h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-		mux := http.NewServeMux()
-		h.RegisterRoutes(mux, authhttp.AuthRouteChains{})
-
-		newReq := func(body string) *http.Request {
-			return httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/users/auth/password/reset", strings.NewReader(body))
-		}
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/users/auth/password/reset")
+		mux, newReq := f.mux, f.newReq
 
 		Convey("Empty body → 400", func() {
 			w := testutil.ServeHTTP(mux, newReq(""))
@@ -67,9 +60,8 @@ func TestInitiatePasswordReset(t *testing.T) {
 }
 
 type resetPasswordFixture struct {
+	*httpFixture
 	svcErr error
-	mux    *http.ServeMux
-	newReq func(body string) *http.Request
 }
 
 func newResetPasswordFixture() *resetPasswordFixture {
@@ -79,12 +71,7 @@ func newResetPasswordFixture() *resetPasswordFixture {
 			return f.svcErr
 		},
 	}
-	h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-	f.mux = http.NewServeMux()
-	h.RegisterRoutes(f.mux, authhttp.AuthRouteChains{})
-	f.newReq = func(body string) *http.Request {
-		return httptest.NewRequestWithContext(context.Background(), http.MethodPut, "/api/v1/users/auth/password/reset", strings.NewReader(body))
-	}
+	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/users/auth/password/reset")
 	return f
 }
 

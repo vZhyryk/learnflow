@@ -1,11 +1,5 @@
 package usershttp
 
-// This file is intentionally in the internal (non-_test-suffixed) package.
-// Every production caller in this module invokes decodeAndValidate with a
-// nil beforeValidateHook (see change_profile.go), so the "hook != nil" branch
-// is unreachable through any real HTTP route and cannot be exercised via the
-// exported mux — it can only be hit by calling decodeAndValidate directly.
-
 import (
 	"context"
 	"net/http"

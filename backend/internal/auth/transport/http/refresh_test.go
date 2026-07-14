@@ -3,22 +3,18 @@ package authhttp_test
 import (
 	"context"
 	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
 
 	authdomain "learnflow_backend/internal/auth/domain"
-	authhttp "learnflow_backend/internal/auth/transport/http"
 	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 type refreshFixture struct {
+	*httpFixture
 	svcResult *authdomain.AuthTokens
 	svcErr    error
-	mux       *http.ServeMux
-	newReq    func(body string) *http.Request
 }
 
 func newRefreshFixture() *refreshFixture {
@@ -28,12 +24,7 @@ func newRefreshFixture() *refreshFixture {
 			return f.svcResult, f.svcErr
 		},
 	}
-	h := authhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
-	f.mux = http.NewServeMux()
-	h.RegisterRoutes(f.mux, authhttp.AuthRouteChains{})
-	f.newReq = func(body string) *http.Request {
-		return httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/refresh", strings.NewReader(body))
-	}
+	f.httpFixture = newHTTPFixture(svc, http.MethodPost, "/api/v1/auth/refresh")
 	return f
 }
 

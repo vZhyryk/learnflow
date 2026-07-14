@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
 
@@ -11,14 +12,13 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// newTestEmailWorker returns an EmailWorker[string] with a discard logger — the only
-// dependency handleRunBLPopErrors touches. Redis and Process/Validate callbacks are
-// intentionally left unset: EmailWorker.redisClient is a concrete *redis.Client, so
-// handleMessage/Run (which call SetNX/BLPop against it) aren't unit-testable here.
-func newTestEmailWorker() *EmailWorker[string] {
-	return &EmailWorker[string]{
+func newTestEmailWorker() *EmailWorker[map[string]string] {
+	return &EmailWorker[map[string]string]{
 		logger: testutil.NewTestLogger(),
-		cfg:    Config[string]{EventType: "test.event"},
+		cfg: Config[map[string]string]{
+			EventType: "test.event",
+			Validate:  func(_ map[string]string) error { return nil },
+		},
 	}
 }
 
@@ -88,6 +88,65 @@ func TestHandleRunBLPopErrorsNoError(t *testing.T) {
 
 			So(shouldContinue, ShouldBeFalse)
 			So(shouldReturn, ShouldBeFalse)
+		})
+	})
+}
+
+func TestHandleMessage(t *testing.T) {
+	Convey("handleMessage", t, func() {
+		Convey("Invalid JSON", func() {
+			w := newTestEmailWorker()
+
+			result, idempotencyKey, err := w.handleMessage(context.Background(), "")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "unmarshal")
+			So(result, ShouldBeNil)
+			So(idempotencyKey, ShouldBeEmpty)
+		})
+
+		Convey("Break validate", func() {
+			w := newTestEmailWorker()
+			w.cfg.Validate = func(_ map[string]string) error {
+				return fmt.Errorf("some error")
+			}
+
+			result, idempotencyKey, err := w.handleMessage(context.Background(), `{"value": "value"}`)
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "some error")
+			So(result, ShouldBeNil)
+			So(idempotencyKey, ShouldBeEmpty)
+		})
+
+		Convey("JSON null payload (e.g. a nil interface published upstream)", func() {
+			w := &EmailWorker[events.RegistrationAttemptPayload]{
+				logger: testutil.NewTestLogger(),
+				cfg: Config[events.RegistrationAttemptPayload]{
+					EventType: "registration_attempt",
+					Validate:  ValidateRegistrationAttemptsPayload,
+				},
+			}
+
+			result, idempotencyKey, err := w.handleMessage(context.Background(), "null")
+
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "missing fields")
+			So(result, ShouldBeNil)
+			So(idempotencyKey, ShouldBeEmpty)
+		})
+
+		Convey("No redis (broken SetNX)", func() {
+			w := newTestEmailWorker()
+			w.cfg.Validate = func(_ map[string]string) error {
+				return nil
+			}
+
+			w.cfg.IdempotencyKey = func(_ map[string]string) string {
+				return "test_key:test_key"
+			}
+
+			So(func() {
+				_, _, _ = w.handleMessage(context.Background(), `{"value": "value"}`) //nolint:errcheck // panics before returning; asserted via ShouldPanic
+			}, ShouldPanic)
 		})
 	})
 }

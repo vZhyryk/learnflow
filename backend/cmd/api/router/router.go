@@ -44,10 +44,10 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 		token:  tokens.NewTokens(a.Config.Secret.JWTSecret, a.Config.Secret.JWTSecretPrev, a.Config.Secret.JWTIssuer, a.Config.Secret.JWTAudience),
 	}
 
-	router.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		if err := helpers.NotFoundResponse(w); err != nil {
-			a.Logger.Error(err, nil)
-		}
+	router.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		helpers.LogRespondError(a.Logger, r, "not_found_response_write", nil, func() error {
+			return helpers.NotFoundResponse(w)
+		})
 	}))
 
 	chains := route.buildChains()
@@ -78,13 +78,9 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	users.RegisterUsersRoutes(router, userSvc, chains.StaticWithAuth, a.Logger)
 
 	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		err := helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"status": "ok"}, nil)
-		if err != nil {
-			route.App.Logger.Error(err, map[string]any{
-				"method": r.Method,
-				"path":   r.URL.Path,
-			})
-		}
+		helpers.LogRespondError(route.App.Logger, r, "health_response_write", map[string]any{"method": r.Method}, func() error {
+			return helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"status": "ok"}, nil)
+		})
 	}))
 
 	router.Handle("GET /readiness", http.HandlerFunc(route.Readiness))

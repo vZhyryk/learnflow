@@ -18,7 +18,7 @@ func TestGetUserProfile(t *testing.T) {
 	Convey("Given a users service", t, func() {
 		var repoResult *usersdomain.UserProfile
 		var repoErr error
-		svc := New(&mockUserProfileRepo{
+		svc := newTestService(&mockUserProfileRepo{
 			getUserProfileByID: func(_ context.Context, _ string) (*usersdomain.UserProfile, error) {
 				return repoResult, repoErr
 			},

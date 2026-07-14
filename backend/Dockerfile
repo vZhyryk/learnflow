@@ -11,7 +11,7 @@ RUN go mod download
 
 FROM base AS dev
 
-RUN go install github.com/air-verse/air@latest
+RUN go install github.com/air-verse/air@v1.65.3
 
 COPY . .
 

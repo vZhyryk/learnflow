@@ -12,9 +12,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// newTestDLQRetryWorker assembles a DLQRetryWorker from a mock runner and publisher,
-// with a discard logger and a no-op transactor — the parts every test needs but none
-// varies on. A nil publisher is replaced with an empty mockPublisher.
 func newTestDLQRetryWorker(runner *testutil.MockQueryRunner, publisher *mockPublisher) *DLQRetryWorker {
 	if publisher == nil {
 		publisher = &mockPublisher{}
@@ -22,21 +19,12 @@ func newTestDLQRetryWorker(runner *testutil.MockQueryRunner, publisher *mockPubl
 	return NewDLQRetryWorker(runner, publisher, testutil.NewTestLogger(), testutil.NoopTransactor{})
 }
 
-// capturingExecFn returns a MockQueryRunner.ExecFn that records the SQL and args of
-// the call into query/args and reports a successful single-row update.
-func capturingExecFn(query *string, args *[]any) func(context.Context, string, ...any) (pgconn.CommandTag, error) {
-	return func(_ context.Context, sql string, a ...any) (pgconn.CommandTag, error) {
-		*query, *args = sql, a
-		return pgconn.NewCommandTag("UPDATE 1"), nil
-	}
-}
-
 func fakeFailedJobScan(job FailedJob) func(dest ...any) error {
 	return func(dest ...any) error {
 		*testutil.CastStr(dest[0], 0) = job.ID
 		*castEventType(dest[1], 1) = job.EventType
 		*testutil.CastStr(dest[2], 2) = job.QueueName
-		*testutil.CastPtrStr(dest[3], 3) = job.PayloadJSON
+		*testutil.CastStr(dest[3], 3) = job.PayloadJSON
 		*testutil.CastInt(dest[4], 4) = job.AttemptCount
 		return nil
 	}
@@ -93,8 +81,8 @@ func TestGetFailedJobs(t *testing.T) {
 
 		Convey("When rows return valid entries", func() {
 			payload1, payload2 := `{"a":"b"}`, `{"c":"d"}`
-			job1 := FailedJob{ID: "job-1", EventType: events.EventUserRegistered, QueueName: "email_queue", PayloadJSON: &payload1, AttemptCount: 1}
-			job2 := FailedJob{ID: "job-2", EventType: events.EventPasswordReset, QueueName: "email_queue", PayloadJSON: &payload2, AttemptCount: 2}
+			job1 := FailedJob{ID: "job-1", EventType: events.EventUserRegistered, QueueName: "email_queue", PayloadJSON: payload1, AttemptCount: 1}
+			job2 := FailedJob{ID: "job-2", EventType: events.EventPasswordReset, QueueName: "email_queue", PayloadJSON: payload2, AttemptCount: 2}
 
 			runner := &testutil.MockQueryRunner{
 				QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
@@ -139,29 +127,6 @@ func TestHandleFailedJobEntryUnknownEventType(t *testing.T) {
 	})
 }
 
-func TestHandleFailedJobEntryNilPayload(t *testing.T) {
-	Convey("Given a DLQRetryWorker", t, func() {
-		Convey("When payload_json is NULL", func() {
-			var gotQuery string
-			var gotArgs []any
-			runner := &testutil.MockQueryRunner{ExecFn: capturingExecFn(&gotQuery, &gotArgs)}
-			publisher := &mockPublisher{
-				publish: func(_ context.Context, _ events.EventType, _ any) error {
-					t.Fatal("Publish should not be called for a nil payload")
-					return nil
-				},
-			}
-			w := newTestDLQRetryWorker(runner, publisher)
-
-			w.handleFailedJobEntry(context.Background(), FailedJob{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: nil})
-
-			So(gotQuery, ShouldEqual, markAsRetriedFailedSQL)
-			So(gotArgs[0], ShouldEqual, "job-1")
-			So(gotArgs[1], ShouldContainSubstring, "payload_json is NULL")
-		})
-	})
-}
-
 func TestHandleFailedJobEntryPublishFails(t *testing.T) {
 	Convey("Given a DLQRetryWorker", t, func() {
 		Convey("When Publish fails, the entry is marked failed (no retry within this call)", func() {
@@ -176,7 +141,7 @@ func TestHandleFailedJobEntryPublishFails(t *testing.T) {
 			w := newTestDLQRetryWorker(runner, publisher)
 
 			payload := `{"a":"b"}`
-			w.handleFailedJobEntry(context.Background(), FailedJob{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: &payload})
+			w.handleFailedJobEntry(context.Background(), FailedJob{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: payload})
 
 			So(gotQuery, ShouldEqual, markAsRetriedFailedSQL)
 			So(gotArgs[0], ShouldEqual, "job-1")
@@ -202,7 +167,7 @@ func TestHandleFailedJobEntryMarkFailedItselfFails(t *testing.T) {
 
 			// Nothing to assert beyond "this does not panic" — the Exec error is only logged.
 			payload := `{"a":"b"}`
-			w.handleFailedJobEntry(context.Background(), FailedJob{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: &payload})
+			w.handleFailedJobEntry(context.Background(), FailedJob{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: payload})
 		})
 	})
 }
@@ -226,7 +191,7 @@ func TestHandleFailedJobEntrySuccess(t *testing.T) {
 
 			payload := `{"a":"b"}`
 			w.handleFailedJobEntry(context.Background(), FailedJob{
-				ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: &payload,
+				ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: payload,
 			})
 
 			So(publishedType, ShouldEqual, events.EventUserRegistered)
@@ -252,7 +217,38 @@ func TestHandleFailedJobEntrySuccessNoRowsAffected(t *testing.T) {
 
 			// Nothing to assert beyond "this does not panic" — a zero-rows update is only logged.
 			payload := `{"a":"b"}`
-			w.handleFailedJobEntry(context.Background(), FailedJob{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: &payload})
+			w.handleFailedJobEntry(context.Background(), FailedJob{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: payload})
+		})
+	})
+}
+
+func TestHandleFailedJobEntrySuccessButMarkRetriedExecFails(t *testing.T) {
+	Convey("Given a DLQRetryWorker", t, func() {
+		Convey("When Publish succeeds but the mark-retried-success update fails", func() {
+			var publishedType events.EventType
+			var publishedPayload any
+			runner := &testutil.MockQueryRunner{
+				ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+					return pgconn.CommandTag{}, testutil.ErrDBUnexpected
+				},
+			}
+			publisher := &mockPublisher{
+				publish: func(_ context.Context, et events.EventType, payload any) error {
+					publishedType = et
+					publishedPayload = payload
+					return nil
+				},
+			}
+			w := newTestDLQRetryWorker(runner, publisher)
+
+			payload := `{"a":"b"}`
+			// Nothing to assert beyond "this does not panic" — the Exec error is only logged, and the
+			// transaction still commits at the poll() level despite this failure (see handleFailedJobEntry's
+			// void signature).
+			w.handleFailedJobEntry(context.Background(), FailedJob{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: payload})
+
+			So(publishedType, ShouldEqual, events.EventUserRegistered)
+			So(publishedPayload, ShouldResemble, json.RawMessage(`{"a":"b"}`))
 		})
 	})
 }
@@ -273,7 +269,7 @@ func TestDLQRetryWorkerPoll(t *testing.T) {
 
 		Convey("When there are pending entries", func() {
 			payload := `{"a":"b"}`
-			job := FailedJob{ID: "job-1", EventType: events.EventUserRegistered, QueueName: "email_queue", PayloadJSON: &payload, AttemptCount: 1}
+			job := FailedJob{ID: "job-1", EventType: events.EventUserRegistered, QueueName: "email_queue", PayloadJSON: payload, AttemptCount: 1}
 			queryCalls, publishCalls := 0, 0
 			runner := &testutil.MockQueryRunner{
 				QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {

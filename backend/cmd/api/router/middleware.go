@@ -25,13 +25,9 @@ func (routes *RouteHandler) RecoverPanic(next http.Handler) http.Handler {
 					"stack":  string(debug.Stack()),
 				})
 
-				err = helpers.WriteJSON(w, http.StatusInternalServerError, helpers.Envelope{"error": "internal server error"}, nil)
-				if err != nil {
-					routes.App.Logger.Error(fmt.Errorf("response err: %v", err), map[string]any{
-						"method": r.Method,
-						"url":    r.URL.String(),
-					})
-				}
+				helpers.LogRespondError(routes.App.Logger, r, "panic_response_write", map[string]any{"method": r.Method, "url": r.URL.String()}, func() error {
+					return helpers.WriteJSON(w, http.StatusInternalServerError, helpers.Envelope{"error": "internal server error"}, nil)
+				})
 			}
 		}()
 		next.ServeHTTP(w, r)
@@ -92,27 +88,36 @@ func (route *RouteHandler) NewRouteRateLimiter(rps float64, duration time.Durati
 			key := getKeyFunc(r)
 			allowed, err := redisRateLimit(r.Context(), route.App.Redis, key, rps, burst, duration)
 			if err != nil {
-				route.App.Logger.Error(fmt.Errorf("rate limiter: %w", err), map[string]any{
-					"method":         r.Method,
-					"path":           r.URL.Path,
-					"rate_limit_key": key,
-					"request_id":     appcontext.RequestIDFromContext(r.Context()),
-				})
-				if respErr := helpers.ServerErrorResponse(w); respErr != nil {
-					route.App.Logger.Error(respErr, map[string]any{
-						"method": r.Method,
-						"path":   r.URL.Path,
-					})
-				}
+				route.respondRateLimiterError(w, r, key, err)
 				return
 			}
 			if !allowed {
-				route.RateLimitExceededResponse(w, r)
+				route.respondRateLimitExceeded(w, r)
 				return
 			}
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// respondRateLimiterError logs the underlying Redis/rate-limiter failure and writes a 500.
+func (route *RouteHandler) respondRateLimiterError(w http.ResponseWriter, r *http.Request, key string, err error) {
+	route.App.Logger.Error(fmt.Errorf("rate limiter: %w", err), map[string]any{
+		"method":         r.Method,
+		"path":           r.URL.Path,
+		"rate_limit_key": key,
+		"request_id":     appcontext.RequestIDFromContext(r.Context()),
+	})
+	helpers.LogRespondError(route.App.Logger, r, "rate_limiter_error_response_write", map[string]any{"method": r.Method}, func() error {
+		return helpers.ServerErrorResponse(w)
+	})
+}
+
+// respondRateLimitExceeded writes a 429 for a request that exhausted its rate-limit bucket.
+func (route *RouteHandler) respondRateLimitExceeded(w http.ResponseWriter, r *http.Request) {
+	helpers.LogRespondError(route.App.Logger, r, "rate_limit_exceeded_response_write", map[string]any{"method": r.Method}, func() error {
+		return helpers.RateLimitExceededResponse(w)
+	})
 }
 
 // Timeout enforces a 30-second request timeout by wrapping the context.
@@ -161,27 +166,21 @@ func (routes *RouteHandler) RequestLogger(next http.Handler) http.Handler {
 func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.SplitN(r.Header.Get("Authorization"), " ", 2)
+		authProps := map[string]any{"method": r.Method, "ip": appcontext.IPAddressFromContext(r.Context())}
+
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			if err := helpers.InvalidCredentialsResponse(w); err != nil {
-				route.App.Logger.Error(err, map[string]any{
-					"method": r.Method,
-					"path":   r.URL.Path,
-					"ip":     appcontext.IPAddressFromContext(r.Context()),
-				})
-			}
+			helpers.LogRespondError(route.App.Logger, r, "auth_missing_bearer_response_write", authProps, func() error {
+				return helpers.InvalidCredentialsResponse(w)
+			})
 			return
 		}
 
 		tokenStr := parts[1]
 		claims, err := route.token.ValidateToken(tokenStr)
 		if err != nil {
-			if respErr := helpers.InvalidCredentialsResponse(w); respErr != nil {
-				route.App.Logger.Error(respErr, map[string]any{
-					"method": r.Method,
-					"path":   r.URL.Path,
-					"ip":     appcontext.IPAddressFromContext(r.Context()),
-				})
-			}
+			helpers.LogRespondError(route.App.Logger, r, "auth_invalid_token_response_write", authProps, func() error {
+				return helpers.InvalidCredentialsResponse(w)
+			})
 			return
 		}
 
@@ -218,22 +217,18 @@ func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request,
 			"path":       r.URL.Path,
 			"request_id": appcontext.RequestIDFromContext(r.Context()),
 		})
-		if respErr := helpers.ServerErrorResponse(w); respErr != nil {
-			route.App.Logger.Error(respErr, map[string]any{
-				"method":     r.Method,
-				"path":       r.URL.Path,
-				"request_id": appcontext.RequestIDFromContext(r.Context()),
-			})
-		}
+		helpers.LogRespondError(route.App.Logger, r, "auth_redis_error_response_write", map[string]any{
+			"method":     r.Method,
+			"request_id": appcontext.RequestIDFromContext(r.Context()),
+		}, func() error {
+			return helpers.ServerErrorResponse(w)
+		})
 		return wrapped
 	}
 	if blocked > 0 {
-		if respErr := helpers.InvalidCredentialsResponse(w); respErr != nil {
-			route.App.Logger.Error(respErr, map[string]any{
-				"method": r.Method,
-				"path":   r.URL.Path,
-			})
-		}
+		helpers.LogRespondError(route.App.Logger, r, "auth_blocked_response_write", map[string]any{"method": r.Method}, func() error {
+			return helpers.InvalidCredentialsResponse(w)
+		})
 		return fmt.Errorf("%s invalid credentials", key)
 	}
 

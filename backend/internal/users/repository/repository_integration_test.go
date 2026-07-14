@@ -19,9 +19,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// dummyPasswordHash is a well-formed 60-char bcrypt hash — the users.password_hash
-// column is varchar(60) NOT NULL, so fixtures must satisfy the column width even
-// though this module never reads or verifies the hash itself.
 const dummyPasswordHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
 
 const insertTestUserSQL = `
@@ -36,8 +33,6 @@ const insertTestProfileSQL = `
 	)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 
-// randomTestEmail avoids colliding with the unique-active-email index across
-// concurrent test runs sharing the same database.
 func randomTestEmail(t *testing.T) string {
 	t.Helper()
 
@@ -48,10 +43,6 @@ func randomTestEmail(t *testing.T) string {
 	return fmt.Sprintf("users-repo-integration-%s@example.com", hex.EncodeToString(buf))
 }
 
-// insertTestUser creates a row in `users` so a `user_profiles` row can satisfy its
-// FK (ON DELETE RESTRICT) — the users module owns no user-creation SQL itself
-// (that lives in internal/auth/repository), so fixtures replicate the shape
-// directly rather than importing across bounded contexts.
 func insertTestUser(t *testing.T, ctx context.Context, tx pgx.Tx) string {
 	t.Helper()
 
@@ -143,7 +134,7 @@ func TestGetUserProfileByID_Integration(t *testing.T) {
 				userID := insertTestUser(t, ctx, tx)
 				seed := &usersdomain.UserProfile{
 					UserID:     userID,
-					UILanguage: "uk", // NOT NULL DEFAULT 'uk' at the column level, but repository always inserts explicitly
+					UILanguage: "uk",
 				}
 				insertTestProfile(t, ctx, tx, seed)
 
@@ -167,11 +158,6 @@ func TestGetUserProfileByID_Integration(t *testing.T) {
 			})
 		})
 
-		// user_profiles has no deleted_at of its own and getProfileByUserIDSQL never
-		// joins against users.deleted_at — this is intentional (a soft-deleted user's
-		// profile row stays readable/writable since ON DELETE RESTRICT keeps it alive),
-		// but it's exactly the kind of cross-table invariant a mocked QueryRunner can't
-		// verify, so it's pinned down here.
 		Convey("When the owning user is soft-deleted", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
@@ -242,11 +228,6 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 			})
 		})
 
-		// The service layer validates gender via ChangeUserProfileRequest.Validate()
-		// before calling the repository, but the repository itself performs no
-		// validation — the DB CHECK constraint (user_profiles_gender_check) is the
-		// last line of defense against bad data reaching the table directly. A mock
-		// QueryRunner would happily accept any string here.
 		Convey("When the update violates a CHECK constraint at the DB level", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
@@ -263,7 +244,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 				So(errors.Is(err, usersdomain.ErrUserNotFound), ShouldBeFalse)
 				var pgErr *pgconn.PgError
 				So(errors.As(err, &pgErr), ShouldBeTrue)
-				So(pgErr.Code, ShouldEqual, "23514") // check_violation
+				So(pgErr.Code, ShouldEqual, "23514")
 			})
 
 			Convey("When the update violates the country CHECK constraint", func() {
@@ -281,7 +262,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 					So(err, ShouldNotBeNil)
 					var pgErr *pgconn.PgError
 					So(errors.As(err, &pgErr), ShouldBeTrue)
-					So(pgErr.Code, ShouldEqual, "23514") // check_violation
+					So(pgErr.Code, ShouldEqual, "23514")
 					So(pgErr.ConstraintName, ShouldEqual, "user_profiles_country_check")
 				})
 			})
@@ -301,7 +282,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 					So(err, ShouldNotBeNil)
 					var pgErr *pgconn.PgError
 					So(errors.As(err, &pgErr), ShouldBeTrue)
-					So(pgErr.Code, ShouldEqual, "23514") // check_violation
+					So(pgErr.Code, ShouldEqual, "23514")
 					So(pgErr.ConstraintName, ShouldEqual, "user_profiles_dob_not_future")
 				})
 			})
@@ -321,7 +302,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 					So(err, ShouldNotBeNil)
 					var pgErr *pgconn.PgError
 					So(errors.As(err, &pgErr), ShouldBeTrue)
-					So(pgErr.Code, ShouldEqual, "23514") // check_violation
+					So(pgErr.Code, ShouldEqual, "23514")
 					So(pgErr.ConstraintName, ShouldEqual, "user_profiles_dob_min")
 				})
 			})
@@ -329,11 +310,6 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 	})
 }
 
-// TestUserProfileForeignKeyRestrict_Integration pins down that user_profiles'
-// FK to users is ON DELETE RESTRICT — a hard delete of a user with an existing
-// profile must fail at the DB level. This is infrastructure the users module
-// relies on (soft delete is the only supported deletion path) but doesn't
-// enforce itself in Go, so a mocked QueryRunner can't catch a regression here.
 func TestUserProfileForeignKeyRestrict_Integration(t *testing.T) {
 	pool := testutil.NewTestPool(t)
 
@@ -348,7 +324,7 @@ func TestUserProfileForeignKeyRestrict_Integration(t *testing.T) {
 				So(err, ShouldNotBeNil)
 				var pgErr *pgconn.PgError
 				So(errors.As(err, &pgErr), ShouldBeTrue)
-				So(pgErr.Code, ShouldEqual, "23503") // foreign_key_violation
+				So(pgErr.Code, ShouldEqual, "23503")
 			})
 		})
 	})

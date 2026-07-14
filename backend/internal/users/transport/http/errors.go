@@ -46,5 +46,5 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 // response itself. The write error is only logged, never returned — by this point the
 // handler has already decided what to respond with, and callers have nothing left to do.
 func (h *Handler) handleErrorRespond(r *http.Request, caseName string, fn func() error) {
-	helpers.LogRespondError(h.jsonLogger, r, caseName, fn)
+	helpers.LogRespondError(h.jsonLogger, r, caseName, nil, fn)
 }

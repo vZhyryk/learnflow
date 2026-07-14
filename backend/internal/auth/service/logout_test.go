@@ -13,9 +13,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-// newLogoutTestContext only carries the authenticated user. Service.Logout reads
-// JTI/AccessTokenExpiresAt from the request (populated by the HTTP handler from
-// context), never from ctx directly — so ctx has no reason to carry them here.
 func newLogoutTestContext(user *authdomain.User) context.Context {
 	return appcontext.WithUser(context.Background(), user)
 }

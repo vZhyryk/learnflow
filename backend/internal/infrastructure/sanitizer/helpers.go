@@ -39,9 +39,24 @@ func (s *Sanitizer) SanitizeString(value string) string {
 	return stringsx.TruncateString(s.MaskInlineSecrets(value), s.maxStringLen)
 }
 
+// pathLikeKeys are property keys whose string value is a URL/request path —
+// these get segment-aware redaction via SanitizePath instead of the generic
+// key=value scan, since a secret embedded directly in a path segment (e.g.
+// "/auth/reset-password/<token>") has no "key=value" marker for
+// MaskInlineSecrets to find.
+var pathLikeKeys = map[string]struct{}{
+	"path": {}, "urlpath": {}, "requestpath": {}, "requesturi": {},
+}
+
 func (s *Sanitizer) sanitizeMapValue(key string, value any) any {
 	if s.IsSensitiveKey(key) {
 		return s.redactedValue
+	}
+
+	if str, ok := value.(string); ok {
+		if _, isPath := pathLikeKeys[normalizeSensitiveKey(key)]; isPath {
+			return s.SanitizePath(str)
+		}
 	}
 
 	return s.Sanitize(value)

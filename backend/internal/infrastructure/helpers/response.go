@@ -36,3 +36,9 @@ func ErrorResponse(w http.ResponseWriter, status int, msg string) error {
 func NotFoundResponse(w http.ResponseWriter) error {
 	return ErrorResponse(w, http.StatusNotFound, "the requested resource could not be found")
 }
+
+// RateLimitExceededResponse writes a 429 Too Many Requests response with a Retry-After header.
+func RateLimitExceededResponse(w http.ResponseWriter) error {
+	w.Header().Set("Retry-After", "60")
+	return ErrorResponse(w, http.StatusTooManyRequests, "rate limit exceeded")
+}

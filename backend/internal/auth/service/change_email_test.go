@@ -36,8 +36,6 @@ func validGetUserByEmail(_ context.Context, _ string) (*authdomain.User, error) 
 	return nil, authdomain.ErrUserNotFound
 }
 
-// initiateEmailChangeGetUserByID returns the "current user" fixture shared by
-// InitiateEmailChange tests that need a resolvable owner of the email-change request.
 func initiateEmailChangeGetUserByID(_ context.Context, _ string) (*authdomain.User, error) {
 	return &authdomain.User{ID: "user-123", Email: "old@example.com"}, nil
 }

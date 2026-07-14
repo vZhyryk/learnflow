@@ -327,7 +327,7 @@ func (m *mockTokenRepo) MarkAccountRecoveryTokenUsed(ctx context.Context, tokenH
 	return m.markAccountRecoveryTokenUsed(ctx, tokenHash)
 }
 
-// mockRedis implements RedisOps for JTI blocklist tests.
+// mockRedis implements NXSetter for JTI blocklist tests.
 type mockRedis struct {
 	setNX func(ctx context.Context, key string, value any, exp time.Duration) *redis.BoolCmd
 }

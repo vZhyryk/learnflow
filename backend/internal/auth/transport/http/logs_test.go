@@ -2,20 +2,18 @@ package authhttp
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"learnflow_backend/internal/infrastructure/logger"
-	"learnflow_backend/internal/infrastructure/sanitizer"
+	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func newHandlerForLog() *Handler {
 	return &Handler{
-		jsonLogger: logger.New(io.Discard, sanitizer.NewSanitizer("***", 100, nil), logger.LevelFatal),
+		jsonLogger: testutil.NewTestLogger(),
 	}
 }
 

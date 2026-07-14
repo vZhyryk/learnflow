@@ -52,9 +52,7 @@ func ExtractTx(ctx context.Context) (pgx.Tx, bool) {
 	return tx, ok
 }
 
-// FallbackQueryRunner returns the active transaction from ctx (set by InTransaction) if
-// present, otherwise fallback. Repositories/writers call this so the same method works
-// both inside and outside a transaction without the caller having to know which.
+// FallbackQueryRunner returns the active transaction from ctx (set by InTransaction) if present, otherwise fallback.
 func FallbackQueryRunner(ctx context.Context, fallback QueryRunner) QueryRunner {
 	if tx, ok := ExtractTx(ctx); ok {
 		return tx

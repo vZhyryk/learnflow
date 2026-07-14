@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/mailer"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type mockMailer struct {
@@ -37,4 +39,11 @@ func castEventType(v any, idx int) *events.EventType {
 		panic(fmt.Sprintf("dest[%d]: expected *events.EventType, got %T", idx, v))
 	}
 	return s
+}
+
+func capturingExecFn(query *string, args *[]any) func(context.Context, string, ...any) (pgconn.CommandTag, error) {
+	return func(_ context.Context, sql string, a ...any) (pgconn.CommandTag, error) {
+		*query, *args = sql, a
+		return pgconn.NewCommandTag("UPDATE 1"), nil
+	}
 }

@@ -118,7 +118,9 @@ func (r *MockRows) Scan(dest ...any) error {
 }
 
 // Close is a no-op; MockRows has no underlying connection to release.
-func (r *MockRows) Close() {}
+func (r *MockRows) Close() {
+	// no-op: MockRows has no underlying connection to release.
+}
 
 // Err returns RowsErr, the error to surface after iteration completes.
 func (r *MockRows) Err() error { return r.RowsErr }
