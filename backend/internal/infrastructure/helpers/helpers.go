@@ -1,0 +1,112 @@
+package helpers
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"learnflow_backend/internal/infrastructure/logger"
+	"maps"
+	"net/http"
+	"strings"
+)
+
+// Envelope is the standard HTTP response wrapper.
+type Envelope map[string]any
+
+// NewEnvelope wraps a map into an Envelope response.
+func NewEnvelope(uEnvelopeData map[string]any) Envelope {
+	return uEnvelopeData
+}
+
+// WriteJSON marshals data to JSON and writes it to the response with the given status and headers.
+func WriteJSON(w http.ResponseWriter, status int, data Envelope, headers http.Header) error {
+	js, err := json.MarshalIndent(data, "", "\t")
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON: %w", err)
+	}
+	js = append(js, '\n')
+
+	maps.Copy(w.Header(), headers)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	if _, err := w.Write(js); err != nil {
+		return fmt.Errorf("error writing JSON response: %w", err)
+	}
+
+	return nil
+}
+
+// ReadJSON decodes a JSON request body into dst, enforcing a 1 MB size limit, rejecting
+// unknown fields, and rejecting bodies that contain more than one JSON value.
+func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, 1_048_576)
+
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	err := dec.Decode(dst)
+	if err != nil {
+		return parseJSONError(err)
+	}
+
+	err = dec.Decode(&struct{}{})
+	if !errors.Is(err, io.EOF) {
+		return errors.New("body must only contain a single JSON value")
+	}
+
+	return nil
+}
+
+// LogRespondError runs fn (a response-writing call) and logs a failure to write the
+// response itself. The write error is only logged, never returned — by this point the
+// caller has already decided what to respond with, and has nothing left to do. props is
+// merged into the logged properties alongside case/path, letting callers keep request
+// context (method, ip, request_id, ...) that doesn't fit the base shape; it may be nil.
+func LogRespondError(jsonLogger *logger.Logger, r *http.Request, caseName string, props map[string]any, fn func() error) {
+	if err := fn(); err != nil {
+		merged := map[string]any{"case": caseName, "path": r.URL.Path}
+		for k, v := range props {
+			merged[k] = v
+		}
+		jsonLogger.Error(err, merged)
+	}
+}
+
+func parseJSONError(err error) error {
+	var syntaxError *json.SyntaxError
+	var unmarshalTypeError *json.UnmarshalTypeError
+	var invalidUnmarshalError *json.InvalidUnmarshalError
+	var maxBytesError *http.MaxBytesError
+
+	switch {
+	case errors.As(err, &syntaxError):
+		return fmt.Errorf("body contains badly-formed JSON (at character %d)", syntaxError.Offset)
+
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		return errors.New("body contains badly-formed JSON")
+
+	case errors.As(err, &unmarshalTypeError):
+		if unmarshalTypeError.Field != "" {
+			return fmt.Errorf("body contains incorrect JSON type for field %q", unmarshalTypeError.Field)
+		}
+		return fmt.Errorf("body contains incorrect JSON type (at character %d)", unmarshalTypeError.Offset)
+
+	case errors.Is(err, io.EOF):
+		return errors.New("body must not be empty")
+
+	case strings.HasPrefix(err.Error(), "json: unknown field "):
+		fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
+		return fmt.Errorf("body contains unknown key %s", fieldName)
+
+	case errors.As(err, &maxBytesError):
+		return fmt.Errorf("body must not be larger than %d bytes", maxBytesError.Limit)
+
+	case errors.As(err, &invalidUnmarshalError):
+		return fmt.Errorf("invalid unmarshal target: %w", err)
+
+	default:
+		return fmt.Errorf("error parsing JSON: %w", err)
+	}
+}

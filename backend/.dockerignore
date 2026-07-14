@@ -1,11 +1,11 @@
-# Ігноруємо Git-метадані, бо вони не потрібні всередині Docker build context.
+# Exclude Git metadata — not needed inside the Docker build context.
 .git
 
-# Ігноруємо тимчасові файли air і локальні build-артефакти.
+# Exclude Air temporary files and local build artifacts.
 tmp
 
-# Ігноруємо лог-файли локальної розробки.
+# Exclude local development log files.
 *.log
 
-# Ігноруємо editor-специфічні каталоги.
+# Exclude editor-specific directories.
 .vscode

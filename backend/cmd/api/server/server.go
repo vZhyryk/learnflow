@@ -30,13 +30,15 @@ func NewServer(r *router.RouteHandler, a *app.App) *Server {
 // then performs a graceful shutdown waiting up to 20 seconds for in-flight requests.
 func (server *Server) Serve() error {
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", server.App.Config.Port),
-		Handler:      server.Router.Router,
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		// http.Server.ErrorLog вимагає *log.Logger; використовуємо кастомний logger як Writer
-		ErrorLog: log.New(server.App.Logger, "", 0),
+		Addr:              fmt.Sprintf(":%d", server.App.Config.Port),
+		Handler:           server.Router.Router,
+		IdleTimeout:       server.App.Config.Timeouts.IdleTimeout,
+		ReadTimeout:       server.App.Config.Timeouts.ReadTimeout,
+		WriteTimeout:      server.App.Config.Timeouts.WriteTimeout,
+		ReadHeaderTimeout: server.App.Config.Timeouts.ReadHeaderTimeout,
+		// http.Server.ErrorLog requires *log.Logger; use the custom logger as its Writer
+		ErrorLog:       log.New(server.App.Logger, "", 0),
+		MaxHeaderBytes: 1 << 20, // 1MB
 	}
 
 	shutdownError := make(chan error)
@@ -45,6 +47,7 @@ func (server *Server) Serve() error {
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		s := <-quit
+		server.App.Cancel()
 
 		server.App.Logger.Info("caught signal", map[string]any{
 			"signal": s.String(),

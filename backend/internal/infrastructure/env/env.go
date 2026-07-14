@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // GetStringEnv returns the string value of key, trimming whitespace.
@@ -29,6 +30,20 @@ func GetIntEnv(key string, fallback int) int {
 		return fallback
 	}
 	v, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil {
+		return fallback
+	}
+	return v
+}
+
+// GetDurationEnv returns the time.Duration value of key.
+// Returns fallback if the variable is unset, blank, or not a valid duration.
+func GetDurationEnv(key string, fallback time.Duration) time.Duration {
+	raw, ok := os.LookupEnv(key)
+	if !ok {
+		return fallback
+	}
+	v, err := time.ParseDuration(strings.TrimSpace(raw))
 	if err != nil {
 		return fallback
 	}

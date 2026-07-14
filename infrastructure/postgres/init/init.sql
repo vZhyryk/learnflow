@@ -10,7 +10,8 @@
 --         consultation_outcomes, campaigns, expenses, notification_preferences,
 --         notifications, announcements, activity_log, event_outbox, failed_jobs,
 --         admin_actions, support_chats, support_messages,
---         account_recovery_tokens, articles, gift_coupons
+--         account_recovery_tokens, articles, gift_coupons, user_sessions
+-- Synced through: migration 000005
 
 -- Index naming convention: idx_{table}_{col1}_{col2}[_{qualifier}]
 --   qualifier = domain condition key: active, available, booked, pending, open, unread, unresolved, unused
@@ -24,22 +25,34 @@ CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 CREATE TABLE users (
     id                  uuid            PRIMARY KEY DEFAULT gen_random_uuid(),
     email               varchar(254)    NOT NULL,
-    password_hash       text            NOT NULL,
+    password_hash       varchar(60)     NOT NULL,
     role                text            NOT NULL CONSTRAINT users_role_check   CHECK (role IN ('user', 'subadmin', 'admin')),
-    status              text            NOT NULL CONSTRAINT users_status_check CHECK (status IN ('active', 'blocked')),
+    status              text            NOT NULL CONSTRAINT users_status_check CHECK (status IN ('active', 'blocked', 'pending_verification', 'deleted')),
     email_verified_at   timestamptz,
     last_login_at       timestamptz,
     deleted_at          timestamptz,
     created_at          timestamptz     NOT NULL DEFAULT now(),
     updated_at          timestamptz     NOT NULL DEFAULT now(),
-    CONSTRAINT users_email_nonempty                   CHECK (btrim(email) <> ''),
-    CONSTRAINT users_email_verified_at_after_created  CHECK (email_verified_at IS NULL OR email_verified_at >= created_at),
-    CONSTRAINT users_last_login_at_after_created      CHECK (last_login_at IS NULL OR last_login_at >= created_at),
-    CONSTRAINT users_deleted_at_after_created         CHECK (deleted_at IS NULL OR deleted_at >= created_at)
+    password_changed_at    timestamptz,
+    email_changed_at       timestamptz,
+    failed_login_count     integer     NOT NULL DEFAULT 0,
+    last_failed_login_at   timestamptz,
+    login_locked_until     timestamptz,
+
+    CONSTRAINT users_email_nonempty                        CHECK (btrim(email) <> ''),
+    CONSTRAINT users_email_verified_at_after_created       CHECK (email_verified_at IS NULL OR email_verified_at >= created_at),
+    CONSTRAINT users_last_login_at_after_created           CHECK (last_login_at IS NULL OR last_login_at >= created_at),
+    CONSTRAINT users_deleted_at_after_created              CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    CONSTRAINT users_failed_login_count_non_negative       CHECK (failed_login_count >= 0)
 );
 
 -- Unique email only among non-deleted users (case-insensitive)
 CREATE UNIQUE INDEX idx_users_email_active_unique ON users(LOWER(email)) WHERE deleted_at IS NULL;
+
+-- Non-unique lookup index for soft-deleted users by email (case-insensitive).
+-- Not UNIQUE: multiple soft-deleted rows can legitimately share an email
+-- (register -> delete -> someone else registers the same email -> delete).
+CREATE INDEX idx_users_email_deleted ON users(LOWER(email)) WHERE deleted_at IS NOT NULL;
 
 -- ---------------------------------------------------------------------------
 -- 2. USER PROFILES
@@ -72,10 +85,12 @@ CREATE TABLE user_profiles (
 CREATE TABLE email_verification_tokens (
     id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    token_hash  text        NOT NULL CONSTRAINT email_verification_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
-    expires_at  timestamptz NOT NULL,
-    used_at     timestamptz,
-    created_at  timestamptz NOT NULL DEFAULT now(),
+    token_hash  varchar(64)        NOT NULL CONSTRAINT email_verification_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
+    expires_at              timestamptz NOT NULL,
+    used_at                 timestamptz,
+    invalidated_at          timestamptz,
+    invalidated_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    created_at              timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT email_verification_tokens_token_hash_unique    UNIQUE (token_hash),
     CONSTRAINT email_verification_tokens_expires_after_created CHECK (expires_at > created_at),
     CONSTRAINT email_verification_tokens_used_after_created   CHECK (used_at IS NULL OR used_at >= created_at)
@@ -84,13 +99,19 @@ CREATE TABLE email_verification_tokens (
 CREATE INDEX idx_email_verification_tokens_user_id_unused
     ON email_verification_tokens(user_id) WHERE used_at IS NULL;
 
+-- Cleanup job: find expired-but-unused tokens for pruning
+CREATE INDEX idx_email_verification_tokens_expires_at_unused
+    ON email_verification_tokens(expires_at) WHERE used_at IS NULL;
+
 CREATE TABLE password_reset_tokens (
     id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    token_hash  text        NOT NULL CONSTRAINT password_reset_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
-    expires_at  timestamptz NOT NULL,
-    used_at     timestamptz,
-    created_at  timestamptz NOT NULL DEFAULT now(),
+    token_hash  varchar(64)        NOT NULL CONSTRAINT password_reset_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
+    expires_at              timestamptz NOT NULL,
+    used_at                 timestamptz,
+    invalidated_at          timestamptz,
+    invalidated_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    created_at              timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT password_reset_tokens_token_hash_unique    UNIQUE (token_hash),
     CONSTRAINT password_reset_tokens_expires_after_created CHECK (expires_at > created_at),
     CONSTRAINT password_reset_tokens_used_after_created   CHECK (used_at IS NULL OR used_at >= created_at)
@@ -99,14 +120,20 @@ CREATE TABLE password_reset_tokens (
 CREATE INDEX idx_password_reset_tokens_user_id_unused
     ON password_reset_tokens(user_id) WHERE used_at IS NULL;
 
+-- Cleanup job: find expired-but-unused tokens for pruning
+CREATE INDEX idx_password_reset_tokens_expires_at_unused
+    ON password_reset_tokens(expires_at) WHERE used_at IS NULL;
+
 CREATE TABLE email_change_tokens (
     id          uuid            PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     uuid            NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     new_email   varchar(254)    NOT NULL,
-    token_hash  text            NOT NULL CONSTRAINT email_change_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
-    expires_at  timestamptz     NOT NULL,
-    used_at     timestamptz,
-    created_at  timestamptz     NOT NULL DEFAULT now(),
+    token_hash  varchar(64)     NOT NULL CONSTRAINT email_change_tokens_token_hash_nonempty CHECK (length(token_hash) > 0),
+    expires_at              timestamptz     NOT NULL,
+    used_at                 timestamptz,
+    invalidated_at          timestamptz,
+    invalidated_by_user_id  uuid            REFERENCES users(id) ON DELETE RESTRICT,
+    created_at              timestamptz     NOT NULL DEFAULT now(),
     CONSTRAINT email_change_tokens_token_hash_unique    UNIQUE (token_hash),
     CONSTRAINT email_change_tokens_expires_after_created CHECK (expires_at > created_at),
     CONSTRAINT email_change_tokens_used_after_created   CHECK (used_at IS NULL OR used_at >= created_at)
@@ -114,6 +141,10 @@ CREATE TABLE email_change_tokens (
 
 CREATE INDEX idx_email_change_tokens_user_id_unused
     ON email_change_tokens(user_id) WHERE used_at IS NULL;
+
+-- Cleanup job: find expired-but-unused tokens for pruning
+CREATE INDEX idx_email_change_tokens_expires_at_unused
+    ON email_change_tokens(expires_at) WHERE used_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 4. COURSES
@@ -146,7 +177,7 @@ CREATE TABLE courses (
     CONSTRAINT courses_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL)
 );
 
-CREATE INDEX idx_courses_status ON courses(status);
+CREATE INDEX idx_courses_status ON courses(status) WHERE deleted_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 5. CONTENT ITEMS
@@ -183,7 +214,7 @@ CREATE TABLE content_items (
     CONSTRAINT content_items_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL)
 );
 
-CREATE INDEX idx_content_items_content_type_status ON content_items(content_type, status);
+CREATE INDEX idx_content_items_content_type_status ON content_items(content_type, status) WHERE deleted_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 6. COURSE ↔ CONTENT ITEMS (junction)
@@ -417,6 +448,9 @@ CREATE TABLE user_content_access (
 CREATE UNIQUE INDEX idx_user_content_access_user_id_content_item_id_active_unique
     ON user_content_access(user_id, content_item_id) WHERE status = 'active';
 
+CREATE INDEX idx_user_content_access_content_item_id_active
+    ON user_content_access(content_item_id) WHERE status = 'active';
+
 -- ---------------------------------------------------------------------------
 -- 12. USER NOTES
 -- ---------------------------------------------------------------------------
@@ -486,7 +520,7 @@ CREATE TABLE consultation_briefs (
 );
 
 CREATE INDEX idx_consultation_briefs_user_id ON consultation_briefs(user_id);
-CREATE INDEX idx_consultation_briefs_status  ON consultation_briefs(status);
+CREATE INDEX idx_consultation_briefs_status  ON consultation_briefs(status) WHERE deleted_at IS NULL;
 
 CREATE TABLE consultation_bookings (
     id                          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -662,7 +696,7 @@ CREATE TABLE event_outbox (
     aggregate_id    uuid        NOT NULL,
     event_type      text        NOT NULL,
     payload_json    jsonb       NOT NULL,
-    status          text        NOT NULL CONSTRAINT event_outbox_status_check        CHECK (status IN ('pending', 'published', 'failed')),
+    status          text        NOT NULL DEFAULT 'pending' CONSTRAINT event_outbox_status_check CHECK (status IN ('pending', 'processing', 'published', 'failed', 'dead_letter')),
     attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT event_outbox_attempt_count_check CHECK (attempt_count >= 0),
     available_at    timestamptz NOT NULL DEFAULT now(),
     locked_until    timestamptz,
@@ -682,9 +716,9 @@ CREATE TABLE failed_jobs (
     event_type      text        NOT NULL,
     queue_name      text        NOT NULL,
     payload_json    jsonb,
-    attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT failed_jobs_attempt_count_check CHECK (attempt_count >= 0),
+    attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT failed_jobs_attempt_count_check CHECK (attempt_count >= 0 AND attempt_count <= 10),
     error_message   text,
-    failed_at       timestamptz NOT NULL,
+    failed_at       timestamptz NOT NULL DEFAULT now(),
     resolved_at     timestamptz,
     resolution_note text,
     created_at      timestamptz NOT NULL DEFAULT now(),
@@ -800,12 +834,14 @@ FULL OUTER JOIN expense_totals exp ON exp.period = rev.period AND exp.currency =
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE account_recovery_tokens (
-    id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash  text        NOT NULL,
-    expires_at  timestamptz NOT NULL,
-    used_at     timestamptz,
-    created_at  timestamptz NOT NULL DEFAULT now(),
+    id                      uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id                 uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    token_hash              varchar(64)        NOT NULL,
+    expires_at              timestamptz NOT NULL,
+    used_at                 timestamptz,
+    invalidated_at          timestamptz,
+    invalidated_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    created_at              timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT account_recovery_tokens_token_hash_unique     UNIQUE (token_hash),
     CONSTRAINT account_recovery_tokens_token_hash_nonempty   CHECK (length(token_hash) > 0),
     CONSTRAINT account_recovery_tokens_expires_after_created CHECK (expires_at > created_at),
@@ -814,6 +850,10 @@ CREATE TABLE account_recovery_tokens (
 
 CREATE INDEX idx_account_recovery_tokens_user_id_unused
     ON account_recovery_tokens(user_id) WHERE used_at IS NULL;
+
+-- Cleanup job: find expired-but-unused tokens for pruning
+CREATE INDEX idx_account_recovery_tokens_expires_at_unused
+    ON account_recovery_tokens(expires_at) WHERE used_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 26. ARTICLES
@@ -864,7 +904,6 @@ CREATE TABLE gift_coupons (
     created_by_user_id  uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT gift_coupons_code_unique               UNIQUE (code),
     CONSTRAINT gift_coupons_code_nonempty             CHECK (btrim(code) <> ''),
     CONSTRAINT gift_coupons_expires_after_created     CHECK (expires_at IS NULL OR expires_at > created_at),
     CONSTRAINT gift_coupons_redeemed_at_after_created CHECK (redeemed_at IS NULL OR redeemed_at >= created_at),
@@ -878,3 +917,58 @@ CREATE INDEX idx_gift_coupons_unredeemed
     ON gift_coupons(created_at DESC) WHERE redeemed_at IS NULL;
 CREATE INDEX idx_gift_coupons_course_id
     ON gift_coupons(course_id) WHERE course_id IS NOT NULL;
+
+-- Case-insensitive uniqueness: prevents 'SAVE10' and 'save10' from being different codes
+CREATE UNIQUE INDEX gift_coupons_code_lower_unique
+    ON gift_coupons (LOWER(code));
+
+
+-- ---------------------------------------------------------------------------
+-- 28. USER SESSIONS
+-- --------------------------------------------------------------------------- for JWT refresh token storage.
+CREATE TABLE user_sessions (
+    id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    refresh_hash    varchar(64)        NOT NULL,
+    user_agent      varchar(255),
+    ip              varchar(45),
+    expires_at      timestamptz NOT NULL,
+    revoked_at      timestamptz,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    token_version          integer NOT NULL DEFAULT 1,
+    previous_refresh_hash  varchar(64),
+    failed_attempt_count integer NOT NULL DEFAULT 0,
+    locked_until timestamptz,
+    last_attempt_at         timestamptz,
+    revoke_reason           varchar(30),
+    revoked_by_user_id      uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    last_seen_ip            varchar(45),
+    last_seen_at            timestamptz,
+    CONSTRAINT user_sessions_refresh_hash_unique        UNIQUE (refresh_hash),
+    CONSTRAINT user_sessions_expires_after_created      CHECK (expires_at > created_at),
+    CONSTRAINT user_sessions_revoked_after_created      CHECK (revoked_at IS NULL OR revoked_at >= created_at),
+    CONSTRAINT user_sessions_revoke_reason_check
+        CHECK (revoke_reason IN ('logout', 'password_changed', 'admin', 'suspicious_activity', 'token_expired', 'password_reset', 'email_change')),
+    CONSTRAINT user_sessions_token_version_positive CHECK (token_version > 0),
+    CONSTRAINT user_sessions_failed_attempts_non_negative CHECK (failed_attempt_count >= 0)
+);
+
+-- Primary lookup: validate refresh token
+CREATE INDEX idx_user_sessions_refresh_hash_active
+    ON user_sessions(refresh_hash)
+    WHERE revoked_at IS NULL;
+
+-- Admin/user: list active sessions per user + RevokeAllForUser
+CREATE INDEX idx_user_sessions_user_id_active
+    ON user_sessions(user_id)
+    WHERE revoked_at IS NULL;
+
+-- Cleanup job: expired sessions
+CREATE INDEX idx_user_sessions_expires_at
+    ON user_sessions(expires_at)
+    WHERE revoked_at IS NULL;
+
+-- Sliding window refresh: look up previous token hash during rotation
+CREATE INDEX idx_user_sessions_previous_refresh_hash
+    ON user_sessions(previous_refresh_hash)
+    WHERE previous_refresh_hash IS NOT NULL;

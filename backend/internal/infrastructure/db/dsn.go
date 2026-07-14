@@ -1,4 +1,4 @@
-package config // package comment is in main.go
+package db
 
 import (
 	"errors"
