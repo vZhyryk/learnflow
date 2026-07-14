@@ -1,0 +1,728 @@
+Project LearnFlowDatabase {
+  database_type: "PostgreSQL"
+  Note: 'Synchronized with infrastructure/postgres/init/init.sql through migration 000005. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
+}
+
+Table users {
+  id uuid [pk]
+  email varchar(254) [not null, note: 'Case-insensitive unique among non-deleted users via partial unique index on LOWER(email)']
+  password_hash text [not null, note: 'bcrypt hash']
+  role text [not null, note: 'CHECK: user | subadmin | admin']
+  status text [not null, note: 'CHECK: active | blocked | pending_verification | deleted']
+  email_verified_at timestamptz
+  last_login_at timestamptz
+  deleted_at timestamptz [note: 'Soft delete marker']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  password_changed_at timestamptz [note: 'NULL = never changed since registration; used to invalidate pre-change sessions']
+  email_changed_at timestamptz [note: 'NULL = never changed since registration']
+  failed_login_count integer [not null, default: 0, note: 'CHECK: >= 0; reset to 0 on successful login']
+  last_failed_login_at timestamptz
+  login_locked_until timestamptz [note: 'Account-level brute-force lock; NULL = not locked']
+
+  indexes {
+    email [name: 'users_email_active_unique', unique, note: 'Implemented in SQL as partial unique index on LOWER(email) WHERE deleted_at IS NULL']
+  }
+}
+
+Table user_profiles {
+  user_id uuid [pk, ref: > users.id]
+  first_name text
+  last_name text
+  phone_number text
+  country text
+  city text
+  date_of_birth date
+  gender text [note: 'CHECK: male | female | other | prefer_not_to_say']
+  ui_language text [not null, default: 'uk']
+  avatar_url text
+  timezone text
+  bio text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table email_verification_tokens {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  token_hash text [not null, unique]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  invalidated_at timestamptz [note: 'Explicit admin/system invalidation; NULL = not invalidated']
+  invalidated_by_user_id uuid [ref: > users.id, note: 'NULL = natural expiry; non-NULL = explicit invalidation actor']
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'email_verification_tokens_user_unused_idx', note: 'Partial index WHERE used_at IS NULL']
+  }
+}
+
+Table password_reset_tokens {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  token_hash text [not null, unique]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  invalidated_at timestamptz
+  invalidated_by_user_id uuid [ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'password_reset_tokens_user_unused_idx', note: 'Partial index WHERE used_at IS NULL']
+  }
+}
+
+Table email_change_tokens {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  new_email varchar(254) [not null]
+  token_hash text [not null, unique]
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  invalidated_at timestamptz
+  invalidated_by_user_id uuid [ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'email_change_tokens_user_unused_idx', note: 'Partial index WHERE used_at IS NULL']
+  }
+}
+
+Table user_sessions {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  refresh_hash text [not null, unique, note: 'SHA-256 hash of the raw refresh token — never store raw']
+  user_agent text [note: 'Nullable — some clients omit this header']
+  ip varchar(45) [note: 'Nullable; varchar(45) covers IPv4, IPv6, IPv6-mapped IPv4']
+  expires_at timestamptz [not null, note: 'CHECK: expires_at > created_at']
+  revoked_at timestamptz [note: 'NULL = active; NOT NULL = revoked']
+  created_at timestamptz [not null, default: `now()`]
+  token_version integer [not null, default: 1, note: 'CHECK: > 0; incremented on each rotation to detect replay attacks']
+  previous_refresh_hash text [note: 'Short-lived sliding window: allows the previous hash during rotation grace period']
+  failed_attempt_count integer [not null, default: 0, note: 'CHECK: >= 0; per-session/device brute-force counter']
+  locked_until timestamptz [note: 'Per-session lock after too many failed refresh attempts']
+  last_attempt_at timestamptz
+  revoke_reason varchar(30) [note: 'CHECK: logout | password_changed | admin | suspicious_activity | token_expired | password_reset | email_change']
+  revoked_by_user_id uuid [ref: > users.id, note: 'NULL = self-revoke or system; non-NULL = admin action']
+  last_seen_ip varchar(45)
+  last_seen_at timestamptz
+
+  indexes {
+    (refresh_hash) [name: 'idx_user_sessions_refresh_hash_active', note: 'Partial WHERE revoked_at IS NULL — primary lookup for POST /auth/refresh']
+    (user_id) [name: 'idx_user_sessions_user_id_active', note: 'Partial WHERE revoked_at IS NULL — list sessions per user + RevokeAll']
+    (expires_at) [name: 'idx_user_sessions_expires_at', note: 'Partial WHERE revoked_at IS NULL — cleanup job']
+    (previous_refresh_hash) [name: 'idx_user_sessions_previous_refresh_hash', note: 'Partial WHERE previous_refresh_hash IS NOT NULL — sliding window refresh lookup']
+  }
+}
+
+Table courses {
+  id uuid [pk]
+  slug text [not null, unique]
+  title text [not null]
+  description text
+  thumbnail_url text
+  preview_video_url text
+  status text [not null, note: 'CHECK: draft | published | archived']
+  estimated_minutes integer
+  seo_title text
+  seo_description text
+  og_image_url text
+  canonical_url text
+  is_indexable boolean [not null, default: true]
+  created_by_user_id uuid [not null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  published_at timestamptz
+  deleted_at timestamptz
+
+  indexes {
+    status [name: 'courses_status_idx']
+  }
+}
+
+Table content_items {
+  id uuid [pk]
+  slug text [not null, unique]
+  title text [not null]
+  content_type text [not null, note: 'CHECK: video | book | presentation']
+  description text
+  body text
+  video_url text
+  file_url text
+  estimated_minutes integer
+  estimated_pages integer
+  thumbnail_url text
+  seo_title text
+  seo_description text
+  og_image_url text
+  canonical_url text
+  is_indexable boolean [not null, default: true]
+  status text [not null, note: 'CHECK: draft | published | archived']
+  created_by_user_id uuid [not null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  published_at timestamptz
+  deleted_at timestamptz
+
+  indexes {
+    (content_type, status) [name: 'content_items_type_status_idx']
+  }
+}
+
+Table course_content_items {
+  id uuid [pk]
+  course_id uuid [not null, ref: > courses.id]
+  content_item_id uuid [not null, ref: > content_items.id]
+  position integer [not null]
+  is_required boolean [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (course_id, content_item_id) [name: 'course_content_items_unique_pair', unique]
+    (course_id, position) [name: 'course_content_items_unique_position', unique, note: 'DEFERRABLE INITIALLY DEFERRED in SQL']
+    content_item_id [name: 'course_content_items_content_item_id_idx']
+  }
+}
+
+Table course_reviews {
+  id uuid [pk]
+  course_id uuid [not null, ref: > courses.id]
+  user_id uuid [not null, ref: > users.id]
+  rating integer [not null, note: 'CHECK: 1..5']
+  comment text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    (user_id, course_id) [name: 'course_reviews_user_course_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL — allows re-review after soft-delete']
+    course_id [name: 'course_reviews_course_id_idx', note: 'Partial index WHERE deleted_at IS NULL']
+  }
+}
+
+Table content_reviews {
+  id uuid [pk]
+  content_item_id uuid [not null, ref: > content_items.id]
+  user_id uuid [not null, ref: > users.id]
+  rating integer [not null, note: 'CHECK: 1..5']
+  comment text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    (user_id, content_item_id) [name: 'content_reviews_user_content_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL']
+    content_item_id [name: 'content_reviews_content_item_id_idx', note: 'Partial index WHERE deleted_at IS NULL']
+  }
+}
+
+Table payments {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  amount bigint [not null, note: 'CHECK: > 0. Stored in minimal currency units']
+  currency text [not null, default: 'PLN']
+  status text [not null, note: 'CHECK: pending | completed | failed']
+  payment_method text [not null, note: 'CHECK: card | bank_transfer | manual']
+  provider_reference text
+  utm_source text
+  utm_medium text
+  utm_campaign text
+  utm_content text
+  utm_term text
+  gclid text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, created_at) [name: 'payments_user_created_at_idx', note: 'DESC on created_at in SQL']
+    (status, created_at) [name: 'payments_status_created_at_idx']
+    utm_campaign [name: 'payments_utm_campaign_idx', note: 'Partial index WHERE utm_campaign IS NOT NULL']
+    provider_reference [name: 'payments_provider_reference_idx', note: 'Partial index WHERE provider_reference IS NOT NULL']
+  }
+}
+
+Table payment_line_items {
+  id uuid [pk]
+  payment_id uuid [not null, ref: > payments.id]
+  resource_type text [not null, note: 'CHECK: course | consultation | content_item']
+  resource_id uuid [not null]
+  amount bigint [not null]
+  description text
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    payment_id [name: 'payment_line_items_payment_id_idx']
+  }
+}
+
+Table refunds {
+  id uuid [pk]
+  payment_id uuid [not null, ref: > payments.id]
+  amount bigint [not null, note: 'CHECK: > 0']
+  reason text
+  created_by_user_id uuid [not null, ref: > users.id]
+  refunded_at timestamptz [not null]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    payment_id [name: 'refunds_payment_id_idx']
+  }
+}
+
+Table user_course_access {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  course_id uuid [not null, ref: > courses.id]
+  payment_id uuid [ref: > payments.id]
+  access_type text [not null, note: 'CHECK: purchased | admin_granted | gift_coupon']
+  status text [not null, note: 'CHECK: active | revoked | refunded']
+  granted_at timestamptz [not null]
+  expires_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, course_id) [name: 'user_course_access_active_unique', unique, note: 'Partial unique WHERE status = active']
+    user_id [name: 'user_course_access_active_idx', note: 'SQL index is (user_id, course_id) WHERE status = active']
+  }
+}
+
+Table user_course_progress {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  course_id uuid [not null, ref: > courses.id]
+  status text [not null, note: 'CHECK: not_started | in_progress | completed']
+  progress_percent integer [not null, default: 0, note: 'CHECK: 0..100']
+  started_at timestamptz
+  last_interacted_at timestamptz
+  completed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, course_id) [name: 'user_course_progress_unique', unique]
+  }
+}
+
+Table user_content_progress {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  content_item_id uuid [not null, ref: > content_items.id]
+  status text [not null, note: 'CHECK: not_started | in_progress | completed']
+  progress_percent integer [not null, default: 0, note: 'CHECK: 0..100']
+  time_spent_minutes integer
+  started_at timestamptz
+  last_interacted_at timestamptz
+  completed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, content_item_id) [name: 'user_content_progress_unique', unique]
+  }
+}
+
+Table user_video_engagement {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  content_item_id uuid [not null, ref: > content_items.id]
+  watched_seconds integer [not null, default: 0, note: 'CHECK: >= 0']
+  last_position_seconds integer
+  started_at timestamptz
+  last_watched_at timestamptz
+  completed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, content_item_id) [name: 'user_video_engagement_unique', unique]
+  }
+}
+
+Table user_document_engagement {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  content_item_id uuid [not null, ref: > content_items.id]
+  viewed_pages integer
+  last_page integer
+  time_spent_minutes integer
+  started_at timestamptz
+  last_viewed_at timestamptz
+  completed_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, content_item_id) [name: 'user_document_engagement_unique', unique]
+  }
+}
+
+Table user_content_access {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  content_item_id uuid [not null, ref: > content_items.id]
+  payment_id uuid [ref: > payments.id]
+  access_type text [not null, note: 'CHECK: purchased | admin_granted | gift_coupon']
+  status text [not null, note: 'CHECK: active | revoked | refunded']
+  granted_at timestamptz [not null]
+  expires_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, content_item_id) [name: 'user_content_access_active_unique', unique, note: 'Partial unique WHERE status = active']
+    content_item_id [name: 'idx_user_content_access_content_item_id_active', note: 'Partial WHERE status = active — admin query: who has access to this item?']
+  }
+}
+
+Table user_notes {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  resource_type text [note: 'CHECK: course | content_item']
+  resource_id uuid
+  title text [not null]
+  description text
+  body text [not null]
+  deleted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'user_notes_user_id_idx', note: 'Partial index WHERE deleted_at IS NULL']
+    (resource_type, resource_id) [name: 'user_notes_resource_idx', note: 'Partial index WHERE resource_type IS NOT NULL AND deleted_at IS NULL']
+  }
+
+  Note: 'SQL check constraint requires both resource_type and resource_id to be null together or non-null together.'
+}
+
+Table consultation_slots {
+  id uuid [pk]
+  date date [not null]
+  start_time time [not null]
+  duration_minutes integer [not null, note: 'CHECK: > 0']
+  status text [not null, default: 'available', note: 'CHECK: available | booked | blocked']
+  created_by_user_id uuid [not null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (date, start_time) [name: 'consultation_slots_date_time_unique', unique]
+    (date, start_time, status) [name: 'consultation_slots_available_date_idx', note: 'SQL index is partial on (date, start_time) WHERE status = available']
+  }
+}
+
+Table consultation_briefs {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  slot_id uuid [not null, ref: > consultation_slots.id, note: 'Required at brief submission (SLOT-03)']
+  goal_type text [note: 'CHECK: bring_partner_back | recover_after_breakup | improve_good_relationship | recover_problematic_relationship | improve_meeting_skills | find_good_partner_skills | analyze_situation | check_partner']
+  goal text
+  context text
+  review_notes text
+  metadata_json jsonb
+  status text [not null, note: 'CHECK: submitted | processing | booked | failed']
+  submitted_at timestamptz [not null, default: `now()`]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    user_id [name: 'consultation_briefs_user_id_idx']
+    status [name: 'consultation_briefs_status_idx']
+  }
+}
+
+Table consultation_bookings {
+  id uuid [pk]
+  brief_id uuid [not null, ref: > consultation_briefs.id]
+  user_id uuid [not null, ref: > users.id]
+  slot_id uuid [not null, ref: > consultation_slots.id, note: 'Each booking (including reschedules) owns its slot; enables slot liberation on reschedule']
+  payment_id uuid [ref: > payments.id]
+  status text [not null, note: 'CHECK: created | confirmed | cancelled | rescheduled | completed']
+  scheduled_at timestamptz
+  confirmed_at timestamptz
+  cancelled_at timestamptz
+  completed_at timestamptz
+  rescheduled_from_booking_id uuid [ref: > consultation_bookings.id]
+  handled_by_user_id uuid [ref: > users.id]
+  notes text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+
+  indexes {
+    brief_id [name: 'consultation_bookings_brief_unique', unique, note: 'Partial unique WHERE rescheduled_from_booking_id IS NULL']
+    brief_id [name: 'consultation_bookings_brief_idx']
+    (user_id, status) [name: 'consultation_bookings_user_status_idx']
+    scheduled_at [name: 'consultation_bookings_scheduled_at_idx', note: 'Partial index WHERE scheduled_at IS NOT NULL']
+  }
+}
+
+Table consultation_outcomes {
+  id uuid [pk]
+  brief_id uuid [not null, ref: > consultation_briefs.id]
+  recommendation text
+  knowledge text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    brief_id [name: 'consultation_outcomes_brief_unique', unique]
+  }
+}
+
+Table campaigns {
+  id text [pk]
+  name text [not null, note: 'CHECK: btrim(name) <> empty']
+  platform text [not null, default: 'google', note: 'CHECK: google | meta | tiktok | other']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table expenses {
+  id uuid [pk]
+  category text [not null, note: 'CHECK: hosting | tooling | contractor | marketing | other']
+  amount bigint [not null, note: 'CHECK: > 0']
+  currency text [not null]
+  description text
+  occurred_at timestamptz [not null]
+  vendor text
+  campaign_id text [ref: > campaigns.id]
+  course_id uuid [ref: > courses.id]
+  content_item_id uuid [ref: > content_items.id]
+  external_reference text
+  metadata_json jsonb
+  created_by_user_id uuid [not null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    occurred_at [name: 'expenses_occurred_at_idx']
+    campaign_id [name: 'expenses_campaign_id_idx', note: 'Partial index WHERE campaign_id IS NOT NULL']
+    course_id [name: 'expenses_course_id_idx', note: 'Partial index WHERE course_id IS NOT NULL']
+    content_item_id [name: 'expenses_content_item_id_idx', note: 'Partial index WHERE content_item_id IS NOT NULL']
+  }
+
+  Note: 'SQL check constraint expenses_resource_exclusive allows at most one of course_id or content_item_id.'
+}
+
+Table notification_preferences {
+  user_id uuid [pk, ref: > users.id]
+  email_on_booking_confirmed boolean [not null, default: true]
+  email_on_reminder boolean [not null, default: true]
+  email_on_new_content boolean [not null, default: true]
+  email_on_support_reply boolean [not null, default: true]
+  email_on_consultation_booked boolean [not null, default: true]
+  email_on_support_message boolean [not null, default: true]
+  email_on_announcement boolean [not null, default: true]
+  email_on_failed_job boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+}
+
+Table notifications {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  kind text [not null, note: 'CHECK: booking_created | booking_confirmed | payment_confirmed | refund_processed | reminder | admin_message | new_content | consultation_booked_admin | support_message_admin | re_engagement | failed_job_alert | announcement_sent']
+  channel text [not null, note: 'CHECK: email | in_app']
+  title text
+  body text
+  delivery_status text [not null, note: 'CHECK: pending | skipped | sent | failed']
+  payload_json jsonb
+  scheduled_for timestamptz
+  read_at timestamptz
+  sent_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, created_at) [name: 'notifications_user_created_at_idx', note: 'DESC on created_at in SQL']
+    scheduled_for [name: 'notifications_scheduled_pending_idx', note: 'Partial index WHERE delivery_status = pending AND scheduled_for IS NOT NULL']
+  }
+}
+
+Table announcements {
+  id uuid [pk]
+  title text [not null]
+  body text [not null]
+  created_by_user_id uuid [not null, ref: > users.id]
+  expires_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    created_at [name: 'announcements_created_at_idx', note: 'DESC index for chronological listing']
+    expires_at [name: 'announcements_expires_at_idx', note: 'Partial index WHERE expires_at IS NOT NULL — active filter applied in query, not index predicate']
+  }
+}
+
+Table activity_log {
+  id uuid [pk]
+  user_id uuid [ref: > users.id]
+  event_type text [not null]
+  resource_type text [not null]
+  resource_id uuid [not null]
+  metadata_json jsonb
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (user_id, created_at) [name: 'activity_log_user_created_at_idx', note: 'DESC on created_at in SQL']
+    (resource_type, resource_id) [name: 'activity_log_resource_idx']
+  }
+}
+
+Table event_outbox {
+  id uuid [pk]
+  aggregate_type text [not null]
+  aggregate_id uuid [not null]
+  event_type text [not null]
+  payload_json jsonb [not null]
+  status text [not null, default: 'pending', note: 'CHECK: pending | processing | published | failed | dead_letter']
+  attempt_count integer [not null, default: 0, note: 'CHECK: >= 0']
+  available_at timestamptz [not null, default: `now()`]
+  locked_until timestamptz
+  published_at timestamptz
+  last_error text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (status, available_at) [name: 'event_outbox_pending_idx', note: 'Partial index WHERE status = pending']
+    locked_until [name: 'event_outbox_locked_until_idx', note: 'Partial index WHERE locked_until IS NOT NULL']
+  }
+}
+
+Table failed_jobs {
+  id uuid [pk]
+  event_type text [not null]
+  queue_name text [not null]
+  payload_json jsonb
+  attempt_count integer [not null, default: 0, note: 'CHECK: >= 0 AND <= 10']
+  error_message text
+  failed_at timestamptz [not null, default: `now()`]
+  resolved_at timestamptz
+  resolution_note text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    failed_at [name: 'failed_jobs_unresolved_idx', note: 'Partial DESC index WHERE resolved_at IS NULL']
+  }
+}
+
+Table admin_actions {
+  id uuid [pk]
+  admin_user_id uuid [not null, ref: > users.id]
+  action_type text [not null, note: 'CHECK: confirm_booking | cancel_booking | grant_course_access | issue_refund | record_expense | block_user | reschedule_booking | close_support_chat | assign_subadmin | revoke_subadmin | deactivate_user | delete_user | create_gift_coupon | revoke_gift_coupon | publish_article | delete_article']
+  target_type text [not null, note: 'CHECK: user | booking | course | failed_job | payment | support_chat | review | announcement | article | gift_coupon']
+  target_id uuid [not null]
+  details_json jsonb
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (admin_user_id, created_at) [name: 'admin_actions_admin_user_id_idx', note: 'DESC on created_at in SQL']
+    (target_type, target_id) [name: 'admin_actions_target_idx']
+  }
+}
+
+Table support_chats {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  status text [not null, default: 'open', note: 'CHECK: open | closed']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_support_chats_user_id_open_unique', unique, note: 'Partial unique WHERE status = open — allows multiple closed chats, one open at a time']
+    status [name: 'support_chats_status_idx', note: 'Partial index WHERE status = open']
+  }
+}
+
+Table support_messages {
+  id uuid [pk]
+  chat_id uuid [not null, ref: > support_chats.id]
+  sender_id uuid [not null, ref: > users.id]
+  body text [not null]
+  read_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    (chat_id, created_at) [name: 'support_messages_chat_created_at_idx', note: 'ASC on created_at in SQL']
+    chat_id [name: 'support_messages_chat_unread_idx', note: 'Partial index WHERE read_at IS NULL']
+  }
+}
+
+Table monthly_revenue {
+  period timestamptz
+  currency text
+  gross_revenue_cents bigint
+  refunded_cents bigint
+  net_revenue_cents bigint
+
+  Note: 'View: aggregates completed payments and refunds by month and currency.'
+}
+
+Table monthly_pnl {
+  period timestamptz
+  currency text
+  net_revenue_cents bigint
+  total_expenses_cents bigint
+  profit_cents bigint
+
+  Note: 'View: FULL OUTER JOIN of monthly revenue and aggregated expenses. Months with expenses but no revenue appear as losses.'
+}
+
+Table account_recovery_tokens {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id, note: 'ON DELETE RESTRICT']
+  token_hash text [not null, unique, note: 'SHA-256 of raw token; raw token sent to user via email']
+  expires_at timestamptz [not null]
+  used_at timestamptz
+  invalidated_at timestamptz
+  invalidated_by_user_id uuid [ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    user_id [name: 'idx_account_recovery_tokens_user_id_unused', note: 'Partial index WHERE used_at IS NULL']
+  }
+}
+
+Table articles {
+  id uuid [pk]
+  slug text [not null, unique]
+  title text [not null]
+  excerpt text [note: 'Optional short preview; if provided must be non-empty']
+  body text [not null, note: 'CHECK: btrim(body) <> empty string']
+  seo_title text
+  seo_description text
+  og_image_url text
+  is_indexable boolean [not null, default: true]
+  status text [not null, default: 'draft', note: 'CHECK: draft | published']
+  published_at timestamptz
+  created_by_user_id uuid [not null, ref: > users.id]
+  deleted_at timestamptz [note: 'Soft delete']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    created_at [name: 'idx_articles_created_at', note: 'DESC — admin panel list']
+    published_at [name: 'idx_articles_published_at', note: 'Partial DESC WHERE status = published AND deleted_at IS NULL']
+  }
+}
+
+Table gift_coupons {
+  id uuid [pk]
+  code text [not null]
+  course_id uuid [ref: > courses.id, note: 'Nullable — global coupon if null']
+  expires_at timestamptz
+  redeemed_by_user_id uuid [ref: > users.id]
+  redeemed_at timestamptz [note: 'NULL iff redeemed_by_user_id IS NULL (pair consistency enforced by CHECK)']
+  created_by_user_id uuid [not null, ref: > users.id]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  indexes {
+    code [name: 'gift_coupons_code_lower_unique', unique, note: 'Implemented in SQL as partial unique index on LOWER(code) — case-insensitive uniqueness']
+    created_at [name: 'idx_gift_coupons_unredeemed', note: 'Partial DESC WHERE redeemed_at IS NULL']
+    course_id [name: 'idx_gift_coupons_course_id', note: 'Partial WHERE course_id IS NOT NULL']
+  }
+}
