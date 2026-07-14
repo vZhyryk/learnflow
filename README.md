@@ -1,6 +1,6 @@
 # LearnFlow
 
-![Go](https://img.shields.io/badge/Go-1.26.2-00ADD8?style=flat&logo=go&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.26.3-00ADD8?style=flat&logo=go&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat&logo=typescript&logoColor=white)
 ![Vue 3](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat&logo=vue.js&logoColor=white)
 ![Nuxt](https://img.shields.io/badge/Nuxt-4.4-00DC82?style=flat&logo=nuxt.js&logoColor=white)
@@ -27,7 +27,7 @@ The platform covers the full lifecycle of a learning product: course catalog, vi
 - Integrating real external services (Stripe, Resend, Cloudflare R2, Prometheus/Grafana)
 - SSR frontend with Nuxt 4, Pinia, and a strict layered architecture
 
-**Current status:** Phase 2 of 9 — Auth & Users (infrastructure and foundation complete).
+**Current status:** Phase 2 of 9 — Auth & Users complete (JWT sessions, email flows, event-driven workers, full unit + real-Postgres integration test coverage).
 
 ---
 
@@ -83,7 +83,7 @@ HTTP Request
 
 | Layer                | Technology                                    | Notes                                                 |
 | -------------------- | --------------------------------------------- | ----------------------------------------------------- |
-| **Language**         | Go 1.26.2                                     | Stdlib only — `net/http`, `database/sql`, `context`   |
+| **Language**         | Go 1.26.3                                     | Stdlib only — `net/http`, `database/sql`, `context`   |
 | **Frontend**         | Nuxt 4 + Vue 3.5 + TypeScript 6               | SSR, Pinia, Tailwind CSS 4                            |
 | **Database**         | PostgreSQL 17                                 | UUID PKs, soft deletes, bigint cents, partial indexes |
 | **Cache / Queue**    | Redis 7                                       | Event queue (BLPop), outbox relay                     |
@@ -92,7 +92,7 @@ HTTP Request
 | **Email**            | Resend (prod) · stub (local)                  | Interface-driven, no lock-in                          |
 | **Payments**         | Stripe + Przelewy24                           | Card + BLIK/bank transfer (PL market)                 |
 | **Observability**    | Prometheus + Grafana                          | `pg_stat_statements`, custom metrics                  |
-| **Testing**          | GoConvey · Vitest · Playwright                | Unit + integration + e2e                              |
+| **Testing**          | GoConvey · Vitest · Playwright                | Unit + real-Postgres/Redis integration + e2e          |
 | **Linting**          | golangci-lint (15+ linters) · oxlint + ESLint | Strict configs, CI-enforced                           |
 | **Containerization** | Docker Compose                                | Dev, observability, and full-stack profiles           |
 
@@ -104,7 +104,7 @@ The backend is organized into 16 bounded contexts under `backend/internal/`:
 
 | Module            | Responsibility                                                                                    |
 | ----------------- | ------------------------------------------------------------------------------------------------- |
-| `auth/`           | JWT middleware, email verification, password reset, email change, account recovery                |
+| `auth/`           | JWT sessions (refresh rotation, reuse detection, brute-force lock), email verification, password reset, email change, account recovery |
 | `users/`          | User accounts, profiles (avatar, phone), notification preferences                                 |
 | `courses/`        | Course catalog (draft/published/archived), SEO metadata, landing pages, reviews & ratings         |
 | `content/`        | Learning content items (video, book, presentation), completion tracking, individual access grants |
@@ -139,13 +139,26 @@ Logging only happens in handlers and workers — never in service or repository 
 
 ### Architecture Decision Records
 
-Key infrastructure choices are documented as ADRs in `docs/adr/`:
+Key infrastructure and security choices are documented as ADRs in `docs/adr/`:
 
-| ADR                                      | Decision               | Rationale                                                                   |
-| ---------------------------------------- | ---------------------- | --------------------------------------------------------------------------- |
-| [001](docs/adr/001-storage-provider.md)  | Cloudflare R2 + MinIO  | S3-compatible API — no vendor lock-in; local dev parity                     |
-| [002](docs/adr/002-email-provider.md)    | Resend + stub provider | Interface-driven — swap provider without touching business logic            |
-| [003](docs/adr/003-payment-providers.md) | Stripe + Przelewy24    | Card + BLIK/bank transfer for Polish market; outbox for webhook reliability |
+| ADR                                                   | Decision                                      | Rationale                                                                                                            |
+| ------------------------------------------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| [001](docs/adr/001-storage-provider.md)                | Cloudflare R2 + MinIO                          | S3-compatible API — no vendor lock-in; local dev parity                                                              |
+| [002](docs/adr/002-email-provider.md)                  | Resend + stub provider                         | Interface-driven — swap provider without touching business logic                                                    |
+| [003](docs/adr/003-payment-providers.md)               | Stripe + Przelewy24                            | Card + BLIK/bank transfer for the Polish market; outbox for webhook reliability                                      |
+| [004](docs/adr/004-jwt-session-security.md)            | JWT blocklist + zero-downtime secret rotation  | Redis JTI blocklist for instant logout; dual-secret validation rotates `JWT_SECRET` without invalidating live sessions |
+| [005](docs/adr/005-refresh-token-replay-detection.md)  | Refresh token rotation + replay detection      | Reuse of a rotated-out refresh token (theft or race) revokes all sessions for that user                              |
+| [006](docs/adr/006-fail-closed-rate-limiting.md)       | Rate limiter fails closed on Redis error       | A Redis outage blocks `/auth/*` rather than silently disabling brute-force protection                               |
+
+### Security & Reliability Mechanisms
+
+Beyond the ADRs above, a few deliberate, non-obvious decisions worth calling out:
+
+- **Timing-safe login** — a precomputed dummy bcrypt hash is compared even when the email doesn't exist, so response time can't reveal whether an account is registered ([ADR-004](docs/adr/004-jwt-session-security.md))
+- **`SELECT ... FOR UPDATE SKIP LOCKED`** on the outbox poller — multiple worker instances can poll `event_outbox` concurrently without claiming the same row twice
+- **Compile-time repository contract enforcement** (`make lint_repo_interfaces`) — every repository package must declare `var _ domain.XRepository = (*Repository)(nil)`, since no linter catches a silently-missing interface assertion
+- **Non-root containers** — `api`, `worker`, and `migrate` all run as `app:app` (uid 1000), not root
+- **Secrets never hit `argv`** — `SONAR_TOKEN` is written to a `chmod 600` temp file and passed via `docker run --env-file`, not `-e KEY=value` (which leaks through `ps`/`/proc/<pid>/cmdline`)
 
 ---
 
@@ -183,7 +196,7 @@ Event type constants live in `internal/events/types.go`; payload structs in `int
 
 ## Database Design
 
-The schema spans 32 tables across six domains, designed for PostgreSQL 17+ with production-grade constraints.
+The schema spans 39 tables across six domains, designed for PostgreSQL 17+ with production-grade constraints.
 
 **Design principles applied throughout:**
 
@@ -277,6 +290,8 @@ make migrate_down             # roll back last migration batch
 make run_test_coverage_backend   # Go tests with coverage report
 make run_test_coverage_frontend  # Vue/TS tests with coverage report
 make run_test_goconvey        # Go tests with GoConvey UI
+make test_integration         # real-Postgres/Redis integration tests (-tags=integration)
+make test_integration_down    # stop the integration test stack
 
 # Linting
 make lint_backend             # golangci-lint (15+ linters)
@@ -311,7 +326,7 @@ cd frontend && npm run type-check
 | ----- | --------------------------------------------------------------- | -------------- |
 | 1     | Backend foundation — project structure, infrastructure, CI      | ✅ Complete    |
 | 1.1   | Spike — physical data model and database schema                 | ✅ Complete    |
-| **2** | **Auth & Users — JWT, registration, verification, profiles**    | 🔄 In Progress |
+| **2** | **Auth & Users — JWT, registration, verification, profiles**    | ✅ Complete    |
 | 3     | Courses & Content — catalog, content items, completion tracking | ⬜ Planned     |
 | 4     | Consultations — booking, availability, rescheduling             | ⬜ Planned     |
 | 4.1   | Spike — real-time support chat (WebSocket)                      | ⬜ Planned     |
@@ -373,6 +388,7 @@ learnflow/
 - **Payment integration** — Stripe webhooks, Przelewy24, idempotency via outbox pattern
 - **Observability** — Prometheus instrumentation, Grafana dashboards, structured JSON logging
 - **Production hygiene** — golangci-lint (15+ linters), oxlint + ESLint strict, migration safety rules, ADRs
+- **Test discipline** — GoConvey unit suite (97.6%+ service coverage) plus real-Postgres/Redis integration tests exercising full BLPop → process → retry → DLQ worker flows
 
 ---
 
