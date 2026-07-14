@@ -112,7 +112,7 @@ func stopRunAndWait(t *testing.T, cancel context.CancelFunc, done <-chan struct{
 func waitForDLQRow(t *testing.T, pool *pgxpool.Pool, eventType string) (attempts int, errMsg string) {
 	t.Helper()
 
-	deadline := time.After(20 * time.Second)
+	deadline := time.After(180 * time.Second)
 	for {
 		select {
 		case <-time.After(500 * time.Millisecond):

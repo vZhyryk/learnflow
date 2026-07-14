@@ -179,7 +179,7 @@ test_integration_up:
 	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' up -d --wait sonar_db redis
 
 test_integration_migrate: test_integration_up
-	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' up --build 'migrate'
+	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' up --build --exit-code-from migrate 'migrate'
 
 test_integration: test_integration_migrate
 	cd $(BACKEND_DIR) && \

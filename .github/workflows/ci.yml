@@ -41,8 +41,9 @@ jobs:
               run: go test ./... -race -count=1
 
             - name: Test coverage
-              working-directory: backend
-              run: go test ./... -coverpkg=./... -coverprofile=../tests/coverage.out
+              run: |
+                  mkdir -p tests
+                  cd backend && go test ./... -coverpkg=./... -coverprofile=../tests/coverage.out
 
             - name: Install Sonar
               run: npm install -g @sonar/scan
