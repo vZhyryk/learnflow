@@ -9,7 +9,10 @@ prompt*.md
 .code-review-graph
 .planning
 .vscode
-docs
+docs/DATABASE_SCHEMA.dbml
+docs/db_operation_flows.md
+docs/db_operation_matrix.md
+docs/load-testing.md
 .mcp.json
 .agents
 node_modules
