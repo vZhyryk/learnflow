@@ -42,9 +42,8 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 	}
 }
 
-// handleErrorRespond runs fn (a response-writing call) and logs a failure to write the
-// response itself. The write error is only logged, never returned — by this point the
-// handler has already decided what to respond with, and callers have nothing left to do.
+// handleErrorRespond runs fn and logs (never returns) a failure to write the response —
+// by this point the handler has nothing left to do about it.
 func (h *Handler) handleErrorRespond(r *http.Request, caseName string, fn func() error) {
 	helpers.LogRespondError(h.jsonLogger, r, caseName, nil, fn)
 }

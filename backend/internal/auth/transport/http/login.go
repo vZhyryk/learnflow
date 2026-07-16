@@ -12,7 +12,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	ua := r.UserAgent()
 
 	var req authdomain.LoginRequest
-	if !h.decodeAndValidate(w, r, &req, func() {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, func() {
 		req.IPAddress = appcontext.IPAddressFromContext(r.Context())
 		req.UserAgent = ua
 	}) {

@@ -73,6 +73,16 @@ func UserFromContext(ctx context.Context) (*authdomain.User, bool) {
 	return user, ok && user != nil
 }
 
+// MustUserFromContext retrieves the authenticated user from ctx, panicking if absent —
+// a sign the route is missing the AuthenticateUser middleware.
+func MustUserFromContext(ctx context.Context) *authdomain.User {
+	user, ok := UserFromContext(ctx)
+	if !ok {
+		panic("appcontext: user missing from context — handler not registered behind AuthenticateUser middleware")
+	}
+	return user
+}
+
 // WithJTI stores the JWT ID in ctx.
 func WithJTI(ctx context.Context, jti string) context.Context {
 	return context.WithValue(ctx, jtiKey{}, jti)

@@ -43,7 +43,7 @@ func TestRefreshRequestValidation(t *testing.T) {
 		})
 
 		Convey("Empty RefreshToken → 400", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"RefreshToken":""}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token":""}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 	})
@@ -55,43 +55,43 @@ func TestRefreshServiceOutcomes(t *testing.T) {
 
 		Convey("Service ErrSessionNotFound → 401", func() {
 			f.svcErr = authdomain.ErrSessionNotFound
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"RefreshToken":"ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token":"ref"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Service ErrSessionExpired → 401", func() {
 			f.svcErr = authdomain.ErrSessionExpired
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"RefreshToken":"ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token":"ref"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Service ErrSessionRevoked → 401", func() {
 			f.svcErr = authdomain.ErrSessionRevoked
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"RefreshToken":"ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token":"ref"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Service ErrInvalidCredentials → 401", func() {
 			f.svcErr = authdomain.ErrInvalidCredentials
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"RefreshToken":"ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token":"ref"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Service ErrAccountBlocked → 403", func() {
 			f.svcErr = authdomain.ErrAccountBlocked
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"RefreshToken":"ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token":"ref"}`))
 			So(w.Code, ShouldEqual, http.StatusForbidden)
 		})
 
 		Convey("Unexpected service error → 500", func() {
 			f.svcErr = testutil.ErrDBUnexpected
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"RefreshToken":"ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token":"ref"}`))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid token → 200 with auth envelope", func() {
 			f.svcResult = &authdomain.AuthTokens{AccessToken: "new-acc", RefreshToken: "new-ref", UserID: "user-123"}
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"RefreshToken":"ref"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token":"ref"}`))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["auth"], ShouldNotBeNil)
@@ -99,7 +99,7 @@ func TestRefreshServiceOutcomes(t *testing.T) {
 
 		Convey("Valid token and the success response write fails → does not panic", func() {
 			f.svcResult = &authdomain.AuthTokens{AccessToken: "new-acc", RefreshToken: "new-ref", UserID: "user-123"}
-			So(func() { f.mux.ServeHTTP(&errWriter{}, f.newReq(`{"RefreshToken":"ref"}`)) }, ShouldNotPanic)
+			So(func() { f.mux.ServeHTTP(&errWriter{}, f.newReq(`{"refresh_token":"ref"}`)) }, ShouldNotPanic)
 		})
 	})
 }

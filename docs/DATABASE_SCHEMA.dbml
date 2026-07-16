@@ -1,6 +1,6 @@
 Project LearnFlowDatabase {
   database_type: "PostgreSQL"
-  Note: 'Synchronized with infrastructure/postgres/init/init.sql through migration 000005. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
+  Note: 'Synchronized with backend/migrations through migration 000007. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
 }
 
 Table users {
@@ -122,7 +122,7 @@ Table courses {
   description text
   thumbnail_url text
   preview_video_url text
-  status text [not null, note: 'CHECK: draft | published | archived']
+  status text [not null, default: 'draft', note: 'CHECK: draft | published | archived; DEFAULT since migration 000007']
   estimated_minutes integer
   seo_title text
   seo_description text
@@ -595,7 +595,7 @@ Table failed_jobs {
   id uuid [pk]
   event_type text [not null]
   queue_name text [not null]
-  payload_json jsonb
+  payload_json jsonb [not null, note: 'NOT NULL since migration 000006']
   attempt_count integer [not null, default: 0, note: 'CHECK: >= 0 AND <= 10']
   error_message text
   failed_at timestamptz [not null, default: `now()`]

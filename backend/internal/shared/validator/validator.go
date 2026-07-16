@@ -19,6 +19,9 @@ const (
 // EmailRX is the compiled regular expression for validating email addresses.
 var EmailRX = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
 
+// SlugRX is the compiled regular expression for validating URL-safe slugs.
+var SlugRX = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
 // dobMinDate is the earliest date_of_birth accepted, matching the
 // user_profiles_dob_min DB constraint.
 var dobMinDate = time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -29,6 +32,11 @@ func MatchesEmail(value string) bool {
 		return false
 	}
 	return EmailRX.MatchString(value)
+}
+
+// IsValidSlug reports whether value is a URL-safe slug.
+func IsValidSlug(value string) bool {
+	return SlugRX.MatchString(value)
 }
 
 // IsValidFirstName reports whether value is 1-100 runes.
@@ -65,9 +73,8 @@ func IsValidGender(value string) bool {
 	}
 }
 
-// IsValidDateOfBirth reports whether value is a "2006-01-02"-formatted date
-// within [1900-01-01, now], matching the user_profiles_dob_not_future and
-// user_profiles_dob_min DB constraints.
+// IsValidDateOfBirth reports whether value is a "2006-01-02" date within [1900-01-01, now],
+// matching the user_profiles dob DB constraints.
 func IsValidDateOfBirth(value string) bool {
 	dob, err := time.Parse("2006-01-02", value)
 	if err != nil {
@@ -86,10 +93,15 @@ func IsValidUILanguage(value string) bool {
 	}
 }
 
-// IsValidAvatarURL reports whether value is a valid HTTPS URL.
-func IsValidAvatarURL(value string) bool {
+// IsValidHTTPSURL reports whether value is a valid HTTPS URL with a non-empty host.
+func IsValidHTTPSURL(value string) bool {
 	u, err := url.Parse(value)
 	return err == nil && u.Scheme == "https" && u.Host != ""
+}
+
+// IsValidAvatarURL reports whether value is a valid HTTPS URL.
+func IsValidAvatarURL(value string) bool {
+	return IsValidHTTPSURL(value)
 }
 
 // IsValidTimezone reports whether value is a valid IANA timezone name.

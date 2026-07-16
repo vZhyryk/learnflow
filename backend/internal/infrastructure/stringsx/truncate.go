@@ -1,8 +1,7 @@
 package stringsx
 
-// TruncateString shortens s to at most limit runes, appending "...[TRUNCATED]" if cut.
-// Uses rune (Unicode code point) count — not bytes — so multi-byte characters
-// (Cyrillic, Chinese, Arabic, etc.) are never split in the middle.
+// TruncateString shortens s to at most limit runes (not bytes, so multi-byte chars
+// aren't split), appending "...[TRUNCATED]" if cut.
 func TruncateString(val string, limit int) string {
 	if limit <= 0 {
 		return ""

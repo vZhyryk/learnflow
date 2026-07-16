@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 )
@@ -291,4 +292,29 @@ func (routes *RouteHandler) SetRequestID(next http.Handler) http.Handler {
 		ctx := appcontext.WithRequestID(r.Context(), requestID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// RequireRole returns middleware that rejects requests unless the authenticated user's
+// role is one of allowed. Must run after AuthenticateUser.
+func (route *RouteHandler) RequireRole(allowed ...authdomain.UserRole) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, ok := appcontext.UserFromContext(r.Context())
+			if !ok {
+				helpers.LogRespondError(route.App.Logger, r, "require_role_no_user", nil, func() error {
+					return helpers.InvalidCredentialsResponse(w)
+				})
+				return
+			}
+
+			if !slices.Contains(allowed, user.Role) {
+				helpers.LogRespondError(route.App.Logger, r, "require_role_forbidden", map[string]any{"user_id": user.ID, "role": user.Role}, func() error {
+					return helpers.ForbiddenResponse(w, helpers.Envelope{"error": "forbidden", "code": "forbidden"})
+				})
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }

@@ -29,7 +29,7 @@ func newRegisterFixture() *registerFixture {
 	return f
 }
 
-const validRegisterBody = `{"Email":"user@example.com","Password":"password123"}`
+const validRegisterBody = `{"email":"user@example.com","password":"password123"}`
 
 func TestRegisterRequestValidation(t *testing.T) {
 	Convey("POST /api/v1/auth/register — request validation", t, func() {
@@ -46,22 +46,22 @@ func TestRegisterRequestValidation(t *testing.T) {
 		})
 
 		Convey("Invalid email format → 400", func() {
-			w := f.doRequest(`{"Email":"notanemail","Password":"password123"}`)
+			w := f.doRequest(`{"email":"notanemail","password":"password123"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Email too short → 400", func() {
-			w := f.doRequest(`{"Email":"a@","Password":"password123"}`)
+			w := f.doRequest(`{"email":"a@","password":"password123"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Password too short → 400", func() {
-			w := f.doRequest(`{"Email":"user@example.com","Password":"short"}`)
+			w := f.doRequest(`{"email":"user@example.com","password":"short"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Password too long → 400", func() {
-			w := f.doRequest(`{"Email":"user@example.com","Password":"` + strings.Repeat("a", 73) + `"}`)
+			w := f.doRequest(`{"email":"user@example.com","password":"` + strings.Repeat("a", 73) + `"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 	})

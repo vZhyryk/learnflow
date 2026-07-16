@@ -1,0 +1,2 @@
+ALTER TABLE courses
+    ALTER COLUMN status DROP DEFAULT;

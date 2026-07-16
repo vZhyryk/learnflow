@@ -5,10 +5,8 @@ import (
 	"time"
 )
 
-// UserProfile holds a user's extended profile information. Fields backed by
-// nullable columns are *string: nil means the column is SQL NULL ("not
-// provided"), distinct from an empty string. UILanguage stays a plain string
-// because its column is NOT NULL DEFAULT 'uk'.
+// UserProfile holds extended profile info. Nullable-column fields are *string (nil = not
+// provided); UILanguage stays plain string since its column is NOT NULL DEFAULT 'uk'.
 type UserProfile struct {
 	UserID      string    `json:"user_id"`
 	FirstName   *string   `json:"first_name"`

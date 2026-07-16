@@ -46,12 +46,8 @@ type Logger struct {
 	traceLevel Level // minimum level at which a goroutine stack trace is added
 }
 
-// New creates a Logger.
-// If sanit is nil a no-op sanitizer is used (values pass through unchanged —
-// safe for dev or testing, but never pass nil in production without intent).
-// traceLevel controls when stack traces are attached:
-//   - LevelError → traces on every error and fatal (good for development)
-//   - LevelFatal → traces only on fatal (good for production)
+// New creates a Logger. A nil sanit is a no-op passthrough — fine for dev/test, never in prod.
+// traceLevel controls when stack traces are attached (LevelError: dev, LevelFatal: prod).
 func New(out io.Writer, sanit *sanitizer.Sanitizer, traceLevel Level) *Logger {
 	if sanit == nil {
 		sanit = sanitizer.NewSanitizer("", 0, nil)

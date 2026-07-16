@@ -53,7 +53,6 @@ type BriefSubmittedPayload struct {
 
 // NotificationSendPayload is the event payload emitted when a notification should be delivered.
 type NotificationSendPayload struct {
-	UserID   string            `json:"user_id"`
 	Template string            `json:"template"`
 	Data     map[string]string `json:"data"`
 }

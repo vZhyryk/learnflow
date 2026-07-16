@@ -59,11 +59,8 @@ func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	return nil
 }
 
-// LogRespondError runs fn (a response-writing call) and logs a failure to write the
-// response itself. The write error is only logged, never returned — by this point the
-// caller has already decided what to respond with, and has nothing left to do. props is
-// merged into the logged properties alongside case/path, letting callers keep request
-// context (method, ip, request_id, ...) that doesn't fit the base shape; it may be nil.
+// LogRespondError runs fn and logs (never returns) a write failure; props (may be nil) is
+// merged into the logged properties alongside case/path for extra request context.
 func LogRespondError(jsonLogger *logger.Logger, r *http.Request, caseName string, props map[string]any, fn func() error) {
 	if err := fn(); err != nil {
 		merged := map[string]any{"case": caseName, "path": r.URL.Path}

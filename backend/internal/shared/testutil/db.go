@@ -10,9 +10,8 @@ import (
 	"learnflow_backend/internal/infrastructure/db"
 )
 
-// NewTestPool opens a pgxpool.Pool against the integration test database
-// (DB_* env vars — see docker-compose.tests.yml / make test_integration_up)
-// and registers pool.Close via t.Cleanup.
+// NewTestPool opens a pgxpool.Pool against the integration test database (DB_* env
+// vars, see docker-compose.tests.yml) and registers pool.Close via t.Cleanup.
 func NewTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
@@ -30,10 +29,8 @@ func NewTestPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-// WithTestTx opens a transaction on pool, runs fn with it, and always rolls
-// back afterward — repository/service integration tests write through tx
-// (or through db.ExtractTx if the code under test resolves it from ctx) and
-// never leave rows behind in the shared test database.
+// WithTestTx opens a transaction, runs fn, and always rolls back — so integration
+// tests never leave rows behind in the shared test database.
 func WithTestTx(t *testing.T, pool *pgxpool.Pool, fn func(ctx context.Context, tx pgx.Tx)) {
 	t.Helper()
 

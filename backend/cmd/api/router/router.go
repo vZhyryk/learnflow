@@ -13,6 +13,9 @@ import (
 	authrepository "learnflow_backend/internal/auth/repository"
 	authservice "learnflow_backend/internal/auth/service"
 	authhttp "learnflow_backend/internal/auth/transport/http"
+	"learnflow_backend/internal/courses"
+	courserepository "learnflow_backend/internal/courses/repository"
+	courseservice "learnflow_backend/internal/courses/service"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/helpers"
@@ -50,10 +53,15 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 		})
 	}))
 
-	chains := route.buildChains()
-	authRepo := authrepository.NewRepository(a.DB)
 	transactor := db.NewTransactor(a.DB)
 	outbox := events.NewOutboxWriter(a.DB)
+
+	chains := route.buildChains()
+	adminStaticWithAuth := chains.StaticWithAuth.Append(route.RequireRole(authdomain.RoleAdmin, authdomain.RoleSubAdmin))
+
+	// Auth Routes
+	authRepo := authrepository.NewRepository(a.DB)
+
 	authSvc, err := authservice.New(
 		authservice.Repos{
 			UserRepo:    authRepo,
@@ -70,13 +78,20 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("router: NewRouter: %w", err)
 	}
-
 	auth.RegisterAuthRoutes(router, authSvc, chains, a.Logger)
 
+	// User Routes
 	usersrepo := usersrepository.NewRepository(a.DB)
 	userSvc := usersservice.New(usersrepo)
 	users.RegisterUsersRoutes(router, userSvc, chains.StaticWithAuth, a.Logger)
 
+	// Course Routes
+	courseRepo := courserepository.NewRepository(a.DB)
+	courseSvc := courseservice.New(courseRepo, transactor, outbox)
+
+	courses.RegisterCourseRoutes(router, courseSvc, chains.StaticWithAuth, adminStaticWithAuth, a.Logger)
+
+	// Helper routes
 	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		helpers.LogRespondError(route.App.Logger, r, "health_response_write", map[string]any{"method": r.Method}, func() error {
 			return helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"status": "ok"}, nil)

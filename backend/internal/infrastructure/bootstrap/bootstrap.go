@@ -72,10 +72,8 @@ func GetRedis() (*redis.Client, error) {
 	return lredis.InitRedis(env.GetStringEnv("REDIS_ADDR", "redis:6379"), env.GetStringEnv("REDIS_PASSWORD", ""), pool)
 }
 
-// MustInitInfra initializes the database pool and Redis client, exiting the process via
-// jsonLogger.Fatal (which never returns) if either fails. It returns a single cleanup
-// func that closes both connections in the reverse order of acquisition; callers should
-// `defer cleanup()` immediately.
+// MustInitInfra inits the DB pool and Redis client (jsonLogger.Fatal on failure) and
+// returns a cleanup func closing both in reverse order — `defer cleanup()` immediately.
 func MustInitInfra(dbCfg DatabaseConfig, jsonLogger *logger.Logger) (*pgxpool.Pool, *redis.Client, func()) {
 	dbInstance, err := db.InitDatabase(dbCfg.DSN, dbCfg.MaxIdleTime, dbCfg.MaxLifetime, int32(dbCfg.MaxOpenConns), int32(dbCfg.MinOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
 	if err != nil {

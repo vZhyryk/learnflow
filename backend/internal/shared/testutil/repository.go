@@ -10,9 +10,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// MockQueryRunner implements db.QueryRunner (internal/infrastructure/db) via
-// function fields. Any unset field panics with a descriptive message on use,
-// which surfaces missing test setup immediately instead of nil-pointer-panicking.
+// MockQueryRunner implements db.QueryRunner via function fields; an unset field panics
+// with a descriptive message, surfacing missing test setup immediately.
 type MockQueryRunner struct {
 	QueryRowFn func(ctx context.Context, sql string, args ...any) pgx.Row
 	QueryFn    func(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
@@ -87,9 +86,8 @@ func CastInt(v any, idx int) *int {
 	return s
 }
 
-// CastPgtypeDate safely type-asserts a scan destination to *pgtype.Date —
-// the scan target repositories use for nullable `date` columns (pgx v5 has
-// no native scan support for `date` into *string/**string).
+// CastPgtypeDate safely type-asserts a scan destination to *pgtype.Date — used for
+// nullable `date` columns since pgx v5 can't scan `date` into *string.
 func CastPgtypeDate(v any, idx int) *pgtype.Date {
 	d, ok := v.(*pgtype.Date)
 	if !ok {

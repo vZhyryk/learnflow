@@ -8,7 +8,7 @@ import (
 
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	var req authdomain.RegisterRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 

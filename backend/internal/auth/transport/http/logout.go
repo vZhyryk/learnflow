@@ -9,7 +9,7 @@ import (
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	var req authdomain.LogoutRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 	ctx := r.Context()

@@ -8,12 +8,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// PoolConfig holds Redis connection-pool tuning parameters.
-// Field names follow go-redis's redis.Options naming (PoolSize, MinIdleConns,
-// ConnMaxLifetime) rather than pgxpool's (MaxConns, MinConns, MaxConnLifetime) —
-// this struct is a thin, directly-mapped wrapper over redis.Options, not a
-// cross-infrastructure abstraction, so it intentionally mirrors its own client
-// library instead of the PostgreSQL pool naming in internal/infrastructure/db.
+// PoolConfig holds Redis connection-pool tuning parameters. Field names mirror
+// go-redis's redis.Options, not pgxpool's — this is a thin wrapper, not a cross-infra abstraction.
 type PoolConfig struct {
 	PoolSize        int
 	MinIdleConns    int

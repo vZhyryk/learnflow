@@ -303,7 +303,9 @@ CREATE TABLE courses (
     --         inside a transaction if other migrations follow.
     --   text+CHECK: ALTER TABLE courses ADD CONSTRAINT ... CHECK (..., 'suspended')
     --         — fully transactional, rollback-safe.
-    status              text        NOT NULL CONSTRAINT courses_status_check CHECK (status IN ('draft', 'published', 'archived')),
+    -- [DEFAULT 'draft']: added in migration 000007 — new courses default to draft
+    -- without the API having to send an explicit status on create.
+    status              text        NOT NULL DEFAULT 'draft' CONSTRAINT courses_status_check CHECK (status IN ('draft', 'published', 'archived')),
 
     -- [CHECK estimated_minutes > 0]: A course advertised as "0 minutes" or negative is a
     -- data entry error. NULL is allowed — not all courses have a duration estimate.
@@ -1348,7 +1350,10 @@ CREATE TABLE failed_jobs (
     id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     event_type      text        NOT NULL,
     queue_name      text        NOT NULL,
-    payload_json    jsonb,
+
+    -- [payload_json NOT NULL]: made NOT NULL in migration 000006 — a DLQ entry without
+    -- its original payload can't be inspected or replayed.
+    payload_json    jsonb       NOT NULL,
     attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT failed_jobs_attempt_count_check CHECK (attempt_count >= 0 AND attempt_count <= 10),
     error_message   text,
     failed_at       timestamptz NOT NULL DEFAULT now(),

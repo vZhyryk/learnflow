@@ -43,7 +43,7 @@ func TestVerifyEmailRequestValidation(t *testing.T) {
 		})
 
 		Convey("Empty Token → 400", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":""}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":""}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 	})
@@ -55,31 +55,31 @@ func TestVerifyEmailServiceOutcomes(t *testing.T) {
 
 		Convey("Service ErrTokenExpired → 400", func() {
 			f.svcErr = authdomain.ErrTokenExpired
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Service ErrTokenUsed → 401", func() {
 			f.svcErr = authdomain.ErrTokenUsed
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Service ErrInvalidToken → 401", func() {
 			f.svcErr = authdomain.ErrInvalidToken
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Unexpected service error → 500", func() {
 			f.svcErr = testutil.ErrDBUnexpected
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid token → 200 with message", func() {
 			f.svcResult = "user-123"
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["message"], ShouldNotBeNil)
@@ -87,7 +87,7 @@ func TestVerifyEmailServiceOutcomes(t *testing.T) {
 
 		Convey("Valid token and the success response write fails → does not panic", func() {
 			f.svcResult = "user-123"
-			So(func() { f.mux.ServeHTTP(&errWriter{}, f.newReq(`{"Token":"tok"}`)) }, ShouldNotPanic)
+			So(func() { f.mux.ServeHTTP(&errWriter{}, f.newReq(`{"token":"tok"}`)) }, ShouldNotPanic)
 		})
 	})
 }

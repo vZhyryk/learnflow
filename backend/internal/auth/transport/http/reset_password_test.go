@@ -30,31 +30,31 @@ func TestInitiatePasswordReset(t *testing.T) {
 		})
 
 		Convey("Invalid email format → 400", func() {
-			w := testutil.ServeHTTP(mux, newReq(`{"Email":"notanemail"}`))
+			w := testutil.ServeHTTP(mux, newReq(`{"email":"notanemail"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Service ErrInvalidAccountState → 200 (account state guard)", func() {
 			svcErr = authdomain.ErrInvalidAccountState
-			w := testutil.ServeHTTP(mux, newReq(`{"Email":"user@example.com"}`))
+			w := testutil.ServeHTTP(mux, newReq(`{"email":"user@example.com"}`))
 			So(w.Code, ShouldEqual, http.StatusOK)
 		})
 
 		Convey("Unexpected service error → 500", func() {
 			svcErr = testutil.ErrDBUnexpected
-			w := testutil.ServeHTTP(mux, newReq(`{"Email":"user@example.com"}`))
+			w := testutil.ServeHTTP(mux, newReq(`{"email":"user@example.com"}`))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid email → 200 with message", func() {
-			w := testutil.ServeHTTP(mux, newReq(`{"Email":"user@example.com"}`))
+			w := testutil.ServeHTTP(mux, newReq(`{"email":"user@example.com"}`))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["message"], ShouldNotBeNil)
 		})
 
 		Convey("Valid email and the success response write fails → does not panic", func() {
-			So(func() { mux.ServeHTTP(&errWriter{}, newReq(`{"Email":"user@example.com"}`)) }, ShouldNotPanic)
+			So(func() { mux.ServeHTTP(&errWriter{}, newReq(`{"email":"user@example.com"}`)) }, ShouldNotPanic)
 		})
 	})
 }
@@ -85,17 +85,17 @@ func TestResetPasswordRequestValidation(t *testing.T) {
 		})
 
 		Convey("Empty Token → 400", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"","NewPassword":"password123"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"","new_password":"password123"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("NewPassword too short → 400", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok","NewPassword":"short"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok","new_password":"short"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("NewPassword too long → 400", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok","NewPassword":"`+strings.Repeat("a", 73)+`"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok","new_password":"`+strings.Repeat("a", 73)+`"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 	})
@@ -107,30 +107,30 @@ func TestResetPasswordServiceOutcomes(t *testing.T) {
 
 		Convey("Service ErrTokenExpired → 400", func() {
 			f.svcErr = authdomain.ErrTokenExpired
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok","NewPassword":"password123"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok","new_password":"password123"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Service ErrTokenUsed → 401", func() {
 			f.svcErr = authdomain.ErrTokenUsed
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok","NewPassword":"password123"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok","new_password":"password123"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Service ErrInvalidToken → 401", func() {
 			f.svcErr = authdomain.ErrInvalidToken
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok","NewPassword":"password123"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok","new_password":"password123"}`))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Unexpected service error → 500", func() {
 			f.svcErr = testutil.ErrDBUnexpected
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok","NewPassword":"password123"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok","new_password":"password123"}`))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid request → 200 with message", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok","NewPassword":"password123"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok","new_password":"password123"}`))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["message"], ShouldNotBeNil)
@@ -138,7 +138,7 @@ func TestResetPasswordServiceOutcomes(t *testing.T) {
 
 		Convey("Valid request and the success response write fails → does not panic", func() {
 			So(func() {
-				f.mux.ServeHTTP(&errWriter{}, f.newReq(`{"Token":"tok","NewPassword":"password123"}`))
+				f.mux.ServeHTTP(&errWriter{}, f.newReq(`{"token":"tok","new_password":"password123"}`))
 			}, ShouldNotPanic)
 		})
 	})

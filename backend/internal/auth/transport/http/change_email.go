@@ -9,16 +9,12 @@ import (
 
 func (h *Handler) initiateEmailChange(w http.ResponseWriter, r *http.Request) {
 	var req authdomain.RequestEmailChangeRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 
 	ctx := r.Context()
-	user, ok := appcontext.UserFromContext(ctx)
-	if !ok {
-		h.handleErrorResponse(w, r, authdomain.ErrUserNotFound)
-		return
-	}
+	user := appcontext.MustUserFromContext(ctx)
 	req.UserID = user.ID
 
 	err := h.svc.InitiateEmailChange(ctx, req)
@@ -36,16 +32,12 @@ func (h *Handler) initiateEmailChange(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
 	var req authdomain.EmailChangeRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 
 	ctx := r.Context()
-	user, ok := appcontext.UserFromContext(ctx)
-	if !ok {
-		h.handleErrorResponse(w, r, authdomain.ErrInvalidCredentials)
-		return
-	}
+	user := appcontext.MustUserFromContext(ctx)
 
 	req.UserID = user.ID
 	req.JTI = appcontext.JTIFromContext(ctx)

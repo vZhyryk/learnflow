@@ -32,13 +32,7 @@ func TestGetProfile(t *testing.T) {
 
 		Convey("When no user in context", func() {
 			r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/users/profile", http.NoBody)
-			w := testutil.ServeHTTP(mux, r)
-			So(w.Code, ShouldEqual, http.StatusUnauthorized)
-		})
-
-		Convey("When no user in context and the error response write also fails", func() {
-			r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/users/profile", http.NoBody)
-			So(func() { mux.ServeHTTP(&errWriter{}, r) }, ShouldNotPanic)
+			So(func() { testutil.ServeHTTP(mux, r) }, ShouldPanic)
 		})
 
 		Convey("When the profile exists", func() {
@@ -125,12 +119,7 @@ func TestChangeProfileRequestValidation(t *testing.T) {
 		})
 
 		Convey("When no user in context", func() {
-			w := testutil.ServeHTTP(f.mux, f.patch(`{"first_name":"Jane"}`))
-			So(w.Code, ShouldEqual, http.StatusUnauthorized)
-		})
-
-		Convey("When no user in context and the error response write also fails", func() {
-			So(func() { f.mux.ServeHTTP(&errWriter{}, f.patch(`{"first_name":"Jane"}`)) }, ShouldNotPanic)
+			So(func() { testutil.ServeHTTP(f.mux, f.patch(`{"first_name":"Jane"}`)) }, ShouldPanic)
 		})
 	})
 }

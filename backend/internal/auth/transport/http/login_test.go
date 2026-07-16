@@ -37,7 +37,7 @@ func newLoginFixture() *loginFixture {
 	return f
 }
 
-const validLoginBody = `{"Email":"user@example.com","Password":"password123"}`
+const validLoginBody = `{"email":"user@example.com","password":"password123"}`
 
 func TestLoginRequestValidation(t *testing.T) {
 	Convey("POST /api/v1/auth/login — request validation", t, func() {
@@ -54,35 +54,35 @@ func TestLoginRequestValidation(t *testing.T) {
 		})
 
 		Convey("Wrong type for Email → 400", func() {
-			w := f.doRequest(`{"Email":123,"Password":"password123"}`)
+			w := f.doRequest(`{"email":123,"password":"password123"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Invalid email format → 400", func() {
-			w := f.doRequest(`{"Email":"notanemail","Password":"password123"}`)
+			w := f.doRequest(`{"email":"notanemail","password":"password123"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Password too short → 400", func() {
-			w := f.doRequest(`{"Email":"user@example.com","Password":"short"}`)
+			w := f.doRequest(`{"email":"user@example.com","password":"short"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Password too long → 400", func() {
-			w := f.doRequest(`{"Email":"user@example.com","Password":"` + strings.Repeat("a", 73) + `"}`)
+			w := f.doRequest(`{"email":"user@example.com","password":"` + strings.Repeat("a", 73) + `"}`)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("No User-Agent header → 400", func() {
 			r := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/login",
-				strings.NewReader(`{"Email":"user@example.com","Password":"password123"}`))
+				strings.NewReader(`{"email":"user@example.com","password":"password123"}`))
 			w := testutil.ServeHTTP(f.mux, r)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("User-Agent too long → 400", func() {
 			r := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/auth/login",
-				strings.NewReader(`{"Email":"user@example.com","Password":"password123"}`))
+				strings.NewReader(`{"email":"user@example.com","password":"password123"}`))
 			r.Header.Set("User-Agent", strings.Repeat("x", 2001))
 			w := testutil.ServeHTTP(f.mux, r)
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -94,7 +94,7 @@ func TestLoginRequestValidation(t *testing.T) {
 
 		Convey("Invalid email format and the error response write also fails → does not panic", func() {
 			So(func() {
-				f.doRequestWithWriter(&errWriter{}, `{"Email":"notanemail","Password":"password123"}`)
+				f.doRequestWithWriter(&errWriter{}, `{"email":"notanemail","password":"password123"}`)
 			}, ShouldNotPanic)
 		})
 	})
