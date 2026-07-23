@@ -7,14 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
-
-	. "github.com/smartystreets/goconvey/convey"
 )
-
-func assertUnexpectedDBError(err error, substr string) {
-	So(err, ShouldNotBeNil)
-	So(err.Error(), ShouldContainSubstring, substr)
-}
 
 func newTestRepo(runner *testutil.MockQueryRunner) *Repository {
 	return &Repository{db: runner}
@@ -24,14 +17,6 @@ func castPtrRevokeReason(v any, idx int) **authdomain.RevokeReason {
 	s, ok := v.(**authdomain.RevokeReason)
 	if !ok {
 		panic(fmt.Sprintf("dest[%d]: expected **authdomain.RevokeReason, got %T", idx, v))
-	}
-	return s
-}
-
-func castPtrTime(v any, idx int) **time.Time {
-	s, ok := v.(**time.Time)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected **time.Time, got %T", idx, v))
 	}
 	return s
 }
@@ -124,16 +109,16 @@ func fakeScanUser(now time.Time) func(dest ...any) error {
 		*testutil.CastStr(dest[2], 2) = u.PasswordHash
 		*castUserRole(dest[3], 3) = u.Role
 		*castUserStatus(dest[4], 4) = u.Status
-		*castPtrTime(dest[5], 5) = u.EmailVerifiedAt
-		*castPtrTime(dest[6], 6) = u.LastLoginAt
-		*castPtrTime(dest[7], 7) = u.DeletedAt
+		*testutil.CastPtrTime(dest[5], 5) = u.EmailVerifiedAt
+		*testutil.CastPtrTime(dest[6], 6) = u.LastLoginAt
+		*testutil.CastPtrTime(dest[7], 7) = u.DeletedAt
 		*testutil.CastTime(dest[8], 8) = u.CreatedAt
 		*testutil.CastTime(dest[9], 9) = u.UpdatedAt
-		*castPtrTime(dest[10], 10) = u.PasswordChangedAt
-		*castPtrTime(dest[11], 11) = u.EmailChangedAt
+		*testutil.CastPtrTime(dest[10], 10) = u.PasswordChangedAt
+		*testutil.CastPtrTime(dest[11], 11) = u.EmailChangedAt
 		*testutil.CastInt(dest[12], 12) = u.FailedLoginCount
-		*castPtrTime(dest[13], 13) = u.LastFailedLoginAt
-		*castPtrTime(dest[14], 14) = u.LoginLockedUntil
+		*testutil.CastPtrTime(dest[13], 13) = u.LastFailedLoginAt
+		*testutil.CastPtrTime(dest[14], 14) = u.LoginLockedUntil
 		return nil
 	}
 }
@@ -169,16 +154,16 @@ func fakeScanUserSession(now time.Time) func(dest ...any) error {
 		*testutil.CastPtrStr(dest[3], 3) = userSession.UserAgent
 		*testutil.CastPtrStr(dest[4], 4) = userSession.IPAddress
 		*testutil.CastTime(dest[5], 5) = userSession.ExpiresAt
-		*castPtrTime(dest[6], 6) = userSession.RevokedAt
+		*testutil.CastPtrTime(dest[6], 6) = userSession.RevokedAt
 		*castPtrRevokeReason(dest[7], 7) = userSession.RevokeReason
 		*testutil.CastPtrStr(dest[8], 8) = userSession.RevokedByUserID
 		*testutil.CastTime(dest[9], 9) = userSession.CreatedAt
 		*testutil.CastInt(dest[10], 10) = userSession.TokenVersion
-		*castPtrTime(dest[11], 11) = userSession.LastAttemptAt
-		*castPtrTime(dest[12], 12) = userSession.LockedUntil
+		*testutil.CastPtrTime(dest[11], 11) = userSession.LastAttemptAt
+		*testutil.CastPtrTime(dest[12], 12) = userSession.LockedUntil
 		*testutil.CastInt(dest[13], 13) = userSession.FailedAttemptCount
 		*testutil.CastPtrStr(dest[14], 14) = userSession.PreviousRefreshHash
-		*castPtrTime(dest[15], 15) = userSession.LastSeenAt
+		*testutil.CastPtrTime(dest[15], 15) = userSession.LastSeenAt
 		*testutil.CastPtrStr(dest[16], 16) = userSession.LastSeenIP
 		return nil
 	}
@@ -205,8 +190,8 @@ func fakeScanToken(now time.Time) func(dest ...any) error {
 		*testutil.CastStr(dest[2], 2) = tb.TokenHash
 		*testutil.CastTime(dest[3], 3) = tb.ExpiresAt
 		*testutil.CastTime(dest[4], 4) = tb.CreatedAt
-		*castPtrTime(dest[5], 5) = tb.UsedAt
-		*castPtrTime(dest[6], 6) = tb.InvalidatedAt
+		*testutil.CastPtrTime(dest[5], 5) = tb.UsedAt
+		*testutil.CastPtrTime(dest[6], 6) = tb.InvalidatedAt
 		*testutil.CastPtrStr(dest[7], 7) = tb.InvalidatedByUserID
 		return nil
 	}
@@ -228,8 +213,8 @@ func fakeScanEmailChangeToken(now time.Time) func(dest ...any) error {
 		*testutil.CastStr(dest[3], 3) = t.TokenHash
 		*testutil.CastTime(dest[4], 4) = t.ExpiresAt
 		*testutil.CastTime(dest[5], 5) = t.CreatedAt
-		*castPtrTime(dest[6], 6) = t.UsedAt
-		*castPtrTime(dest[7], 7) = t.InvalidatedAt
+		*testutil.CastPtrTime(dest[6], 6) = t.UsedAt
+		*testutil.CastPtrTime(dest[7], 7) = t.InvalidatedAt
 		*testutil.CastPtrStr(dest[8], 8) = t.InvalidatedByUserID
 		return nil
 	}

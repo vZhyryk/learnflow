@@ -47,7 +47,7 @@ func unsetEnv(t *testing.T, key string) {
 	}
 	t.Cleanup(func() {
 		if wasSet {
-			os.Setenv(key, orig) //nolint:errcheck // best-effort env restore in test cleanup
+			os.Setenv(key, orig) //nolint:errcheck,gosec // best-effort env restore in test cleanup
 		}
 	})
 }
@@ -62,7 +62,7 @@ func TestBuildDSNFromEnv(t *testing.T) {
 			So(dsn, ShouldContainSubstring, "testuser")
 			So(dsn, ShouldContainSubstring, "testdb")
 			So(dsn, ShouldContainSubstring, "localhost")
-			So(dsn, ShouldContainSubstring, "sslmode=disable")
+			So(dsn, ShouldContainSubstring, "sslmode=require")
 		})
 
 		Convey("When DB_PORT is overridden", func() {
@@ -75,10 +75,10 @@ func TestBuildDSNFromEnv(t *testing.T) {
 
 		Convey("When DB_SSLMODE is overridden", func() {
 			setRequiredEnv(t)
-			t.Setenv(envDBSSLMode, "require")
+			t.Setenv(envDBSSLMode, "disable")
 			dsn, err := db.BuildDSNFromEnv()
 			So(err, ShouldBeNil)
-			So(dsn, ShouldContainSubstring, "sslmode=require")
+			So(dsn, ShouldContainSubstring, "sslmode=disable")
 		})
 
 		missing := []struct {

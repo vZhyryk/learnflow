@@ -24,7 +24,7 @@ func (h *Handler) createCourse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"course_id": courseID, "status": "success"}, nil)
+	err = helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"course_id": courseID}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}

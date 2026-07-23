@@ -13,6 +13,7 @@ func (h *Handler) initiatePasswordReset(w http.ResponseWriter, r *http.Request) 
 	}
 
 	ctx := r.Context()
+
 	err := h.svc.InitiatePasswordReset(ctx, req)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)

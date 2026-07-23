@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 
@@ -61,34 +60,6 @@ func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockToke
 		panic(err)
 	}
 	return srv
-}
-
-// newNoopOutbox returns an OutboxWriter whose Emit always succeeds without touching a real DB.
-func newNoopOutbox() *events.OutboxWriter {
-	return events.NewOutboxWriterWithRunner(&testutil.MockQueryRunner{
-		ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-			return pgconn.CommandTag{}, nil
-		},
-	})
-}
-
-// newFailingOutbox returns an OutboxWriter whose Emit always fails with err.
-func newFailingOutbox(err error) *events.OutboxWriter {
-	return events.NewOutboxWriterWithRunner(&testutil.MockQueryRunner{
-		ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-			return pgconn.CommandTag{}, err
-		},
-	})
-}
-
-// newCapturingOutbox returns an OutboxWriter that records the Exec args of the last Emit call.
-func newCapturingOutbox(captured *[]any) *events.OutboxWriter {
-	return events.NewOutboxWriterWithRunner(&testutil.MockQueryRunner{
-		ExecFn: func(_ context.Context, _ string, args ...any) (pgconn.CommandTag, error) {
-			*captured = args
-			return pgconn.CommandTag{}, nil
-		},
-	})
 }
 
 func newSuccessfulMockRedis() *mockRedis {

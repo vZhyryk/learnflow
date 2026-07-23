@@ -11,6 +11,7 @@ import (
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
 	lredis "learnflow_backend/internal/infrastructure/redis"
+	"learnflow_backend/internal/infrastructure/sanitizer"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -23,7 +24,7 @@ func NewLogger(environment string) *logger.Logger {
 	if environment == "dev" {
 		traceLevel = logger.LevelError
 	}
-	return logger.New(os.Stdout, nil, traceLevel)
+	return logger.New(os.Stdout, sanitizer.NewSanitizer("", 0, nil), traceLevel)
 }
 
 // DatabaseConfig holds PostgreSQL connection settings, shared by every entrypoint's Config.
@@ -87,7 +88,7 @@ func MustInitInfra(dbCfg DatabaseConfig, jsonLogger *logger.Logger) (*pgxpool.Po
 
 	cleanup := func() {
 		if closeErr := redisClient.Close(); closeErr != nil {
-			jsonLogger.Fatal(closeErr, nil)
+			jsonLogger.Error(closeErr, nil)
 		}
 		dbInstance.Close()
 	}

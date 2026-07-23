@@ -5,7 +5,8 @@ import (
 	"fmt"
 )
 
-// ArchiveCourse marks a course as archived.
+// ArchiveCourse marks a course as archived. Unlike PublishCourse, intentionally allowed
+// from any status — archiving is a takedown action, not a state-machine step.
 func (s *Service) ArchiveCourse(ctx context.Context, courseID string) error {
 	err := s.courseRepo.ArchiveCourse(ctx, courseID)
 	if err != nil {

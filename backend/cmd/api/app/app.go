@@ -13,10 +13,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Config holds all runtime configuration for the API server.
-//
-// Each field's doc comment names the env var (or CLI flag) it is sourced from —
-// see cmd/api/main.go's getAppConfig/getJWTConfig/getServerTimeout for the loading logic.
+// Config holds all runtime configuration for the API server. Each field's doc comment
+// names its source env var/flag — see cmd/api/main.go's getAppConfig/getJWTConfig.
 type Config struct {
 	Port     int    // PORT
 	Env      string // ENVIRONMENT
@@ -50,13 +48,8 @@ type Config struct {
 	}
 }
 
-// App is the shared application container injected into every handler and worker.
-// App must not be copied after first use — always pass as *App.
-//
-// Ctx/Cancel are the process-lifetime shutdown signal, not a per-request context — every
-// request still gets its own context from net/http, passed explicitly through the call
-// chain as usual. Storing this pair here is the standard root-container pattern for fanning
-// out graceful shutdown to workers and background goroutines that outlive any single request.
+// App is the shared application container — must not be copied after first use, always
+// pass as *App. Ctx/Cancel are the process-lifetime shutdown signal, not per-request.
 type App struct {
 	_      noCopy
 	Config Config

@@ -14,8 +14,6 @@ import (
 )
 
 func TestCreateUser(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
-
 	Convey("Given a users repository", t, func() {
 		var row *testutil.MockRow
 		repo := newTestRepo(&testutil.MockQueryRunner{
@@ -47,10 +45,8 @@ func TestCreateUser(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreateUser(context.Background(), &authdomain.User{})
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
-
-		_ = now
 	})
 }
 
@@ -74,7 +70,7 @@ func TestCreateUserProfile(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.CreateUserProfile(context.Background(), &authdomain.UserProfile{})
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -108,7 +104,7 @@ func TestGetUserByID(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetUserByID(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -140,7 +136,7 @@ func TestGetUserByEmail(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetUserByEmail(context.Background(), "john@gmail.com")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -172,7 +168,7 @@ func TestGetDeletedUserByID(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetDeletedUserByID(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -204,7 +200,7 @@ func TestGetDeletedUserByEmail(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetDeletedUserByEmail(context.Background(), "john@gmail.com")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -238,7 +234,7 @@ func TestGetUserProfileByUserID(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetUserProfileByUserID(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -256,7 +252,7 @@ func TestRestoreUser(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.RestoreUser(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found (0 rows affected)", func() {
@@ -285,7 +281,7 @@ func TestUpdateStatus(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.UpdateStatus(context.Background(), "user-123", authdomain.StatusBlocked)
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -314,7 +310,7 @@ func TestUpdateRole(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.UpdateRole(context.Background(), "user-123", authdomain.RoleAdmin)
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -343,7 +339,7 @@ func TestUpdateLastLoginAt(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.UpdateLastLoginAt(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -372,7 +368,7 @@ func TestUpdatePasswordHash(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.UpdatePasswordHash(context.Background(), "user-123", "new-hash")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -401,7 +397,7 @@ func TestUpdateEmail(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.UpdateEmail(context.Background(), "user-123", "new@example.com")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -430,7 +426,7 @@ func TestUpdateEmailVerifiedAt(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.UpdateEmailVerifiedAt(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -459,7 +455,7 @@ func TestDeleteUser(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.DeleteUser(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -488,7 +484,7 @@ func TestIncrementFailedLogin(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.IncrementFailedLogin(context.Background(), "user-123", "15 minutes", 5)
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -553,7 +549,7 @@ func TestResetFailedLogin(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.ResetFailedLogin(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {

@@ -9,15 +9,16 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// mockMailer implements the Mailer interface via a function field.
 type mockMailer struct {
 	send func(templateFile string, data any, ccUser mailer.CCUser, attachmentList []string) error
 }
 
 func (m *mockMailer) Send(templateFile string, data any, ccUser mailer.CCUser, attachmentList []string) error {
-	if m.send != nil {
-		return m.send(templateFile, data, ccUser, attachmentList)
+	if m.send == nil {
+		panic("mockMailer.send not set")
 	}
-	return nil
+	return m.send(templateFile, data, ccUser, attachmentList)
 }
 
 // mockPublisher implements events.Publisher via a function field.
@@ -26,10 +27,10 @@ type mockPublisher struct {
 }
 
 func (m *mockPublisher) Publish(ctx context.Context, eventType events.EventType, payload any) error {
-	if m.publish != nil {
-		return m.publish(ctx, eventType, payload)
+	if m.publish == nil {
+		panic("mockPublisher.publish not set")
 	}
-	return nil
+	return m.publish(ctx, eventType, payload)
 }
 
 // castEventType safely type-asserts a scan destination to *events.EventType.

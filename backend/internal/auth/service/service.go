@@ -13,6 +13,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// accessTokenTTL/refreshTokenTTL drive JWT expiry; the rest bound single-use action
+// tokens (verify/reset/change/recover) emailed to the user before they expire.
 const (
 	accessTokenTTL            = 15 * time.Minute
 	refreshTokenTTL           = 7 * 24 * time.Hour
@@ -62,10 +64,8 @@ func New(
 	if cost == 0 {
 		cost = hashDefaultCost
 	}
-	// "dummy" is a fixed placeholder password, not a credential: it only exists so
-	// Login always runs a real bcrypt comparison (against dummyPasswordHash) on the
-	// user-not-found path, keeping response timing indistinguishable from a wrong-password
-	// failure and preventing user-enumeration via timing (see TestLoginConstantTimeUserEnumeration).
+	// "dummy" is a placeholder, not a credential — only used so Login's user-not-found
+	// path still runs a real bcrypt comparison, keeping timing indistinguishable.
 	dummyPasswordHash, err := bcrypt.GenerateFromPassword([]byte("dummy"), cost)
 	if err != nil {
 		return nil, fmt.Errorf("authservice.New: generate dummy hash: %w", err)

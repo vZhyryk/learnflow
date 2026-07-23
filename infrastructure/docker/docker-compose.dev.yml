@@ -28,6 +28,12 @@ services:
                 limits:
                     memory: 512M
                     cpus: "1.0"
+        healthcheck:
+            test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:$${PORT:-8080}/health || exit 1"]
+            interval: 10s
+            timeout: 5s
+            retries: 3
+            start_period: 15s
 
     worker:
         build:
@@ -140,6 +146,9 @@ services:
         environment:
             POSTGRES_DB: ${DB_NAME:-learnflow}
             POSTGRES_USER: ${DB_USER:-postgres}
+            # dev.yml only — the `postgres` fallback is fine for a local, non-exposed
+            # container, but DB_PASSWORD must be set explicitly for any shared/deployed
+            # environment. Never copy this file's defaults into a non-local compose file.
             POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
         volumes:
             - postgres_data:/var/lib/postgresql/data

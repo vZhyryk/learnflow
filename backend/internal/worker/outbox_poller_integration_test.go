@@ -15,21 +15,12 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+// insertOutboxRow inserts a 'pending' row for the poller's own publish-path tests. For
+// arbitrary status/published_at combinations (e.g. cleanup-worker retention tests), use
+// insertOutboxRowWithStatus (outbox_cleanup_integration_test.go) instead.
 func insertOutboxRow(t *testing.T, pool db.QueryRunner, eventType events.EventType) string {
 	t.Helper()
-
-	var id string
-	err := pool.QueryRow(context.Background(),
-		`INSERT INTO event_outbox (aggregate_type, aggregate_id, event_type, payload_json, status)
-		 VALUES ($1, gen_random_uuid(), $2, $3, 'pending')
-		 RETURNING id`,
-		"outbox_poller_concurrency_test", string(eventType), `{}`,
-	).Scan(&id)
-	if err != nil {
-		t.Fatalf("insertOutboxRow: %v", err)
-	}
-
-	return id
+	return insertOutboxRowWithStatus(t, pool, eventType, "pending", nil)
 }
 
 func getOutboxStatus(t *testing.T, pool db.QueryRunner, id string) string {

@@ -43,21 +43,24 @@ func TestVerifyEmailTokenLookup(t *testing.T) {
 	})
 }
 
-func validVerifyEmailToken(_ context.Context, _ string) (*authdomain.EmailVerificationToken, error) {
+func fakeVerifyEmailToken(_ context.Context, _ string) (*authdomain.EmailVerificationToken, error) {
 	return &authdomain.EmailVerificationToken{
 		TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
 	}, nil
+}
+
+func fakePendingVerificationUser(_ context.Context, id string) (*authdomain.User, error) {
+	return &authdomain.User{ID: id, Status: authdomain.StatusPendingVerification}, nil
 }
 
 func TestVerifyEmailUserUpdateFailures(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When marking the email verified fails", func() {
 			uRepo := &mockUserRepo{
-				updateEmailVerifiedAt: func(_ context.Context, _ string) error {
-					return testutil.ErrDBUnexpected
-				},
+				getUserByID:           fakePendingVerificationUser,
+				updateEmailVerifiedAt: testutil.AlwaysFailsDB,
 			}
-			tRepo := &mockTokenRepo{getEmailVerificationToken: validVerifyEmailToken}
+			tRepo := &mockTokenRepo{getEmailVerificationToken: fakeVerifyEmailToken}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
 
 			_, err := srv.VerifyEmail(context.Background(), authdomain.VerifyEmailRequest{Token: "tok"})
@@ -68,12 +71,13 @@ func TestVerifyEmailUserUpdateFailures(t *testing.T) {
 
 		Convey("When activating the account status fails", func() {
 			uRepo := &mockUserRepo{
+				getUserByID:           fakePendingVerificationUser,
 				updateEmailVerifiedAt: testutil.AlwaysNil,
 				updateStatus: func(_ context.Context, _ string, _ authdomain.UserStatus) error {
 					return testutil.ErrDBUnexpected
 				},
 			}
-			tRepo := &mockTokenRepo{getEmailVerificationToken: validVerifyEmailToken}
+			tRepo := &mockTokenRepo{getEmailVerificationToken: fakeVerifyEmailToken}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
 
 			_, err := srv.VerifyEmail(context.Background(), authdomain.VerifyEmailRequest{Token: "tok"})
@@ -88,14 +92,13 @@ func TestVerifyEmailMarkTokenUsedFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When marking the token as used fails", func() {
 			uRepo := &mockUserRepo{
+				getUserByID:           fakePendingVerificationUser,
 				updateEmailVerifiedAt: testutil.AlwaysNil,
 				updateStatus:          func(_ context.Context, _ string, _ authdomain.UserStatus) error { return nil },
 			}
 			tRepo := &mockTokenRepo{
-				getEmailVerificationToken: validVerifyEmailToken,
-				markEmailVerificationTokenUsed: func(_ context.Context, _ string) error {
-					return testutil.ErrDBUnexpected
-				},
+				getEmailVerificationToken:      fakeVerifyEmailToken,
+				markEmailVerificationTokenUsed: testutil.AlwaysFailsDB,
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
 
@@ -107,12 +110,70 @@ func TestVerifyEmailMarkTokenUsedFails(t *testing.T) {
 	})
 }
 
+func TestVerifyEmailStatusGuard(t *testing.T) {
+	Convey("Given an auth service", t, func() {
+		Convey("When the user lookup fails", func() {
+			uRepo := &mockUserRepo{
+				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
+					return nil, testutil.ErrDBUnexpected
+				},
+			}
+			tRepo := &mockTokenRepo{getEmailVerificationToken: fakeVerifyEmailToken}
+			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+
+			_, err := srv.VerifyEmail(context.Background(), authdomain.VerifyEmailRequest{Token: "tok"})
+
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "GetUserByID")
+		})
+
+		Convey("When the account is already active, the transition is rejected", func() {
+			uRepo := &mockUserRepo{
+				getUserByID: func(_ context.Context, id string) (*authdomain.User, error) {
+					return &authdomain.User{ID: id, Status: authdomain.StatusActive}, nil
+				},
+			}
+			tRepo := &mockTokenRepo{getEmailVerificationToken: fakeVerifyEmailToken}
+			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+
+			_, err := srv.VerifyEmail(context.Background(), authdomain.VerifyEmailRequest{Token: "tok"})
+
+			So(errors.Is(err, authdomain.ErrInvalidAccountState), ShouldBeTrue)
+		})
+
+		Convey("When the account is blocked, the transition is rejected and status is never touched", func() {
+			statusUpdateCalled := false
+			uRepo := &mockUserRepo{
+				getUserByID: func(_ context.Context, id string) (*authdomain.User, error) {
+					return &authdomain.User{ID: id, Status: authdomain.StatusBlocked}, nil
+				},
+				updateStatus: func(_ context.Context, _ string, _ authdomain.UserStatus) error {
+					statusUpdateCalled = true
+					return nil
+				},
+			}
+			tRepo := &mockTokenRepo{getEmailVerificationToken: fakeVerifyEmailToken}
+			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+
+			_, err := srv.VerifyEmail(context.Background(), authdomain.VerifyEmailRequest{Token: "tok"})
+
+			So(errors.Is(err, authdomain.ErrInvalidAccountState), ShouldBeTrue)
+			So(statusUpdateCalled, ShouldBeFalse)
+		})
+	})
+}
+
 func TestVerifyEmailSuccess(t *testing.T) {
 	Convey("Given an auth service", t, func() {
-		Convey("When the token is valid and unused", func() {
+		Convey("When the token is valid and the user is pending verification", func() {
+			var gotLookupUserID string
 			var gotUpdatedStatusUserID string
 			var gotMarkedUsedHash string
 			uRepo := &mockUserRepo{
+				getUserByID: func(_ context.Context, id string) (*authdomain.User, error) {
+					gotLookupUserID = id
+					return &authdomain.User{ID: id, Status: authdomain.StatusPendingVerification}, nil
+				},
 				updateEmailVerifiedAt: testutil.AlwaysNil,
 				updateStatus: func(_ context.Context, userID string, status authdomain.UserStatus) error {
 					gotUpdatedStatusUserID = userID
@@ -121,7 +182,7 @@ func TestVerifyEmailSuccess(t *testing.T) {
 				},
 			}
 			tRepo := &mockTokenRepo{
-				getEmailVerificationToken: validVerifyEmailToken,
+				getEmailVerificationToken: fakeVerifyEmailToken,
 				markEmailVerificationTokenUsed: func(_ context.Context, hash string) error {
 					gotMarkedUsedHash = hash
 					return nil
@@ -133,6 +194,7 @@ func TestVerifyEmailSuccess(t *testing.T) {
 
 			So(err, ShouldBeNil)
 			So(userID, ShouldEqual, "user-123")
+			So(gotLookupUserID, ShouldEqual, "user-123")
 			So(gotUpdatedStatusUserID, ShouldEqual, "user-123")
 			So(gotMarkedUsedHash, ShouldNotBeEmpty)
 		})

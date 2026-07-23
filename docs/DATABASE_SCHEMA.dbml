@@ -1,6 +1,6 @@
 Project LearnFlowDatabase {
   database_type: "PostgreSQL"
-  Note: 'Synchronized with backend/migrations through migration 000007. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
+  Note: 'Synchronized with backend/migrations through migration 000008. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
 }
 
 Table users {
@@ -588,6 +588,7 @@ Table event_outbox {
   indexes {
     (status, available_at) [name: 'event_outbox_pending_idx', note: 'Partial index WHERE status = pending']
     locked_until [name: 'event_outbox_locked_until_idx', note: 'Partial index WHERE locked_until IS NOT NULL']
+    published_at [name: 'idx_event_outbox_published_at_published', note: 'Partial index WHERE status = published — backs OutboxCleanupWorker retention DELETE']
   }
 }
 

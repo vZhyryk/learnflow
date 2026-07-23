@@ -1,45 +1,15 @@
 package worker
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/logger"
 	"time"
 )
 
-// FailedJob represents a dead-letter queue entry that failed all retry attempts.
-type FailedJob struct {
-	ID           string
-	EventType    events.EventType
-	QueueName    string
-	PayloadJSON  string
-	AttemptCount int
-}
-
-// DLQRetryWorker polls the failed_jobs table and re-publishes eligible events.
-type DLQRetryWorker struct {
-	db         db.QueryRunner
-	publisher  events.Publisher
-	logger     *logger.Logger
-	transactor Transactor
-}
-
-// NewDLQRetryWorker returns a DLQRetryWorker that retries failed jobs on a 5-minute ticker.
-func NewDLQRetryWorker(queryRunner db.QueryRunner, publisher events.Publisher, jsonLogger *logger.Logger, transactor Transactor) *DLQRetryWorker {
-	return &DLQRetryWorker{
-		db:         queryRunner,
-		publisher:  publisher,
-		logger:     jsonLogger,
-		transactor: transactor,
-	}
-}
-
-func (p *DLQRetryWorker) queryRunner(ctx context.Context) db.QueryRunner {
-	return db.FallbackQueryRunner(ctx, p.db)
-}
+// DLQRetryWorker is a phantom type parameterizing Poller[T] for failed_jobs, mirroring
+// OutboxPoller for event_outbox.
+type DLQRetryWorker struct{}
 
 const (
 	selectFailedJobSQL = `
@@ -69,95 +39,20 @@ const (
 	`
 )
 
-// Run starts the DLQ retry loop, polling every 5 minutes until ctx is cancelled.
-func (p *DLQRetryWorker) Run(ctx context.Context) {
-	ticker := time.NewTicker(5 * time.Minute)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			p.poll(ctx)
-		}
-	}
+// scanFailedJob reads the 5 columns selectFailedJobSQL selects — failed_jobs has
+// queue_name/attempt_count, unlike event_outbox.
+func scanFailedJob(row entryScanner) (PollerEntry[DLQRetryWorker], error) {
+	var entry PollerEntry[DLQRetryWorker]
+	err := row.Scan(&entry.ID, &entry.EventType, &entry.QueueName, &entry.PayloadJSON, &entry.AttemptCount)
+	return entry, err
 }
 
-func (p *DLQRetryWorker) poll(ctx context.Context) {
-	err := p.transactor.InTransaction(ctx, func(ctx context.Context) error {
-		entries, err := p.getFailedJobs(ctx)
-		if err != nil {
-			return err
-		}
-
-		for _, entry := range entries {
-			p.handleFailedJobEntry(ctx, entry)
-		}
-
-		return nil
+// NewDLQRetryWorker returns a Poller that retries failed_jobs entries on a 5-minute ticker.
+func NewDLQRetryWorker(queryRunner db.QueryRunner, publisher events.Publisher, jsonLogger *logger.Logger, transactor Transactor) *Poller[DLQRetryWorker] {
+	return NewPoller[DLQRetryWorker](queryRunner, publisher, jsonLogger, transactor, "failedJobs", 5*time.Minute, SQLList[DLQRetryWorker]{
+		selectSQL:      selectFailedJobSQL,
+		markSuccessSQL: markAsRetriedSuccessSQL,
+		markFailedSQL:  markAsRetriedFailedSQL,
+		scanEntry:      scanFailedJob,
 	})
-	if err != nil {
-		p.logger.Error(fmt.Errorf("failedJobs.poll transaction: %w", err), map[string]any{"worker": "dlq_retry"})
-	}
-}
-
-func (p *DLQRetryWorker) getFailedJobs(ctx context.Context) ([]FailedJob, error) {
-	rows, err := p.queryRunner(ctx).Query(ctx, selectFailedJobSQL)
-	if err != nil {
-		return nil, fmt.Errorf("failedJobs.poll query: %w", err)
-	}
-
-	defer rows.Close()
-
-	var entries []FailedJob
-
-	for rows.Next() {
-		var entry FailedJob
-		if err := rows.Scan(&entry.ID, &entry.EventType, &entry.QueueName, &entry.PayloadJSON, &entry.AttemptCount); err != nil {
-			return nil, fmt.Errorf("failedJobs.poll scan: %w", err)
-		}
-		entries = append(entries, entry)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failedJobs.poll rows: %w", err)
-	}
-
-	return entries, nil
-}
-
-func (p *DLQRetryWorker) handleFailedJobEntry(ctx context.Context, entry FailedJob) {
-	if !events.IsKnownEventType(entry.EventType) {
-		p.markEntryFailed(ctx, fmt.Errorf("failedJobs: unknown event_type: %s", entry.EventType), entry.ID)
-		return
-	}
-
-	if err := p.publisher.Publish(ctx, entry.EventType, json.RawMessage(entry.PayloadJSON)); err != nil {
-		p.markEntryFailed(ctx, fmt.Errorf("failedJobs.poll publish: %w", err), entry.ID)
-		return
-	}
-
-	tag, err := p.queryRunner(ctx).Exec(ctx, markAsRetriedSuccessSQL, entry.ID)
-	if err != nil {
-		p.logger.Error(fmt.Errorf("failedJobs.poll update status: %w", err), map[string]any{"entry_id": entry.ID, "event_type": string(entry.EventType)})
-		return
-	}
-
-	if tag.RowsAffected() == 0 {
-		p.logger.Error(fmt.Errorf("failedJobs.poll update status: not updated"), map[string]any{"entry_id": entry.ID, "event_type": string(entry.EventType)})
-	}
-}
-
-func (p *DLQRetryWorker) markEntryFailed(ctx context.Context, failErr error, entryID string) {
-	p.logger.Error(failErr, map[string]any{"entry_id": entryID})
-	tag, err := p.queryRunner(ctx).Exec(ctx, markAsRetriedFailedSQL, entryID, failErr.Error())
-	if err != nil {
-		p.logger.Error(fmt.Errorf("failedJobs.poll mark failed: %w", err), map[string]any{"entry_id": entryID})
-		return
-	}
-
-	if tag.RowsAffected() == 0 {
-		p.logger.Error(fmt.Errorf("failedJobs.poll mark failed: no changes"), map[string]any{"entry_id": entryID})
-		return
-	}
 }

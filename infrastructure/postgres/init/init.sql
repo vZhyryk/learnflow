@@ -11,7 +11,7 @@
 --         notifications, announcements, activity_log, event_outbox, failed_jobs,
 --         admin_actions, support_chats, support_messages,
 --         account_recovery_tokens, articles, gift_coupons, user_sessions
--- Synced through: migration 000005
+-- Synced through: migration 000008
 
 -- Index naming convention: idx_{table}_{col1}_{col2}[_{qualifier}]
 --   qualifier = domain condition key: active, available, booked, pending, open, unread, unresolved, unused
@@ -710,6 +710,8 @@ CREATE INDEX idx_event_outbox_status_available_at_pending
     ON event_outbox(status, available_at) WHERE status = 'pending';
 CREATE INDEX idx_event_outbox_locked_until
     ON event_outbox(locked_until) WHERE locked_until IS NOT NULL;
+CREATE INDEX idx_event_outbox_published_at_published
+    ON event_outbox(published_at) WHERE status = 'published';
 
 CREATE TABLE failed_jobs (
     id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),

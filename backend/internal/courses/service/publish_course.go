@@ -13,7 +13,7 @@ func (s *Service) PublishCourse(ctx context.Context, courseID string) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		course, err := s.courseRepo.GetCourseByID(ctx, courseID)
 		if err != nil {
-			return fmt.Errorf("service.GetCourseByID: %w", err)
+			return fmt.Errorf("service.PublishCourse: get course: %w", err)
 		}
 
 		if course.Status != coursedomain.DraftStatus {
@@ -30,6 +30,8 @@ func (s *Service) PublishCourse(ctx context.Context, courseID string) error {
 			return fmt.Errorf("service.PublishCourse: %w", err)
 		}
 
+		// TODO(notifications module, Phase 3+): Template/recipient unset — nothing to
+		// wire to yet; fill in once the notifications module lands.
 		payload := events.NotificationSendPayload{
 			Template: "",
 			Data: map[string]string{

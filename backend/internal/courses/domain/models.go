@@ -1,7 +1,6 @@
 package coursedomain
 
 import (
-	"strings"
 	"time"
 
 	"learnflow_backend/internal/shared/validator"
@@ -124,9 +123,12 @@ func (req *CreateCourseRequest) Validate() error {
 	checks := []func() error{
 		req.validateSlug,
 		req.validateTitle,
+		req.validateDescription,
 		req.validateEstimatedMinutes,
 		req.validateThumbnailURL,
 		req.validatePreviewVideoURL,
+		req.validateSeoTitle,
+		req.validateSeoDescription,
 		req.validateOgImageURL,
 		req.validateCanonicalURL,
 	}
@@ -147,42 +149,98 @@ func (req *CreateCourseRequest) validateSlug() error {
 }
 
 func (req *CreateCourseRequest) validateTitle() error {
-	if strings.TrimSpace(req.Title) == "" {
+	if !validator.IsValidContentTitle(req.Title) {
 		return ErrInvalidTitle
 	}
 	return nil
 }
 
+func (req *CreateCourseRequest) validateDescription() error {
+	return validateOptionalDescription(req.Description)
+}
+
+func (req *CreateCourseRequest) validateSeoTitle() error {
+	return validateOptionalSeoTitle(req.SeoTitle)
+}
+
+func (req *CreateCourseRequest) validateSeoDescription() error {
+	return validateOptionalSeoDescription(req.SeoDescription)
+}
+
 func (req *CreateCourseRequest) validateEstimatedMinutes() error {
-	if req.EstimatedMinutes != nil && *req.EstimatedMinutes <= 0 {
+	return validateOptionalEstimatedMinutes(req.EstimatedMinutes)
+}
+
+func (req *CreateCourseRequest) validateThumbnailURL() error {
+	return validateOptionalThumbnailURL(req.ThumbnailURL)
+}
+
+func (req *CreateCourseRequest) validatePreviewVideoURL() error {
+	return validateOptionalPreviewVideoURL(req.PreviewVideoURL)
+}
+
+func (req *CreateCourseRequest) validateOgImageURL() error {
+	return validateOptionalOgImageURL(req.OgImageURL)
+}
+
+func (req *CreateCourseRequest) validateCanonicalURL() error {
+	return validateOptionalCanonicalURL(req.CanonicalURL)
+}
+
+// validateOptional* helpers below back both CreateCourseRequest and UpdateCourseRequest,
+// which share every optional field except ID.
+
+func validateOptionalDescription(v *string) error {
+	if v != nil && (*v == "" || !validator.IsValidContentDescription(*v)) {
+		return ErrInvalidDescription
+	}
+	return nil
+}
+
+func validateOptionalSeoTitle(v *string) error {
+	if v != nil && (*v == "" || !validator.IsValidSeoTitle(*v)) {
+		return ErrInvalidSeoTitle
+	}
+	return nil
+}
+
+func validateOptionalSeoDescription(v *string) error {
+	if v != nil && (*v == "" || !validator.IsValidSeoDescription(*v)) {
+		return ErrInvalidSeoDescription
+	}
+	return nil
+}
+
+func validateOptionalEstimatedMinutes(v *int) error {
+	if v != nil && *v <= 0 {
 		return ErrInvalidEstimatedMinutes
 	}
 	return nil
 }
 
-func (req *CreateCourseRequest) validateThumbnailURL() error {
-	if req.ThumbnailURL != nil && (*req.ThumbnailURL == "" || !validator.IsValidHTTPSURL(*req.ThumbnailURL)) {
+func validateOptionalThumbnailURL(v *string) error {
+	if v != nil && (*v == "" || !validator.IsValidHTTPSURL(*v)) {
 		return ErrInvalidThumbnailURL
 	}
 	return nil
 }
 
-func (req *CreateCourseRequest) validatePreviewVideoURL() error {
-	if req.PreviewVideoURL != nil && (*req.PreviewVideoURL == "" || !validator.IsValidHTTPSURL(*req.PreviewVideoURL)) {
+func validateOptionalPreviewVideoURL(v *string) error {
+	if v != nil && (*v == "" || !validator.IsValidHTTPSURL(*v)) {
 		return ErrInvalidPreviewVideoURL
 	}
 	return nil
 }
 
-func (req *CreateCourseRequest) validateOgImageURL() error {
-	if req.OgImageURL != nil && (*req.OgImageURL == "" || !validator.IsValidHTTPSURL(*req.OgImageURL)) {
+func validateOptionalOgImageURL(v *string) error {
+	if v != nil && (*v == "" || !validator.IsValidHTTPSURL(*v)) {
 		return ErrInvalidOgImageURL
 	}
 	return nil
 }
 
-func (req *CreateCourseRequest) validateCanonicalURL() error {
-	if req.CanonicalURL != nil && (*req.CanonicalURL == "" || !validator.IsValidHTTPSURL(*req.CanonicalURL)) {
+func validateOptionalCanonicalURL(v *string) error {
+	if v != nil && (*v == "" || !validator.IsValidHTTPSURL(*v)) {
 		return ErrInvalidCanonicalURL
 	}
 	return nil
@@ -230,7 +288,7 @@ func (req *UpdateCourseRequest) Validate() error {
 }
 
 func (req *UpdateCourseRequest) validateID() error {
-	if req.ID == "" {
+	if req.ID == "" || !validator.IsValidUUID(req.ID) {
 		return ErrInvalidCourseID
 	}
 	return nil
@@ -244,66 +302,42 @@ func (req *UpdateCourseRequest) validateSlug() error {
 }
 
 func (req *UpdateCourseRequest) validateTitle() error {
-	if req.Title != nil && strings.TrimSpace(*req.Title) == "" {
+	if req.Title != nil && !validator.IsValidContentTitle(*req.Title) {
 		return ErrInvalidTitle
 	}
 	return nil
 }
 
 func (req *UpdateCourseRequest) validateDescription() error {
-	if req.Description != nil && *req.Description == "" {
-		return ErrInvalidDescription
-	}
-	return nil
+	return validateOptionalDescription(req.Description)
 }
 
 func (req *UpdateCourseRequest) validateThumbnailURL() error {
-	if req.ThumbnailURL != nil && (*req.ThumbnailURL == "" || !validator.IsValidHTTPSURL(*req.ThumbnailURL)) {
-		return ErrInvalidThumbnailURL
-	}
-	return nil
+	return validateOptionalThumbnailURL(req.ThumbnailURL)
 }
 
 func (req *UpdateCourseRequest) validatePreviewVideoURL() error {
-	if req.PreviewVideoURL != nil && (*req.PreviewVideoURL == "" || !validator.IsValidHTTPSURL(*req.PreviewVideoURL)) {
-		return ErrInvalidPreviewVideoURL
-	}
-	return nil
+	return validateOptionalPreviewVideoURL(req.PreviewVideoURL)
 }
 
 func (req *UpdateCourseRequest) validateSeoTitle() error {
-	if req.SeoTitle != nil && *req.SeoTitle == "" {
-		return ErrInvalidSeoTitle
-	}
-	return nil
+	return validateOptionalSeoTitle(req.SeoTitle)
 }
 
 func (req *UpdateCourseRequest) validateSeoDescription() error {
-	if req.SeoDescription != nil && *req.SeoDescription == "" {
-		return ErrInvalidSeoDescription
-	}
-	return nil
+	return validateOptionalSeoDescription(req.SeoDescription)
 }
 
 func (req *UpdateCourseRequest) validateOgImageURL() error {
-	if req.OgImageURL != nil && (*req.OgImageURL == "" || !validator.IsValidHTTPSURL(*req.OgImageURL)) {
-		return ErrInvalidOgImageURL
-	}
-	return nil
+	return validateOptionalOgImageURL(req.OgImageURL)
 }
 
 func (req *UpdateCourseRequest) validateCanonicalURL() error {
-	if req.CanonicalURL != nil && (*req.CanonicalURL == "" || !validator.IsValidHTTPSURL(*req.CanonicalURL)) {
-		return ErrInvalidCanonicalURL
-	}
-	return nil
+	return validateOptionalCanonicalURL(req.CanonicalURL)
 }
 
 func (req *UpdateCourseRequest) validateEstimatedMinutes() error {
-	if req.EstimatedMinutes != nil && *req.EstimatedMinutes <= 0 {
-		return ErrInvalidEstimatedMinutes
-	}
-	return nil
+	return validateOptionalEstimatedMinutes(req.EstimatedMinutes)
 }
 
 // Apply copies every non-nil field from r onto p.

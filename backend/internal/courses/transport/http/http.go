@@ -25,9 +25,9 @@ func NewHTTPHandler(svc coursedomain.Service, jsonLogger *logger.Logger) *Handle
 
 // RegisterRoutes registers all course HTTP routes on the given mux.
 // chain applies to public routes, adminChain to admin-only routes.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, chain, adminChain alice.Chain) {
-	mux.Handle("GET /api/v1/courses", chain.ThenFunc(h.listCourses))
-	mux.Handle("GET /api/v1/courses/{slug}", chain.ThenFunc(h.getCourseBySlug))
+func (h *Handler) RegisterRoutes(mux *http.ServeMux, staticChain, adminChain alice.Chain) {
+	mux.Handle("GET /api/v1/courses", staticChain.ThenFunc(h.listCourses))
+	mux.Handle("GET /api/v1/courses/{slug}", staticChain.ThenFunc(h.getCourseBySlug))
 
 	mux.Handle("GET /api/v1/admin/courses", adminChain.ThenFunc(h.listAllCourses))
 	mux.Handle("POST /api/v1/admin/courses", adminChain.ThenFunc(h.createCourse))

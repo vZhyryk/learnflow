@@ -101,8 +101,7 @@ func TestGetUserProfileByID(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
 			_, err := repo.GetUserProfileByID(context.Background(), "user-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db connection lost")
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 	})
 }
@@ -138,8 +137,7 @@ func TestUpdateUserProfile(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			execErr = testutil.ErrDBTimeout
 			err := repo.UpdateUserProfile(context.Background(), profile)
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "db timeout")
+			testutil.AssertUnexpectedDBError(err, "db timeout")
 		})
 	})
 }

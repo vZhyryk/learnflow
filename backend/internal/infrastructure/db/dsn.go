@@ -3,6 +3,8 @@ package db
 import (
 	"errors"
 	"fmt"
+	"net/url"
+
 	"learnflow_backend/internal/infrastructure/env"
 )
 
@@ -14,7 +16,7 @@ func BuildDSNFromEnv() (string, error) {
 	dbUser := env.GetStringEnv("DB_USER", "")
 	dbHost := env.GetStringEnv("DB_HOST", "")
 	dbPassword := env.GetStringEnv("DB_PASSWORD", "")
-	dbSSLMode := env.GetStringEnv("DB_SSLMODE", "disable")
+	dbSSLMode := env.GetStringEnv("DB_SSLMODE", "require")
 
 	switch {
 	case dbName == "":
@@ -27,5 +29,18 @@ func BuildDSNFromEnv() (string, error) {
 		return "", errors.New("db: missing DB_PASSWORD")
 	}
 
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s", dbUser, dbPassword, dbHost, dbPort, dbName, dbSSLMode), nil
+	return fmt.Sprintf("postgres://%s@%s:%d/%s?sslmode=%s", url.UserPassword(dbUser, dbPassword), dbHost, dbPort, dbName, dbSSLMode), nil
+}
+
+// MaskDSN redacts dsn's password for logging (CWE-532: the field sanitizer misses
+// credentials inline in a URL). Returns dsn unchanged if unparseable or password-less.
+func MaskDSN(dsn string) string {
+	u, err := url.Parse(dsn)
+	if err != nil || u.User == nil {
+		return dsn
+	}
+	if _, hasPassword := u.User.Password(); hasPassword {
+		u.User = url.UserPassword(u.User.Username(), "***")
+	}
+	return u.String()
 }

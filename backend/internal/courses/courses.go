@@ -10,7 +10,7 @@ import (
 )
 
 // RegisterCourseRoutes wires the courses module's HTTP handler onto mux.
-func RegisterCourseRoutes(mux *http.ServeMux, svc coursedomain.Service, chain, adminChain alice.Chain, jsonLogger *logger.Logger) {
+func RegisterCourseRoutes(mux *http.ServeMux, svc coursedomain.Service, staticChain, adminChain alice.Chain, jsonLogger *logger.Logger) {
 	courseHandler := coursehttp.NewHTTPHandler(svc, jsonLogger)
-	courseHandler.RegisterRoutes(mux, chain, adminChain)
+	courseHandler.RegisterRoutes(mux, staticChain, adminChain)
 }

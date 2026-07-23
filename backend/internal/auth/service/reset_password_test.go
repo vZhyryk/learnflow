@@ -81,7 +81,7 @@ func TestInitiatePasswordResetSuccess(t *testing.T) {
 					return t, nil
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newCapturingOutbox(&captured), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewCapturingOutbox(&captured), nil)
 
 			err := srv.InitiatePasswordReset(context.Background(), authdomain.RequestPasswordResetRequest{Email: "user@example.com"})
 
@@ -107,7 +107,7 @@ func TestInitiatePasswordResetTokenCreationFails(t *testing.T) {
 					return nil, testutil.ErrDBUnexpected
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newNoopOutbox(), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewNoopOutbox(), nil)
 
 			err := srv.InitiatePasswordReset(context.Background(), authdomain.RequestPasswordResetRequest{Email: "user@example.com"})
 
@@ -196,10 +196,8 @@ func TestResetPasswordMarkTokenUsedFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When marking the token as used fails", func() {
 			tRepo := &mockTokenRepo{
-				getPasswordResetToken: validResetPasswordToken,
-				markPasswordResetTokenUsed: func(_ context.Context, _ string) error {
-					return testutil.ErrDBUnexpected
-				},
+				getPasswordResetToken:      validResetPasswordToken,
+				markPasswordResetTokenUsed: testutil.AlwaysFailsDB,
 			}
 			uRepo := &mockUserRepo{
 				getUserByID:        validResetPasswordGetUserByID,

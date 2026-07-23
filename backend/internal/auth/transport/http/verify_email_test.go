@@ -59,6 +59,12 @@ func TestVerifyEmailServiceOutcomes(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
+		Convey("Service ErrInvalidAccountState → 200 (account state guard)", func() {
+			f.svcErr = authdomain.ErrInvalidAccountState
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
+			So(w.Code, ShouldEqual, http.StatusOK)
+		})
+
 		Convey("Service ErrTokenUsed → 401", func() {
 			f.svcErr = authdomain.ErrTokenUsed
 			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))

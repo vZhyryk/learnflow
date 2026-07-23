@@ -45,7 +45,7 @@ func TestCreateEmailVerificationToken(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreateEmailVerificationToken(context.Background(), &authdomain.EmailVerificationToken{})
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -72,7 +72,7 @@ func TestGetEmailVerificationToken(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetEmailVerificationToken(context.Background(), "hash-abc")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -93,7 +93,7 @@ func runTokenMarkTests(t *testing.T, name string, mark func(repo *Repository, ct
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := mark(repo, context.Background(), "hash-abc")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When 0 rows are affected (token already used or never existed)", func() {
@@ -131,7 +131,7 @@ func TestCreatePasswordResetToken(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreatePasswordResetToken(context.Background(), &authdomain.PasswordResetToken{})
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -158,7 +158,7 @@ func TestGetPasswordResetToken(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetPasswordResetToken(context.Background(), "hash-abc")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -187,7 +187,7 @@ func TestCreateEmailChangeToken(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreateEmailChangeToken(context.Background(), &authdomain.EmailChangeToken{})
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -215,7 +215,7 @@ func TestGetEmailChangeToken(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetEmailChangeToken(context.Background(), "hash-abc")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -242,7 +242,7 @@ func TestCreateAccountRecoveryToken(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreateAccountRecoveryToken(context.Background(), &authdomain.AccountRecoveryToken{})
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -269,7 +269,7 @@ func TestGetAccountRecoveryToken(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetAccountRecoveryToken(context.Background(), "hash-abc")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -300,7 +300,7 @@ func TestDeleteExpiredTokens(t *testing.T) {
 			callCount = 0
 			fakeErr = testutil.ErrDB
 			_, err := repo.DeleteExpiredTokens(context.Background())
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 			So(callCount, ShouldEqual, 1)
 		})
 	})

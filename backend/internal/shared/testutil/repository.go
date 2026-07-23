@@ -18,6 +18,16 @@ type MockQueryRunner struct {
 	ExecFn     func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
 
+// AlwaysFailsQuery satisfies MockQueryRunner.QueryFn, failing unconditionally with ErrDBUnexpected.
+func AlwaysFailsQuery(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
+	return nil, ErrDBUnexpected
+}
+
+// AlwaysFailsExec satisfies MockQueryRunner.ExecFn, failing unconditionally with ErrDBUnexpected.
+func AlwaysFailsExec(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+	return pgconn.CommandTag{}, ErrDBUnexpected
+}
+
 // QueryRow delegates to QueryRowFn, panicking if it was not set for this test.
 func (m *MockQueryRunner) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 	if m.QueryRowFn == nil {
@@ -96,6 +106,34 @@ func CastPgtypeDate(v any, idx int) *pgtype.Date {
 	return d
 }
 
+// CastBool safely type-asserts a scan destination to *bool.
+func CastBool(v any, idx int) *bool {
+	b, ok := v.(*bool)
+	if !ok {
+		panic(fmt.Sprintf("dest[%d]: expected *bool, got %T", idx, v))
+	}
+	return b
+}
+
+// CastPtrInt safely type-asserts a scan destination to **int, for nullable integer columns.
+func CastPtrInt(v any, idx int) **int {
+	i, ok := v.(**int)
+	if !ok {
+		panic(fmt.Sprintf("dest[%d]: expected **int, got %T", idx, v))
+	}
+	return i
+}
+
+// CastPtrTime safely type-asserts a scan destination to **time.Time, for nullable
+// timestamptz columns.
+func CastPtrTime(v any, idx int) **time.Time {
+	t, ok := v.(**time.Time)
+	if !ok {
+		panic(fmt.Sprintf("dest[%d]: expected **time.Time, got %T", idx, v))
+	}
+	return t
+}
+
 // MockRows implements pgx.Rows for controlled multi-row Scan injection in
 // repository/worker tests. Rows are consumed front-to-back by successive Scan calls.
 type MockRows struct {
@@ -117,7 +155,6 @@ func (r *MockRows) Scan(dest ...any) error {
 
 // Close is a no-op; MockRows has no underlying connection to release.
 func (r *MockRows) Close() {
-	// no-op: MockRows has no underlying connection to release.
 }
 
 // Err returns RowsErr, the error to surface after iteration completes.

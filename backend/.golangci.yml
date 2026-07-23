@@ -63,7 +63,7 @@ linters:
                 - shadow
 
         gosec:
-            severity: medium
+            severity: low
             confidence: medium
 
         wrapcheck:

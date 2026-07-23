@@ -1,6 +1,6 @@
 -- LearnFlow database initialization — annotated version
 -- PostgreSQL 17+; run once on empty volume via /docker-entrypoint-initdb.d/
--- Synced through: migration 000005
+-- Synced through: migration 000008
 --
 -- GLOBAL DESIGN DECISIONS
 -- ───────────────────────
@@ -1339,6 +1339,13 @@ CREATE INDEX idx_event_outbox_status_available_at_pending
 -- Without this index, the cleanup job scans all events.
 CREATE INDEX idx_event_outbox_locked_until
     ON event_outbox(locked_until) WHERE locked_until IS NOT NULL;
+
+-- [migration 000008]: OutboxCleanupWorker deletes published rows older than 7 days
+-- (internal/worker/outbox_cleanup.go) — without this index that DELETE is a full seq
+-- scan, growing more expensive the larger the table gets (i.e. exactly the scenario
+-- retention exists to prevent).
+CREATE INDEX idx_event_outbox_published_at_published
+    ON event_outbox(published_at) WHERE status = 'published';
 
 -- [Dead Letter Queue — failed_jobs]:
 -- CLAUDE.md: "On failure: retry 3× with exponential backoff, then → DLQ".

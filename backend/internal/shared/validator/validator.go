@@ -3,6 +3,7 @@ package validator
 import (
 	"net/url"
 	"regexp"
+	"strings"
 	"time"
 	"unicode/utf8"
 )
@@ -21,6 +22,15 @@ var EmailRX = regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,
 
 // SlugRX is the compiled regular expression for validating URL-safe slugs.
 var SlugRX = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
+// UUIDRX is the compiled regular expression for validating canonical (8-4-4-4-12,
+// hyphenated) UUID strings, as returned by PostgreSQL's gen_random_uuid().
+var UUIDRX = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+// IsValidUUID reports whether value is a canonical UUID string.
+func IsValidUUID(value string) bool {
+	return UUIDRX.MatchString(value)
+}
 
 // dobMinDate is the earliest date_of_birth accepted, matching the
 // user_profiles_dob_min DB constraint.
@@ -93,8 +103,16 @@ func IsValidUILanguage(value string) bool {
 	}
 }
 
-// IsValidHTTPSURL reports whether value is a valid HTTPS URL with a non-empty host.
+// maxURLLength is a sanity/storage bound, not an SSRF control — there is no server-side
+// fetch of these URLs.
+const maxURLLength = 2048
+
+// IsValidHTTPSURL reports whether value is a valid HTTPS URL with a non-empty host and
+// at most maxURLLength bytes.
 func IsValidHTTPSURL(value string) bool {
+	if len(value) > maxURLLength {
+		return false
+	}
 	u, err := url.Parse(value)
 	return err == nil && u.Scheme == "https" && u.Host != ""
 }
@@ -113,4 +131,29 @@ func IsValidTimezone(value string) bool {
 // IsValidBio reports whether value is at most 500 runes.
 func IsValidBio(value string) bool {
 	return utf8.RuneCountInString(value) <= 500
+}
+
+// IsValidContentTitle reports whether value is 1-300 runes (after trimming), for
+// course/content-item/article title fields.
+func IsValidContentTitle(value string) bool {
+	n := utf8.RuneCountInString(strings.TrimSpace(value))
+	return n > 0 && n <= 300
+}
+
+// IsValidContentDescription reports whether value is at most 10000 runes, for
+// course/content-item/article long-form description fields.
+func IsValidContentDescription(value string) bool {
+	return utf8.RuneCountInString(value) <= 10000
+}
+
+// IsValidSeoTitle reports whether value is at most 70 runes — the practical length
+// before search engines truncate a page's <title> in results.
+func IsValidSeoTitle(value string) bool {
+	return utf8.RuneCountInString(value) <= 70
+}
+
+// IsValidSeoDescription reports whether value is at most 160 runes — the practical
+// length before search engines truncate a meta description in results.
+func IsValidSeoDescription(value string) bool {
+	return utf8.RuneCountInString(value) <= 160
 }

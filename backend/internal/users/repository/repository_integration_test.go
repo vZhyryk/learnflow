@@ -4,10 +4,7 @@ package usersrepository
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"testing"
 
 	"learnflow_backend/internal/shared/testutil"
@@ -19,13 +16,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-const dummyPasswordHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
-
-const insertTestUserSQL = `
-	INSERT INTO users (email, password_hash, role, status)
-	VALUES ($1, $2, 'user', 'active')
-	RETURNING id`
-
 const insertTestProfileSQL = `
 	INSERT INTO user_profiles (
 		user_id, first_name, last_name, phone_number, country, city,
@@ -33,25 +23,9 @@ const insertTestProfileSQL = `
 	)
 	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`
 
-func randomTestEmail(t *testing.T) string {
+func insertTestUser(t *testing.T, tx pgx.Tx) string {
 	t.Helper()
-
-	buf := make([]byte, 8)
-	if _, err := rand.Read(buf); err != nil {
-		t.Fatalf("randomTestEmail: %v", err)
-	}
-	return fmt.Sprintf("users-repo-integration-%s@example.com", hex.EncodeToString(buf))
-}
-
-func insertTestUser(t *testing.T, ctx context.Context, tx pgx.Tx) string {
-	t.Helper()
-
-	var id string
-	err := tx.QueryRow(ctx, insertTestUserSQL, randomTestEmail(t), dummyPasswordHash).Scan(&id)
-	if err != nil {
-		t.Fatalf("insertTestUser: %v", err)
-	}
-	return id
+	return testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "users-repo-integration"))
 }
 
 func softDeleteTestUser(t *testing.T, ctx context.Context, tx pgx.Tx, userID string) {
@@ -103,7 +77,7 @@ func TestGetUserProfileByID_Integration(t *testing.T) {
 		Convey("When the profile has all fields populated", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
-				userID := insertTestUser(t, ctx, tx)
+				userID := insertTestUser(t, tx)
 				seed := fullTestProfile(userID)
 				insertTestProfile(t, ctx, tx, seed)
 
@@ -131,7 +105,7 @@ func TestGetUserProfileByID_Integration(t *testing.T) {
 		Convey("When date_of_birth and other optional fields are NULL", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
-				userID := insertTestUser(t, ctx, tx)
+				userID := insertTestUser(t, tx)
 				seed := &usersdomain.UserProfile{
 					UserID:     userID,
 					UILanguage: "uk",
@@ -161,7 +135,7 @@ func TestGetUserProfileByID_Integration(t *testing.T) {
 		Convey("When the owning user is soft-deleted", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
-				userID := insertTestUser(t, ctx, tx)
+				userID := insertTestUser(t, tx)
 				seed := fullTestProfile(userID)
 				insertTestProfile(t, ctx, tx, seed)
 				softDeleteTestUser(t, ctx, tx, userID)
@@ -182,7 +156,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 		Convey("When updating an existing profile's fields", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
-				userID := insertTestUser(t, ctx, tx)
+				userID := insertTestUser(t, tx)
 				insertTestProfile(t, ctx, tx, &usersdomain.UserProfile{UserID: userID, UILanguage: "uk"})
 
 				update := fullTestProfile(userID)
@@ -204,7 +178,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 		Convey("When nulling out a previously-set date_of_birth", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
-				userID := insertTestUser(t, ctx, tx)
+				userID := insertTestUser(t, tx)
 				insertTestProfile(t, ctx, tx, fullTestProfile(userID))
 
 				update := fullTestProfile(userID)
@@ -231,7 +205,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 		Convey("When the update violates a CHECK constraint at the DB level", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{db: tx}
-				userID := insertTestUser(t, ctx, tx)
+				userID := insertTestUser(t, tx)
 				insertTestProfile(t, ctx, tx, &usersdomain.UserProfile{UserID: userID, UILanguage: "uk"})
 
 				badGender := "not_a_valid_gender"
@@ -250,7 +224,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 			Convey("When the update violates the country CHECK constraint", func() {
 				testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 					repo := &Repository{db: tx}
-					userID := insertTestUser(t, ctx, tx)
+					userID := insertTestUser(t, tx)
 					insertTestProfile(t, ctx, tx, &usersdomain.UserProfile{UserID: userID, UILanguage: "uk"})
 
 					badCountry := "USA" // must be exactly 2 chars (ISO 3166-1 alpha-2)
@@ -270,7 +244,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 			Convey("When the update violates the date_of_birth not-future CHECK constraint", func() {
 				testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 					repo := &Repository{db: tx}
-					userID := insertTestUser(t, ctx, tx)
+					userID := insertTestUser(t, tx)
 					insertTestProfile(t, ctx, tx, &usersdomain.UserProfile{UserID: userID, UILanguage: "uk"})
 
 					futureDOB := "2999-01-01"
@@ -290,7 +264,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 			Convey("When the update violates the date_of_birth min CHECK constraint", func() {
 				testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 					repo := &Repository{db: tx}
-					userID := insertTestUser(t, ctx, tx)
+					userID := insertTestUser(t, tx)
 					insertTestProfile(t, ctx, tx, &usersdomain.UserProfile{UserID: userID, UILanguage: "uk"})
 
 					tooOldDOB := "1899-12-31"
@@ -315,7 +289,7 @@ func TestUserProfileForeignKeyRestrict_Integration(t *testing.T) {
 
 	Convey("Given a user with an existing profile", t, func() {
 		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-			userID := insertTestUser(t, ctx, tx)
+			userID := insertTestUser(t, tx)
 			insertTestProfile(t, ctx, tx, fullTestProfile(userID))
 
 			Convey("When hard-deleting the owning user row", func() {

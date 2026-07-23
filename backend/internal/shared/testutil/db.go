@@ -2,6 +2,9 @@ package testutil
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -42,4 +45,34 @@ func WithTestTx(t *testing.T, pool *pgxpool.Pool, fn func(ctx context.Context, t
 	defer func() { _ = tx.Rollback(ctx) }() //nolint:errcheck // rollback-only helper; error intentionally ignored
 
 	fn(ctx, tx)
+}
+
+// dummyUserPasswordHash is a valid bcrypt hash for seeding test users — not a real credential.
+const dummyUserPasswordHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
+
+const insertTestUserSQL = `
+	INSERT INTO users (email, password_hash, role, status)
+	VALUES ($1, $2, 'user', 'active')
+	RETURNING id`
+
+// RandomTestEmail generates a unique email, prefixed by the caller's package (e.g. "courses-repo").
+func RandomTestEmail(t *testing.T, prefix string) string {
+	t.Helper()
+
+	buf := make([]byte, 8)
+	if _, err := rand.Read(buf); err != nil {
+		t.Fatalf("testutil.RandomTestEmail: %v", err)
+	}
+	return fmt.Sprintf("%s-%s@example.com", prefix, hex.EncodeToString(buf))
+}
+
+// InsertTestUser inserts a minimal active user row to satisfy a users(id) foreign key.
+func InsertTestUser(t *testing.T, tx pgx.Tx, email string) string {
+	t.Helper()
+
+	var id string
+	if err := tx.QueryRow(context.Background(), insertTestUserSQL, email, dummyUserPasswordHash).Scan(&id); err != nil {
+		t.Fatalf("testutil.InsertTestUser: %v", err)
+	}
+	return id
 }

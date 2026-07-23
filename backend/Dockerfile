@@ -38,6 +38,8 @@ COPY --from=builder /out/api /app/api
 RUN chown app:app /app/api
 USER app:app
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/health || exit 1
 CMD ["/app/api"]
 
 ## Worker runtime
@@ -49,6 +51,8 @@ WORKDIR /app
 COPY --from=builder /out/worker /app/worker
 RUN chown app:app /app/worker
 USER app:app
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD pgrep -f /app/worker || exit 1
 CMD ["/app/worker"]
 
 ## Migration runtime

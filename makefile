@@ -28,6 +28,7 @@ help:
 		'  make tidy_and_verify        - tidy and verify Go module dependencies in backend' \
 		'  make cleanup                - clean Go build and module cache' \
 		'  make run                    - run the main dev docker compose stack' \
+		'  make run_rebuild             - run the main dev docker compose stack, forcing an image rebuild' \
 		'  make run_obs                - run observability services (expects dev network or use run_full)' \
 		'  make run_full               - run dev stack together with observability' \
 		'  make stop                   - stop dev, observability, and sonar compose stacks' \
@@ -72,6 +73,9 @@ cleanup:
 	go clean -testcache
 
 run:
+	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up
+
+run_rebuild:
 	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up --build
 
 run_obs:

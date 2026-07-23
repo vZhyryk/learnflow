@@ -80,7 +80,7 @@ func TestEmitTokenEvent(t *testing.T) {
 	Convey("emitTokenEvent", t, func() {
 		Convey("when token generation succeeds and fn succeeds, the event is emitted via outbox", func() {
 			var captured []any
-			srv := newTestService(nil, nil, nil, newCapturingOutbox(&captured), nil)
+			srv := newTestService(nil, nil, nil, testutil.NewCapturingOutbox(&captured), nil)
 
 			var gotRaw, gotHash string
 			var gotExpiry time.Time
@@ -98,8 +98,8 @@ func TestEmitTokenEvent(t *testing.T) {
 			So(captured, ShouldNotBeEmpty)
 		})
 
-		Convey("when fn returns an error, it is returned as-is without wrapping and outbox.Emit is never called", func() {
-			srv := newTestService(nil, nil, nil, newFailingOutbox(errors.New("should not be reached")), nil)
+		Convey("when fn returns an error, it is wrapped and outbox.Emit is never called", func() {
+			srv := newTestService(nil, nil, nil, testutil.NewFailingOutbox(errors.New("should not be reached")), nil)
 
 			fnErr := errors.New("token persistence failed")
 			err := srv.emitTokenEvent(context.Background(), "user-1", time.Hour, events.AggregationTypeUser, events.EventUserRegistered,
@@ -107,12 +107,12 @@ func TestEmitTokenEvent(t *testing.T) {
 					return nil, fnErr
 				})
 
-			So(err, ShouldEqual, fnErr)
+			So(errors.Is(err, fnErr), ShouldBeTrue)
 		})
 
 		Convey("when fn succeeds but outbox.Emit fails, the error propagates", func() {
 			outboxErr := errors.New("outbox insert failed")
-			srv := newTestService(nil, nil, nil, newFailingOutbox(outboxErr), nil)
+			srv := newTestService(nil, nil, nil, testutil.NewFailingOutbox(outboxErr), nil)
 
 			err := srv.emitTokenEvent(context.Background(), "user-1", time.Hour, events.AggregationTypeUser, events.EventUserRegistered,
 				func(context.Context, string, string, time.Time) (any, error) {

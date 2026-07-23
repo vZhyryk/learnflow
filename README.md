@@ -265,6 +265,7 @@ Key variables from `.env.example`:
 | `API_PORT`          | `8080`           | Backend HTTP port                 |
 | `FRONTEND_PORT`     | `3000`           | Nuxt SSR port                     |
 | `DATABASE_DSN`      | `postgres://...` | PostgreSQL connection string      |
+| `DB_PASSWORD`       | `postgres`       | **Must be set explicitly outside local dev** — `docker-compose.dev.yml` falls back to the well-known `postgres` if unset |
 | `REDIS_ADDR`        | `localhost:6379` | Redis address                     |
 | `JWT_SECRET`        | `dev-secret`     | Change in production              |
 | `EMAIL_PROVIDER`    | `stub`           | `stub` (local) or `resend` (prod) |

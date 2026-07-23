@@ -5,7 +5,7 @@ import (
 	"learnflow_backend/internal/events"
 )
 
-// Service implements usersdomain.Service.
+// Service implements coursedomain.Service.
 type Service struct {
 	courseRepo coursedomain.CourseRepository
 	transactor coursedomain.Transactor

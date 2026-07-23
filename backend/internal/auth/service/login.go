@@ -13,40 +13,16 @@ import (
 
 const (
 	loginLockInterval = "15 minutes"
-	// loginFailLimit: max consecutive failed password attempts (tracked per user via
-	// IncrementFailedLogin) before the account is temporarily locked. The repository also
-	// exposes a session-level counter (UpdateFailedLoginAttempts) but no service code
-	// currently calls it — see .planning/STATE.md Deferred Items (sarch-14).
+	// loginFailLimit: consecutive failed attempts before a temporary lock (see sarch-14).
 	loginFailLimit = 5
 )
 
-// bcryptCompareHashAndPassword is a package-level indirection over bcrypt.CompareHashAndPassword.
-// Tests substitute this var with a call-counting spy to assert the dummy-hash comparison in
-// loginGetUser actually executes (the constant-time, user-enumeration-prevention guarantee),
-// without relying on flaky wall-clock timing assertions.
+// bcryptCompareHashAndPassword indirects bcrypt.CompareHashAndPassword so tests can spy on
+// the dummy-hash comparison in loginGetUser instead of asserting on wall-clock timing.
 var bcryptCompareHashAndPassword = bcrypt.CompareHashAndPassword
 
-// Login authenticates a user and returns access/refresh tokens.
-//
-// Check order is intentional and security-sensitive — do not reorder:
-//
-//  1. loginGetUser: fetch user by email. If not found, run dummy bcrypt to prevent
-//     user-enumeration via timing (found vs not-found responses take the same time).
-//
-//  2. LoginLockedUntil (brute-force lock) before bcrypt: skipping bcrypt for locked
-//     accounts avoids ~100ms CPU cost per request during an active attack. Revealing
-//     that an account is locked is acceptable — the attacker most likely triggered the
-//     lock themselves, and the HTTP 429 response already communicates this explicitly.
-//
-//  3. bcrypt: always runs for existing, non-locked accounts regardless of outcome.
-//     bcrypt takes the same ~100ms whether the password is correct or wrong, so the
-//     result does not leak via timing.
-//
-//  4. Status checks (StatusBlocked, StatusPendingVerification) after bcrypt: intentional.
-//     Checking status before bcrypt would create a timing oracle — a blocked account
-//     with the correct password would return faster (no bcrypt) than with a wrong
-//     password, letting an attacker confirm a valid password by measuring response time.
-//     Placing status checks after bcrypt eliminates this difference.
+// Login authenticates a user and returns access/refresh tokens. Check order (lock →
+// bcrypt → status) is timing-attack-sensitive — do not reorder, see TestLoginConstantTimeUserEnumeration.
 func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*authdomain.AuthTokens, error) {
 	user, err := s.loginGetUser(ctx, req)
 	if err != nil {
@@ -78,9 +54,8 @@ func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*auth
 	return s.loginHandleSession(ctx, req, user)
 }
 
-// loginGetUser fetches the user by email. If the email does not exist, it runs a dummy
-// bcrypt comparison against a precomputed hash to match the response time of a real
-// password check, preventing user-enumeration via timing differences.
+// loginGetUser fetches the user by email, running a dummy bcrypt comparison on a miss to
+// keep response timing indistinguishable from a real check (prevents user enumeration).
 func (s *Service) loginGetUser(ctx context.Context, req authdomain.LoginRequest) (*authdomain.User, error) {
 	user, err := s.userRepo.GetUserByEmail(ctx, req.Email)
 	if err == nil {
@@ -91,10 +66,8 @@ func (s *Service) loginGetUser(ctx context.Context, req authdomain.LoginRequest)
 		return nil, fmt.Errorf("login: get user: %w", err)
 	}
 
-	// Dummy bcrypt: keeps response time constant whether the email exists or not.
-	// dummyPasswordHash is precomputed at startup — never generate it per-request
-	// (GenerateFromPassword is slow by design and would invert the timing signature).
-	bcryptCompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck // error is intentionally discarded — call exists only to consume constant time and prevent user enumeration via timing
+	// Dummy bcrypt against a precomputed hash — keeps timing constant; never generate per-request.
+	bcryptCompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck,gosec // discarded intentionally, only used to consume constant time
 	return nil, authdomain.ErrInvalidCredentials
 }
 

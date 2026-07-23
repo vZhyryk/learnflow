@@ -168,7 +168,7 @@ func TestInitiateEmailChangeTokenIssued(t *testing.T) {
 					return tok, nil
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newCapturingOutbox(&captured), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewCapturingOutbox(&captured), nil)
 
 			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
 
@@ -195,7 +195,7 @@ func TestInitiateEmailChangeTokenCreationFails(t *testing.T) {
 					return nil, testutil.ErrDBUnexpected
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newNoopOutbox(), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewNoopOutbox(), nil)
 
 			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
 
@@ -313,10 +313,8 @@ func TestChangeEmailApplyFailures(t *testing.T) {
 
 		Convey("When marking the token as used fails", func() {
 			tRepo := &mockTokenRepo{
-				getEmailChangeToken: validChangeEmailToken,
-				markEmailChangeTokenUsed: func(_ context.Context, _ string) error {
-					return testutil.ErrDBUnexpected
-				},
+				getEmailChangeToken:      validChangeEmailToken,
+				markEmailChangeTokenUsed: testutil.AlwaysFailsDB,
 			}
 			uRepo := validChangeEmailUserRepo()
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)

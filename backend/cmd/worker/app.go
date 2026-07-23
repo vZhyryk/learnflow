@@ -11,10 +11,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Config holds all runtime configuration for the worker process.
-//
-// Each field's doc comment names the env var it is sourced from —
-// see cmd/worker/main.go's getAppConfig/getMailerConfig for the loading logic.
+// Config holds all runtime configuration for the worker process. Each field's doc comment
+// names its source env var — see cmd/worker/main.go's getAppConfig/getMailerConfig.
 type Config struct {
 	Env      string // ENVIRONMENT
 	Database bootstrap.DatabaseConfig
@@ -44,10 +42,8 @@ type App struct {
 	RedisClient *redis.Client
 }
 
-// NewApp wraps raw infrastructure dependencies (DB pool, Redis client) into the
-// App container, mirroring how cmd/api/router.NewRouter wraps cmd/api/app.App's
-// raw DB/Redis into repositories and services — both entrypoints gather raw
-// dependencies in main() first, then hand them to a single factory step.
+// NewApp wraps raw infra dependencies into the App container, mirroring how
+// cmd/api/router.NewRouter wraps cmd/api/app.App's DB/Redis into services.
 func NewApp(cfg Config, log *logger.Logger, dbInstance *pgxpool.Pool, redisClient *redis.Client) *App {
 	return &App{
 		Config:      cfg,

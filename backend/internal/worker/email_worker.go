@@ -13,6 +13,10 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+const (
+	attemptsCount = 3
+)
+
 // Config holds the event-type-specific callbacks and metadata for an EmailWorker.
 type Config[T any] struct {
 	EventType       string
@@ -55,12 +59,6 @@ func NewEmailWorker[T any](
 func (w *EmailWorker[T]) Run(ctx context.Context) {
 	for {
 		result, err := w.redisClient.BLPop(ctx, 5*time.Second, w.cfg.EventType).Result()
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
 		isCont, isRet := w.handleRunBLPopErrors(err)
 		if isCont {
 			continue
@@ -79,12 +77,20 @@ func (w *EmailWorker[T]) Run(ctx context.Context) {
 			continue
 		}
 
-		if err := retry.Do(ctx, 3, func() error {
-			return w.cfg.Process(*payload, w.baseURL, w.mailer)
-		}); err != nil {
-			w.logger.Error(err, nil)
-			w.dlq.Write(ctx, w.cfg.EventType, w.cfg.AggregationType, payload, err, 3)
-			w.redisClient.Del(ctx, key)
+		w.processAndHandleFailure(ctx, payload, key)
+	}
+}
+
+// processAndHandleFailure runs cfg.Process with retries; on exhaustion it DLQs the event
+// and clears the idempotency key so a replay isn't skipped as already-processed.
+func (w *EmailWorker[T]) processAndHandleFailure(ctx context.Context, payload *T, key string) {
+	if err := retry.Do(ctx, attemptsCount, func() error {
+		return w.cfg.Process(*payload, w.baseURL, w.mailer)
+	}); err != nil {
+		w.logger.Error(err, nil)
+		w.dlq.Write(ctx, w.cfg.EventType, w.cfg.AggregationType, payload, err, attemptsCount)
+		if delErr := w.redisClient.Del(ctx, key).Err(); delErr != nil {
+			w.logger.Error(fmt.Errorf("%s: idempotency key cleanup: %w", w.cfg.EventType, delErr), nil)
 		}
 	}
 }

@@ -37,7 +37,7 @@ func (t *PgxTransactor) InTransaction(ctx context.Context, fn func(ctx context.C
 	defer func() { _ = tx.Rollback(ctx) }() //nolint:errcheck // Rollback is a no-op after Commit; error intentionally ignored
 
 	if err := fn(context.WithValue(ctx, txKey{}, tx)); err != nil {
-		return err
+		return fmt.Errorf("transactor.InTransaction: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {

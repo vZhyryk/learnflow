@@ -68,38 +68,74 @@ type mockService struct {
 }
 
 func (m *mockService) Login(ctx context.Context, req authdomain.LoginRequest) (*authdomain.AuthTokens, error) {
+	if m.login == nil {
+		panic("mockService.login not set")
+	}
 	return m.login(ctx, req)
 }
 func (m *mockService) Logout(ctx context.Context, req authdomain.LogoutRequest) (string, error) {
+	if m.logout == nil {
+		panic("mockService.logout not set")
+	}
 	return m.logout(ctx, req)
 }
 func (m *mockService) Register(ctx context.Context, req authdomain.RegisterRequest) (string, error) {
+	if m.register == nil {
+		panic("mockService.register not set")
+	}
 	return m.register(ctx, req)
 }
 func (m *mockService) Refresh(ctx context.Context, req authdomain.RefreshRequest) (*authdomain.AuthTokens, error) {
+	if m.refresh == nil {
+		panic("mockService.refresh not set")
+	}
 	return m.refresh(ctx, req)
 }
 func (m *mockService) VerifyEmail(ctx context.Context, req authdomain.VerifyEmailRequest) (string, error) {
+	if m.verifyEmail == nil {
+		panic("mockService.verifyEmail not set")
+	}
 	return m.verifyEmail(ctx, req)
 }
 func (m *mockService) ChangePassword(ctx context.Context, req authdomain.ChangePasswordRequest) error {
+	if m.changePassword == nil {
+		panic("mockService.changePassword not set")
+	}
 	return m.changePassword(ctx, req)
 }
 func (m *mockService) InitiatePasswordReset(ctx context.Context, req authdomain.RequestPasswordResetRequest) error {
+	if m.initiatePasswordReset == nil {
+		panic("mockService.initiatePasswordReset not set")
+	}
 	return m.initiatePasswordReset(ctx, req)
 }
 func (m *mockService) ResetPassword(ctx context.Context, req authdomain.ResetPasswordRequest) error {
+	if m.resetPassword == nil {
+		panic("mockService.resetPassword not set")
+	}
 	return m.resetPassword(ctx, req)
 }
 func (m *mockService) InitiateEmailChange(ctx context.Context, req authdomain.RequestEmailChangeRequest) error {
+	if m.initiateEmailChange == nil {
+		panic("mockService.initiateEmailChange not set")
+	}
 	return m.initiateEmailChange(ctx, req)
 }
 func (m *mockService) ChangeEmail(ctx context.Context, req authdomain.EmailChangeRequest) error {
+	if m.changeEmail == nil {
+		panic("mockService.changeEmail not set")
+	}
 	return m.changeEmail(ctx, req)
 }
 func (m *mockService) RecoverAccount(ctx context.Context, req authdomain.RecoverAccountRequest) error {
+	if m.recoverAccount == nil {
+		panic("mockService.recoverAccount not set")
+	}
 	return m.recoverAccount(ctx, req)
 }
 func (m *mockService) InitRecoverAccount(ctx context.Context, req authdomain.RequestRecoverAccountRequest) error {
+	if m.initRecoverAccount == nil {
+		panic("mockService.initRecoverAccount not set")
+	}
 	return m.initRecoverAccount(ctx, req)
 }

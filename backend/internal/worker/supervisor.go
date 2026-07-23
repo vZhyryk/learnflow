@@ -18,16 +18,18 @@ const restartBackoff = time.Second
 func RunWithRecovery(ctx context.Context, log *logger.Logger, w Worker) {
 	for {
 		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					log.Error(fmt.Errorf("worker panic: %v\n%s", r, debug.Stack()), nil)
-				}
-			}()
+			defer handleRecover(log)
 			w.Run(ctx)
 		}()
 		if ctx.Err() != nil {
 			return
 		}
 		time.Sleep(restartBackoff)
+	}
+}
+
+func handleRecover(log *logger.Logger) {
+	if r := recover(); r != nil {
+		log.Error(fmt.Errorf("worker panic: %v\n%s", r, debug.Stack()), nil)
 	}
 }

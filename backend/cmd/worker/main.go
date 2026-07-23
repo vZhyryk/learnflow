@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"learnflow_backend/internal/infrastructure/bootstrap"
 	"learnflow_backend/internal/infrastructure/db"
@@ -45,6 +46,7 @@ func main() {
 		worker.NewPasswordResetWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
 		worker.NewRegistrationAttemptsWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
 		worker.NewAccountRecoveryWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
+		worker.NewOutboxCleanupWorker(dbInstance, app.Logger, 24*time.Hour),
 		// worker.NewBriefSubmittedWorker(dbInstance, app.Publisher, app.Logger, transactor),
 		// worker.NewNotificationWorker(dbInstance, app.Publisher, app.Logger, transactor),
 	}

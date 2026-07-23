@@ -1,6 +1,8 @@
 package courserepository
 
 const (
+	// courseColumns' column order must exactly match the Scan() destinations in scanCourse
+	// (scanner.go) — reordering either without the other breaks scanning silently.
 	courseColumns = `
 	    id, slug, title, description, thumbnail_url, preview_video_url, status, estimated_minutes,
 		seo_title, seo_description, og_image_url, canonical_url, is_indexable,
@@ -53,24 +55,28 @@ const (
 		SELECT` + courseColumns + `
 		FROM courses WHERE status = 'published' AND deleted_at IS NULL
 		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
 	`
 
 	getAllDraftCoursesSQL = `
 		SELECT` + courseColumns + `
 		FROM courses WHERE status = 'draft' AND deleted_at IS NULL
 		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
 	`
 
 	getAllArchivedCoursesSQL = `
 		SELECT` + courseColumns + `
 		FROM courses WHERE status = 'archived'
 		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
 	`
 
 	getAllCoursesSQL = `
 		SELECT` + courseColumns + `
 		FROM courses
 		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
 	`
 
 	getCourseByIDSQL = `

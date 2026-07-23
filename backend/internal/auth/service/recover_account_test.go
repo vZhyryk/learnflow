@@ -55,12 +55,12 @@ func TestInitRecoverAccountUserLookup(t *testing.T) {
 	})
 }
 
-func recoverAccountDeletedUser() *authdomain.User {
+func fakeRecoverAccountDeletedUser() *authdomain.User {
 	return &authdomain.User{ID: "user-123", Email: "user@example.com", Status: authdomain.StatusDeleted}
 }
 
 func TestInitRecoverAccountProfileLookup(t *testing.T) {
-	deletedUser := recoverAccountDeletedUser()
+	deletedUser := fakeRecoverAccountDeletedUser()
 
 	Convey("Given an auth service", t, func() {
 		Convey("When fetching the user profile fails", func() {
@@ -94,7 +94,7 @@ func TestInitRecoverAccountProfileLookup(t *testing.T) {
 					return nil, testutil.ErrDBUnexpected
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newNoopOutbox(), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewNoopOutbox(), nil)
 
 			err := srv.InitRecoverAccount(context.Background(), authdomain.RequestRecoverAccountRequest{Email: "user@example.com"})
 
@@ -105,7 +105,7 @@ func TestInitRecoverAccountProfileLookup(t *testing.T) {
 }
 
 func TestInitRecoverAccountTokenIssued(t *testing.T) {
-	deletedUser := recoverAccountDeletedUser()
+	deletedUser := fakeRecoverAccountDeletedUser()
 
 	Convey("Given an auth service", t, func() {
 		Convey("When the token is issued successfully", func() {
@@ -124,7 +124,7 @@ func TestInitRecoverAccountTokenIssued(t *testing.T) {
 					return t, nil
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newCapturingOutbox(&captured), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewCapturingOutbox(&captured), nil)
 
 			err := srv.InitRecoverAccount(context.Background(), authdomain.RequestRecoverAccountRequest{Email: "user@example.com"})
 
@@ -217,9 +217,7 @@ func TestRecoverAccountRestoreFailures(t *testing.T) {
 			tRepo := &mockTokenRepo{getAccountRecoveryToken: validRecoverAccountToken}
 			uRepo := &mockUserRepo{
 				getDeletedUserByID: recoverAccountGetDeletedUserByID,
-				restoreUser: func(_ context.Context, _ string) error {
-					return testutil.ErrDBUnexpected
-				},
+				restoreUser:        testutil.AlwaysFailsDB,
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
 
@@ -231,10 +229,8 @@ func TestRecoverAccountRestoreFailures(t *testing.T) {
 
 		Convey("When marking the token as used fails", func() {
 			tRepo := &mockTokenRepo{
-				getAccountRecoveryToken: validRecoverAccountToken,
-				markAccountRecoveryTokenUsed: func(_ context.Context, _ string) error {
-					return testutil.ErrDBUnexpected
-				},
+				getAccountRecoveryToken:      validRecoverAccountToken,
+				markAccountRecoveryTokenUsed: testutil.AlwaysFailsDB,
 			}
 			uRepo := &mockUserRepo{
 				getDeletedUserByID: recoverAccountGetDeletedUserByID,

@@ -74,9 +74,8 @@ func getServerTimeout(appConfig *app.Config) error {
 	return nil
 }
 
-// getAppConfig loads the API server Config. Each block below is ordered to mirror
-// the field order of app.Config itself (Port, Env, Database, Cors, TrustedProxies,
-// Limiter, Secret, Timeouts) so the loading logic can be scanned side-by-side with the struct.
+// getAppConfig loads the API server Config. Blocks below mirror app.Config's field order
+// so the loading logic can be scanned side-by-side with the struct.
 func getAppConfig(environment string) (app.Config, error) {
 	cfg := app.Config{}
 

@@ -43,7 +43,7 @@ func (m Mailer) Send(templateFile string, data any, ccUser CCUser, attachmentLis
 
 	subject, plainBody, htmlBody, err := renderEmail(templateFile, data)
 	if err != nil {
-		return err
+		return fmt.Errorf("mailer.Send: %w", err)
 	}
 
 	msg := mail.NewMessage()

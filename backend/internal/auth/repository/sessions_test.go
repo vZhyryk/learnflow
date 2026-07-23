@@ -57,7 +57,7 @@ func TestGetUserSessionByRefreshToken(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
 			_, err := repo.GetUserSessionByRefreshToken(context.Background(), "refresh-token-hash")
-			assertUnexpectedDBError(err, "db connection lost")
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 	})
 }
@@ -106,7 +106,7 @@ func TestGetSessionByPrevHash(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
 			_, err := repo.GetSessionByPrevHash(context.Background(), "refresh-token-hash")
-			assertUnexpectedDBError(err, "db connection lost")
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 	})
 }
@@ -116,10 +116,9 @@ func TestGetActiveSessionsByUserID(t *testing.T) {
 
 	Convey("Given a users repository", t, func() {
 		var row *testutil.MockRow
-		var retErr error
 		repo := newTestRepo(&testutil.MockQueryRunner{
 			QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
-				return pgx.Rows(&testutil.MockRows{Rows: []*testutil.MockRow{row}}), retErr
+				return pgx.Rows(&testutil.MockRows{Rows: []*testutil.MockRow{row}}), nil
 			},
 		})
 
@@ -149,17 +148,21 @@ func TestGetActiveSessionsByUserID(t *testing.T) {
 			}
 		})
 
-		Convey("When the session does not exist", func() {
-			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
-			retErr = authdomain.ErrSessionNotFound
-			_, err := repo.GetActiveSessionsByUserID(context.Background(), "unknown")
-			So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
+		Convey("When there are no active sessions", func() {
+			emptyRepo := newTestRepo(&testutil.MockQueryRunner{
+				QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
+					return pgx.Rows(&testutil.MockRows{Rows: nil}), nil
+				},
+			})
+			sessions, err := emptyRepo.GetActiveSessionsByUserID(context.Background(), "unknown")
+			So(err, ShouldBeNil)
+			So(sessions, ShouldBeEmpty)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
 			_, err := repo.GetActiveSessionsByUserID(context.Background(), "refresh-token-hash")
-			assertUnexpectedDBError(err, "db connection lost")
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 
 		Convey("When rows.Err returns an error after iteration", func() {
@@ -169,7 +172,7 @@ func TestGetActiveSessionsByUserID(t *testing.T) {
 				},
 			})
 			_, err := rowsErrRepo.GetActiveSessionsByUserID(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db connection lost")
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 	})
 }
@@ -213,7 +216,7 @@ func TestCreateUserSession(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
 			_, err := repo.CreateUserSession(context.Background(), userSession)
-			assertUnexpectedDBError(err, "db connection lost")
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 	})
 }
@@ -235,13 +238,13 @@ func TestRevokeUserSession(t *testing.T) {
 			reason := authdomain.RevokeReason("invalid_reason")
 			err := repo.RevokeUserSession(context.Background(), userSession.ID, *userSession.RevokedByUserID, reason)
 
-			assertUnexpectedDBError(err, "invalid revoke reason")
+			testutil.AssertUnexpectedDBError(err, "invalid revoke reason")
 		})
 
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDBUnexpected
 			err := repo.RevokeUserSession(context.Background(), userSession.ID, *userSession.RevokedByUserID, *userSession.RevokeReason)
-			assertUnexpectedDBError(err, "db connection lost")
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 
 		Convey("When no active session matches (already revoked or nonexistent)", func() {
@@ -275,13 +278,13 @@ func TestRevokeAllUserSessions(t *testing.T) {
 			reason := authdomain.RevokeReason("invalid_reason")
 			err := repo.RevokeAllUserSessions(context.Background(), userSession.UserID, userSession.RevokedByUserID, reason)
 
-			assertUnexpectedDBError(err, "invalid revoke reason")
+			testutil.AssertUnexpectedDBError(err, "invalid revoke reason")
 		})
 
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDBUnexpected
 			err := repo.RevokeAllUserSessions(context.Background(), userSession.UserID, userSession.RevokedByUserID, *userSession.RevokeReason)
-			assertUnexpectedDBError(err, "db connection lost")
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 
 		Convey("When revocation succeeds", func() {
@@ -308,7 +311,7 @@ func TestUpdateSessionToken(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDBUnexpected
 			err := repo.UpdateSessionToken(context.Background(), userSession.ID, "new-refresh-hash", "Mozilla/5.0", "127.0.0.1")
-			assertUnexpectedDBError(err, "db connection lost")
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 
 		Convey("When the session is missing, revoked, or expired (0 rows)", func() {
@@ -341,7 +344,7 @@ func TestUpdateFailedLoginAttempts(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDBUnexpected
 			err := repo.UpdateFailedLoginAttempts(context.Background(), userSession.ID, "15 minutes", 5)
-			assertUnexpectedDBError(err, "db connection lost")
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 
 		Convey("When the session is not found", func() {

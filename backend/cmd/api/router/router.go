@@ -89,7 +89,7 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	courseRepo := courserepository.NewRepository(a.DB)
 	courseSvc := courseservice.New(courseRepo, transactor, outbox)
 
-	courses.RegisterCourseRoutes(router, courseSvc, chains.StaticWithAuth, adminStaticWithAuth, a.Logger)
+	courses.RegisterCourseRoutes(router, courseSvc, chains.Static, adminStaticWithAuth, a.Logger)
 
 	// Helper routes
 	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -107,10 +107,8 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 
 const rateLimitBodyLimit = 4_096
 
-// bodyRateLimitKey reads a bounded JSON body and passes the raw bytes to extractField to pull
-// out the value to key the rate limiter on, then resets r.Body so downstream handlers
-// (ReadJSON) receive the full body. Do NOT add any body-reading middleware between this
-// call and the handler.
+// bodyRateLimitKey reads a bounded body via extractField to key the limiter, then resets
+// r.Body for downstream handlers. Do NOT add body-reading middleware after this call.
 func (route *RouteHandler) bodyRateLimitKey(r *http.Request, extractField func(bodyBytes []byte) (value string, ok bool)) string {
 	bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, rateLimitBodyLimit))
 	if err != nil {
@@ -221,5 +219,5 @@ func (h *RouteHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 
 // SetChain builds the standard middleware chain, inserting limiter for rate limiting.
 func (route *RouteHandler) SetChain(limiter func(http.Handler) http.Handler) alice.Chain {
-	return alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, limiter, route.Timeout, route.EnableCORS, route.SetSecurityHeaders)
+	return alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, limiter, route.EnableCORS, route.Timeout, route.SetSecurityHeaders)
 }

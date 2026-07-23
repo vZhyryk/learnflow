@@ -13,11 +13,8 @@ func (s *Service) revokeUserSessions(ctx context.Context, caller, jti string, ac
 		return fmt.Errorf("%s: revoke sessions: %w", caller, err)
 	}
 
-	// Redis SetNX is intentionally inside the transaction closure.
-	// If Redis fails, the error propagates → InTransaction rolls back the DB
-	// changes → email remains unchanged. The user gets a 500 but no state
-	// divergence occurs (jti is never blocked while the email stays old).
-	// Trade-off: Redis unavailability also prevents a successful email change.
+	// Redis SetNX stays inside the tx closure so a Redis failure rolls back the DB change too —
+	// no state divergence, at the cost of Redis outages also blocking the DB change.
 	remaining := time.Until(accessTokenExpiresAt)
 	if remaining > 0 && jti != "" {
 		_, err := s.redisClient.SetNX(ctx, "blocklist:"+jti, "1", remaining).Result()
@@ -46,7 +43,7 @@ func (s *Service) emitTokenEvent(
 
 	payload, err := fn(ctx, rawToken, hashToken, expiresAt)
 	if err != nil {
-		return err
+		return fmt.Errorf("emitTokenEvent: %w", err)
 	}
 
 	return s.outbox.Emit(ctx, aggregation, userID, eventType, payload)

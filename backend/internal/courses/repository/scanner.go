@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	coursedomain "learnflow_backend/internal/courses/domain"
+	"learnflow_backend/internal/shared/pagination"
 )
 
 type rowScanner interface {
@@ -38,8 +39,8 @@ func scanCourse(row rowScanner) (*coursedomain.Course, error) {
 	return course, nil
 }
 
-func (rep *Repository) getAndParseCourses(ctx context.Context, query, methodName string) ([]*coursedomain.Course, error) {
-	rows, err := rep.queryRunner(ctx).Query(ctx, query)
+func (rep *Repository) getAndParseCourses(ctx context.Context, query, methodName string, params pagination.Params) ([]*coursedomain.Course, error) {
+	rows, err := rep.queryRunner(ctx).Query(ctx, query, params.Limit(), params.Offset())
 	if err != nil {
 		return nil, fmt.Errorf("repository.%s: %w", methodName, err)
 	}

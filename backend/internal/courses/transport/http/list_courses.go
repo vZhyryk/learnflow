@@ -4,6 +4,7 @@ import (
 	coursedomain "learnflow_backend/internal/courses/domain"
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
+	"learnflow_backend/internal/shared/pagination"
 	"net/http"
 )
 
@@ -11,7 +12,7 @@ func (h *Handler) listCourses(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
 
-	courseList, err := h.svc.GetAllCourses(ctx, coursedomain.PublishedStatus)
+	courseList, err := h.svc.GetAllCourses(ctx, coursedomain.PublishedStatus, pagination.ParsePaginationParams(r))
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return

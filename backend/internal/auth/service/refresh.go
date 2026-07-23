@@ -19,9 +19,8 @@ func (s *Service) Refresh(ctx context.Context, req authdomain.RefreshRequest) (*
 	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		uSession, err := s.sessionRepo.GetUserSessionByRefreshToken(ctx, refreshHashHex)
 		if err != nil {
-			// Token not found as current — check if it was already rotated (exists as previous_refresh_hash).
-			// If yes: someone is replaying a rotated-out token, which indicates theft or a replay attack.
-			// Revoke all sessions for that user as a precaution.
+			// Not found as current — if it exists as previous_refresh_hash, it's a replayed
+			// rotated-out token (theft signal): revoke all sessions for that user.
 			checkErr := s.checkRefreshSessionPrevHash(ctx, refreshHashHex)
 			if checkErr != nil {
 				return checkErr
@@ -34,10 +33,8 @@ func (s *Service) Refresh(ctx context.Context, req authdomain.RefreshRequest) (*
 			return err
 		}
 
-		// Second check — different scenario from the one above.
-		// Token IS valid as current, but also appears as previous_refresh_hash in another session.
-		// This means the same token was used to rotate a different session, which should not happen.
-		// Indicates a race condition or token duplication attack — revoke all sessions.
+		// Token is valid as current but also appears as previous_refresh_hash elsewhere —
+		// a race condition or duplication attack. Revoke all sessions.
 		checkErr := s.checkRefreshSessionPrevHash(ctx, refreshHashHex)
 		if checkErr != nil {
 			return checkErr

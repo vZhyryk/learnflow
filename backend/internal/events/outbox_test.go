@@ -1,7 +1,8 @@
-package events
+package events_test
 
 import (
 	"context"
+	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
 
@@ -18,8 +19,8 @@ func TestOutboxWriterEmit(t *testing.T) {
 					return pgconn.CommandTag{}, nil
 				},
 			}
-			w := NewOutboxWriterWithRunner(runner)
-			err := w.Emit(context.Background(), AggregationTypeUser, "user-123", EventUserRegistered, make(chan int))
+			w := events.NewOutboxWriterWithRunner(runner)
+			err := w.Emit(context.Background(), events.AggregationTypeUser, "user-123", events.EventUserRegistered, make(chan int))
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "marshal")
@@ -27,13 +28,11 @@ func TestOutboxWriterEmit(t *testing.T) {
 
 		Convey("When Exec fails", func() {
 			runner := &testutil.MockQueryRunner{
-				ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-					return pgconn.CommandTag{}, testutil.ErrDBUnexpected
-				},
+				ExecFn: testutil.AlwaysFailsExec,
 			}
-			w := NewOutboxWriterWithRunner(runner)
+			w := events.NewOutboxWriterWithRunner(runner)
 
-			err := w.Emit(context.Background(), AggregationTypeUser, "user-123", EventUserRegistered, map[string]string{"a": "b"})
+			err := w.Emit(context.Background(), events.AggregationTypeUser, "user-123", events.EventUserRegistered, map[string]string{"a": "b"})
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "insert")
@@ -47,14 +46,14 @@ func TestOutboxWriterEmit(t *testing.T) {
 					return pgconn.CommandTag{}, nil
 				},
 			}
-			w := NewOutboxWriterWithRunner(runner)
+			w := events.NewOutboxWriterWithRunner(runner)
 
-			err := w.Emit(context.Background(), AggregationTypeUser, "user-123", EventUserRegistered, map[string]string{"a": "b"})
+			err := w.Emit(context.Background(), events.AggregationTypeUser, "user-123", events.EventUserRegistered, map[string]string{"a": "b"})
 
 			So(err, ShouldBeNil)
-			So(gotArgs[0], ShouldEqual, string(AggregationTypeUser))
+			So(gotArgs[0], ShouldEqual, string(events.AggregationTypeUser))
 			So(gotArgs[1], ShouldEqual, "user-123")
-			So(gotArgs[2], ShouldEqual, string(EventUserRegistered))
+			So(gotArgs[2], ShouldEqual, string(events.EventUserRegistered))
 			So(gotArgs[3], ShouldEqual, `{"a":"b"}`)
 		})
 	})
