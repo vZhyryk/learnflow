@@ -57,6 +57,26 @@ func TestMatchesEmailLengthBoundary(t *testing.T) {
 	})
 }
 
+func TestIsValidUUID(t *testing.T) {
+	Convey("IsValidUUID", t, func() {
+		Convey("canonical UUID is valid", func() {
+			So(validator.IsValidUUID("b3f1c9e2-6a4d-4f2e-9c1a-2d5e7f8a9b0c"), ShouldBeTrue)
+		})
+
+		Convey("empty is invalid", func() {
+			So(validator.IsValidUUID(""), ShouldBeFalse)
+		})
+
+		Convey("malformed is invalid", func() {
+			So(validator.IsValidUUID("not-a-uuid"), ShouldBeFalse)
+		})
+
+		Convey("missing hyphens is invalid", func() {
+			So(validator.IsValidUUID("b3f1c9e26a4d4f2e9c1a2d5e7f8a9b0c"), ShouldBeFalse)
+		})
+	})
+}
+
 func TestIsValidSlug(t *testing.T) {
 	Convey("IsValidSlug", t, func() {
 		valid := []string{
@@ -430,6 +450,22 @@ func TestIsValidSeoDescription(t *testing.T) {
 
 		Convey("161 runes is invalid (boundary)", func() {
 			So(validator.IsValidSeoDescription(strings.Repeat("A", 161)), ShouldBeFalse)
+		})
+	})
+}
+
+func TestIsValidContentBody(t *testing.T) {
+	Convey("IsValidContentBody", t, func() {
+		Convey("empty is valid", func() {
+			So(validator.IsValidContentBody(""), ShouldBeTrue)
+		})
+
+		Convey("10000 runes is valid (boundary)", func() {
+			So(validator.IsValidContentBody(strings.Repeat("A", 10000)), ShouldBeTrue)
+		})
+
+		Convey("10001 runes is invalid (boundary)", func() {
+			So(validator.IsValidContentBody(strings.Repeat("A", 10001)), ShouldBeFalse)
 		})
 	})
 }

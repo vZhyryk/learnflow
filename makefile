@@ -238,11 +238,15 @@ lint_verify:
 	cd $(BACKEND_DIR) && golangci-lint config verify
 
 # lint_repo_interfaces: golangci-lint has no linter for *missing* compile-time interface
-# assertions (it catches bad patterns, not absent enforcement). Every repository.go must
-# assert `var _ domain.XRepository = (*Repository)(nil)` so a method added to a domain
-# interface without a matching Repository implementation fails at compile time, not at
-# runtime via a type assertion panic. This grep-based check fills that gap until a real
-# linter rule exists.
+# assertions (it catches bad patterns, not absent enforcement). Every domain-module
+# repository.go must assert `var _ domain.XRepository = (*Repository)(nil)` so a method
+# added to a domain interface without a matching Repository implementation fails at
+# compile time, not at runtime via a type assertion panic. This grep-based check fills
+# that gap until a real linter rule exists.
+#
+# internal/shared/repository/repository.go is excluded: it's the shared BaseRepository
+# embed helper (db.QueryRunner plumbing), not a domain module implementing a
+# domain.XRepository interface, so there is nothing for it to assert against.
 lint_repo_interfaces:
 	@fail=0; \
 	while IFS= read -r -d '' f; do \
@@ -250,7 +254,7 @@ lint_repo_interfaces:
 			echo "missing compile-time interface check: $$f"; \
 			fail=1; \
 		fi; \
-	done < <(find $(BACKEND_DIR)/internal -path "*/repository/repository.go" -print0); \
+	done < <(find $(BACKEND_DIR)/internal -path "*/repository/repository.go" -not -path "*/shared/repository/repository.go" -print0); \
 	exit $$fail
 
 lint_frontend:
@@ -266,3 +270,7 @@ restore:
 	@test -n "$$FILE" || (echo "No FILE. Use: make restore FILE=learnflow_20240101_120000.sql.gz"; exit 1)
 	@echo "$$FILE" | grep -qE '^learnflow_[0-9]{8}_[0-9]{6}\.sql\.gz$$' || (echo "Invalid FILE: expected format learnflow_YYYYMMDD_HHMMSS.sql.gz, got: $$FILE"; exit 1)
 	docker exec learnflow_backup restore.sh "$$FILE"
+
+
+vuln:
+	cd $(BACKEND_DIR) && govulncheck ./...

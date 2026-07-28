@@ -41,7 +41,7 @@ func (s *Service) CreateCourse(ctx context.Context, req coursedomain.CreateCours
 
 		createdCourse, err := s.courseRepo.CreateCourse(ctx, &course)
 		if err != nil {
-			return err
+			return fmt.Errorf("service.CreateCourse: %w", err)
 		}
 
 		courseID = createdCourse.ID

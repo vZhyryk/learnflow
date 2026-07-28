@@ -13,7 +13,7 @@ import (
 )
 
 func TestInitiatePasswordReset(t *testing.T) {
-	Convey("POST /api/v1/users/auth/password/reset", t, func() {
+	Convey("POST /api/v1/auth/password/reset", t, func() {
 		var svcErr error
 
 		svc := &mockService{
@@ -21,7 +21,7 @@ func TestInitiatePasswordReset(t *testing.T) {
 				return svcErr
 			},
 		}
-		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/users/auth/password/reset")
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/auth/password/reset")
 		mux, newReq := f.mux, f.newReq
 
 		Convey("Empty body → 400", func() {
@@ -71,12 +71,12 @@ func newResetPasswordFixture() *resetPasswordFixture {
 			return f.svcErr
 		},
 	}
-	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/users/auth/password/reset")
+	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/auth/password/reset")
 	return f
 }
 
 func TestResetPasswordRequestValidation(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/password/reset — request validation", t, func() {
+	Convey("PUT /api/v1/auth/password/reset — request validation", t, func() {
 		f := newResetPasswordFixture()
 
 		Convey("Empty body → 400", func() {
@@ -102,7 +102,7 @@ func TestResetPasswordRequestValidation(t *testing.T) {
 }
 
 func TestResetPasswordServiceOutcomes(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/password/reset — service outcomes", t, func() {
+	Convey("PUT /api/v1/auth/password/reset — service outcomes", t, func() {
 		f := newResetPasswordFixture()
 
 		Convey("Service ErrTokenExpired → 400", func() {

@@ -3,6 +3,7 @@ package authrepository
 import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/repository"
 	"learnflow_backend/internal/shared/testutil"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 )
 
 func newTestRepo(runner *testutil.MockQueryRunner) *Repository {
-	return &Repository{db: runner}
+	return &Repository{repository.BaseRepository{DB: runner}}
 }
 
 func castPtrRevokeReason(v any, idx int) **authdomain.RevokeReason {
@@ -65,22 +66,6 @@ func fakeScanProfile(now time.Time) func(dest ...any) error {
 	}
 }
 
-func castUserRole(v any, idx int) *authdomain.UserRole {
-	s, ok := v.(*authdomain.UserRole)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *UserRole, got %T", idx, v))
-	}
-	return s
-}
-
-func castUserStatus(v any, idx int) *authdomain.UserStatus {
-	s, ok := v.(*authdomain.UserStatus)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *UserStatus, got %T", idx, v))
-	}
-	return s
-}
-
 func fakeUser(now time.Time) *authdomain.User {
 	return &authdomain.User{
 		ID:                "user-123",
@@ -107,8 +92,8 @@ func fakeScanUser(now time.Time) func(dest ...any) error {
 		*testutil.CastStr(dest[0], 0) = u.ID
 		*testutil.CastStr(dest[1], 1) = u.Email
 		*testutil.CastStr(dest[2], 2) = u.PasswordHash
-		*castUserRole(dest[3], 3) = u.Role
-		*castUserStatus(dest[4], 4) = u.Status
+		*testutil.CastEnum[authdomain.UserRole](dest[3], 3) = u.Role
+		*testutil.CastEnum[authdomain.UserStatus](dest[4], 4) = u.Status
 		*testutil.CastPtrTime(dest[5], 5) = u.EmailVerifiedAt
 		*testutil.CastPtrTime(dest[6], 6) = u.LastLoginAt
 		*testutil.CastPtrTime(dest[7], 7) = u.DeletedAt

@@ -8,11 +8,17 @@ import (
 	"fmt"
 	"io"
 	"learnflow_backend/cmd/api/app"
+	"learnflow_backend/internal/article"
+	articlerepository "learnflow_backend/internal/article/repository"
+	articleservice "learnflow_backend/internal/article/service"
 	"learnflow_backend/internal/auth"
 	authdomain "learnflow_backend/internal/auth/domain"
 	authrepository "learnflow_backend/internal/auth/repository"
 	authservice "learnflow_backend/internal/auth/service"
 	authhttp "learnflow_backend/internal/auth/transport/http"
+	"learnflow_backend/internal/content"
+	contentrepository "learnflow_backend/internal/content/repository"
+	contentservice "learnflow_backend/internal/content/service"
 	"learnflow_backend/internal/courses"
 	courserepository "learnflow_backend/internal/courses/repository"
 	courseservice "learnflow_backend/internal/courses/service"
@@ -90,6 +96,18 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	courseSvc := courseservice.New(courseRepo, transactor, outbox)
 
 	courses.RegisterCourseRoutes(router, courseSvc, chains.Static, adminStaticWithAuth, a.Logger)
+
+	// Content Routes
+	contentRepo := contentrepository.NewRepository(a.DB)
+	contentSvc := contentservice.New(contentRepo, transactor, outbox)
+
+	content.RegisterContentRoutes(router, contentSvc, chains.Static, adminStaticWithAuth, a.Logger)
+
+	// Article Routes
+	articleRepo := articlerepository.NewRepository(a.DB)
+	articleSvc := articleservice.New(articleRepo, transactor, outbox)
+
+	article.RegisterArticleRoutes(router, articleSvc, chains.Static, adminStaticWithAuth, a.Logger)
 
 	// Helper routes
 	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -194,8 +212,8 @@ func (h *RouteHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	if err := h.App.DB.Ping(ctx); err != nil {
 		if respErr := helpers.WriteJSON(w, http.StatusServiceUnavailable, helpers.Envelope{"status": "unavailable", "reason": "database"}, nil); respErr != nil {
 			h.App.Logger.Error(respErr, map[string]any{
-				"status":  http.StatusServiceUnavailable,
-				"envelop": helpers.Envelope{"status": "unavailable", "reason": "database"},
+				"status":   http.StatusServiceUnavailable,
+				"envelope": helpers.Envelope{"status": "unavailable", "reason": "database"},
 			})
 		}
 		return
@@ -203,16 +221,16 @@ func (h *RouteHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	if err := h.App.Redis.Ping(ctx).Err(); err != nil {
 		if respErr := helpers.WriteJSON(w, http.StatusServiceUnavailable, helpers.Envelope{"status": "unavailable", "reason": "redis"}, nil); respErr != nil {
 			h.App.Logger.Error(respErr, map[string]any{
-				"status":  http.StatusServiceUnavailable,
-				"envelop": helpers.Envelope{"status": "unavailable", "reason": "redis"},
+				"status":   http.StatusServiceUnavailable,
+				"envelope": helpers.Envelope{"status": "unavailable", "reason": "redis"},
 			})
 		}
 		return
 	}
 	if respErr := helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"status": "ready"}, nil); respErr != nil {
 		h.App.Logger.Error(respErr, map[string]any{
-			"status":  http.StatusOK,
-			"envelop": helpers.Envelope{"status": "ready"},
+			"status":   http.StatusOK,
+			"envelope": helpers.Envelope{"status": "ready"},
 		})
 	}
 }

@@ -12,14 +12,14 @@ import (
 )
 
 func TestInitRecoverAccount(t *testing.T) {
-	Convey("POST /api/v1/users/auth/account/recover", t, func() {
+	Convey("POST /api/v1/auth/account/recover", t, func() {
 		var svcErr error
 		svc := &mockService{
 			initRecoverAccount: func(_ context.Context, _ authdomain.RequestRecoverAccountRequest) error {
 				return svcErr
 			},
 		}
-		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/users/auth/account/recover")
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/auth/account/recover")
 		mux, newReq := f.mux, f.newReq
 
 		Convey("Empty body → 400", func() {
@@ -69,12 +69,12 @@ func newRecoverAccountFixture() *recoverAccountFixture {
 			return f.svcErr
 		},
 	}
-	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/users/auth/account/recover")
+	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/auth/account/recover")
 	return f
 }
 
 func TestRecoverAccountRequestValidation(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/account/recover — request validation", t, func() {
+	Convey("PUT /api/v1/auth/account/recover — request validation", t, func() {
 		f := newRecoverAccountFixture()
 
 		Convey("Empty body → 400", func() {
@@ -90,7 +90,7 @@ func TestRecoverAccountRequestValidation(t *testing.T) {
 }
 
 func TestRecoverAccountServiceOutcomes(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/account/recover — service outcomes", t, func() {
+	Convey("PUT /api/v1/auth/account/recover — service outcomes", t, func() {
 		f := newRecoverAccountFixture()
 
 		Convey("Service ErrTokenExpired → 400", func() {

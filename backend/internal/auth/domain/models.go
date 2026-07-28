@@ -3,13 +3,7 @@ package authdomain
 import (
 	"learnflow_backend/internal/shared/validator"
 	"time"
-
-	"golang.org/x/text/unicode/norm"
 )
-
-func normalizePassword(password string) string {
-	return norm.NFC.String(password)
-}
 
 // UserRole represents the permission level of a user account.
 type UserRole string
@@ -206,7 +200,7 @@ func (r *RegisterRequest) validateCredentials() error {
 	if len(r.Email) < 3 || !validator.MatchesEmail(r.Email) {
 		return ErrInvalidCredentialFormat
 	}
-	r.Password = normalizePassword(r.Password)
+	r.Password = validator.NormalizePassword(r.Password)
 	if len(r.Password) < 8 || len(r.Password) > 72 {
 		return ErrInvalidCredentialFormat
 	}
@@ -254,7 +248,7 @@ func (r *LoginRequest) Validate() error {
 	if len(r.Email) < 3 || !validator.MatchesEmail(r.Email) {
 		return ErrInvalidCredentialFormat
 	}
-	r.Password = normalizePassword(r.Password)
+	r.Password = validator.NormalizePassword(r.Password)
 	if len(r.Password) < 8 || len(r.Password) > 72 {
 		return ErrInvalidCredentialFormat
 	}
@@ -333,7 +327,7 @@ func (r *ResetPasswordRequest) Validate() error {
 	if r.Token == "" {
 		return ErrInvalidCredentialFormat
 	}
-	r.NewPassword = normalizePassword(r.NewPassword)
+	r.NewPassword = validator.NormalizePassword(r.NewPassword)
 	if len(r.NewPassword) < 8 || len(r.NewPassword) > 72 {
 		return ErrInvalidCredentialFormat
 	}
@@ -352,11 +346,11 @@ type ChangePasswordRequest struct {
 
 // Validate checks that the change password fields are valid.
 func (r *ChangePasswordRequest) Validate() error {
-	r.OldPassword = normalizePassword(r.OldPassword)
+	r.OldPassword = validator.NormalizePassword(r.OldPassword)
 	if r.OldPassword == "" {
 		return ErrInvalidCredentialFormat
 	}
-	r.NewPassword = normalizePassword(r.NewPassword)
+	r.NewPassword = validator.NormalizePassword(r.NewPassword)
 	if len(r.NewPassword) < 8 || len(r.NewPassword) > 72 {
 		return ErrInvalidCredentialFormat
 	}

@@ -382,7 +382,8 @@ CREATE TABLE content_items (
     og_image_url        text,
     canonical_url       text,
     is_indexable        boolean     NOT NULL DEFAULT true,
-    status              text        NOT NULL CONSTRAINT content_items_status_check CHECK (status IN ('draft', 'published', 'archived')),
+    -- [DEFAULT 'draft']: added in migration 000009 — new content items default to draft
+    status              text        NOT NULL DEFAULT 'draft' CONSTRAINT content_items_status_check CHECK (status IN ('draft', 'published', 'archived')),
     created_by_user_id  uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now(),
@@ -1645,7 +1646,10 @@ CREATE TABLE articles (
     updated_at          timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT articles_slug_unique                     UNIQUE (slug),
-    CONSTRAINT articles_status_check                    CHECK (status IN ('draft', 'published')),
+
+    -- [CHECK: draft | published | archived]: 'archived' added in migration
+    -- 000009 to match the courses/content_items status lifecycle.
+    CONSTRAINT articles_status_check                    CHECK (status IN ('draft', 'published', 'archived')),
 
     -- [nonempty CHECKs]: Guards against inserting whitespace-only values.
     -- btrim() strips leading/trailing whitespace before the empty-string comparison.

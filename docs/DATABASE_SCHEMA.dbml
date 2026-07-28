@@ -1,6 +1,6 @@
 Project LearnFlowDatabase {
   database_type: "PostgreSQL"
-  Note: 'Synchronized with backend/migrations through migration 000008. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
+  Note: 'Synchronized with backend/migrations through migration 000009. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
 }
 
 Table users {
@@ -157,7 +157,7 @@ Table content_items {
   og_image_url text
   canonical_url text
   is_indexable boolean [not null, default: true]
-  status text [not null, note: 'CHECK: draft | published | archived']
+  status text [not null, default: 'draft', note: 'CHECK: draft | published | archived; DEFAULT since migration 000009']
   created_by_user_id uuid [not null, ref: > users.id]
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
@@ -697,7 +697,7 @@ Table articles {
   seo_description text
   og_image_url text
   is_indexable boolean [not null, default: true]
-  status text [not null, default: 'draft', note: 'CHECK: draft | published']
+  status text [not null, default: 'draft', note: 'CHECK: draft | published | archived']
   published_at timestamptz
   created_by_user_id uuid [not null, ref: > users.id]
   deleted_at timestamptz [note: 'Soft delete']

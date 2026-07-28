@@ -21,7 +21,7 @@ func TestUpdateCourse(t *testing.T) {
 	Convey("UpdateCourse Course", t, func() {
 		Convey("UpdateCourse - GetCourseByID error", func() {
 			cRepo := &mockCourseRepoRepo{
-				getCourseByID: AlwaysError,
+				getCourseByID: alwaysError,
 			}
 
 			srv := newTestService(cRepo, nil)
@@ -33,7 +33,7 @@ func TestUpdateCourse(t *testing.T) {
 		Convey("UpdateCourse - getCourseBySlug error", func() {
 			cRepo := &mockCourseRepoRepo{
 				getCourseByID:   getValidCourse,
-				getCourseBySlug: AlwaysError,
+				getCourseBySlug: alwaysError,
 			}
 
 			srv := newTestService(cRepo, nil)
@@ -62,7 +62,7 @@ func TestUpdateCourse(t *testing.T) {
 			cRepo := &mockCourseRepoRepo{
 				getCourseByID:   getValidCourse,
 				getCourseBySlug: getValidCourse,
-				updateCourse:    AlwaysFailsErr,
+				updateCourse:    alwaysFailsErr,
 			}
 
 			srv := newTestService(cRepo, nil)
@@ -72,11 +72,11 @@ func TestUpdateCourse(t *testing.T) {
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
 
-		Convey("UpdateCourse - updateCourse empty slug error", func() {
+		Convey("UpdateCourse - nil slug skips uniqueness check, update failure propagates", func() {
 			cRepo := &mockCourseRepoRepo{
 				getCourseByID:   getValidCourse,
 				getCourseBySlug: getValidCourse,
-				updateCourse:    AlwaysFailsErr,
+				updateCourse:    alwaysFailsErr,
 			}
 
 			srv := newTestService(cRepo, nil)

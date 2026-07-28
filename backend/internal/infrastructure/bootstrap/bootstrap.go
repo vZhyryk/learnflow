@@ -78,7 +78,7 @@ func GetRedis() (*redis.Client, error) {
 func MustInitInfra(dbCfg DatabaseConfig, jsonLogger *logger.Logger) (*pgxpool.Pool, *redis.Client, func()) {
 	dbInstance, err := db.InitDatabase(dbCfg.DSN, dbCfg.MaxIdleTime, dbCfg.MaxLifetime, int32(dbCfg.MaxOpenConns), int32(dbCfg.MinOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
 	if err != nil {
-		jsonLogger.Fatal(err, nil)
+		jsonLogger.Fatal(fmt.Errorf("bootstrap: db init failed (dsn=%s): %w", db.MaskDSN(dbCfg.DSN), err), nil)
 	}
 
 	redisClient, err := GetRedis()

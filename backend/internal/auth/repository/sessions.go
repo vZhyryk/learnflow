@@ -11,7 +11,7 @@ import (
 
 // CreateUserSession persists a new user session and returns it with DB-generated fields.
 func (rep *Repository) CreateUserSession(ctx context.Context, session *authdomain.UserSession) (*authdomain.UserSession, error) {
-	createdSession, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, createUserSessionSQL, session.UserID, session.RefreshHash, session.UserAgent, session.IPAddress, session.ExpiresAt))
+	createdSession, err := scanUserSession(rep.QueryRunner(ctx).QueryRow(ctx, createUserSessionSQL, session.UserID, session.RefreshHash, session.UserAgent, session.IPAddress, session.ExpiresAt))
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateUserSession: %w", err)
 	}
@@ -21,7 +21,7 @@ func (rep *Repository) CreateUserSession(ctx context.Context, session *authdomai
 
 // GetUserSessionByRefreshToken retrieves an active session by its refresh token hash.
 func (rep *Repository) GetUserSessionByRefreshToken(ctx context.Context, refreshTokenHash string) (*authdomain.UserSession, error) {
-	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, getSessionByTokenSQL, refreshTokenHash))
+	session, err := scanUserSession(rep.QueryRunner(ctx).QueryRow(ctx, getSessionByTokenSQL, refreshTokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrSessionNotFound
 	}
@@ -34,7 +34,7 @@ func (rep *Repository) GetUserSessionByRefreshToken(ctx context.Context, refresh
 
 // GetSessionByPrevHash retrieves a session by its previous refresh token hash (rotation detection).
 func (rep *Repository) GetSessionByPrevHash(ctx context.Context, prevRefreshTokenHash string) (*authdomain.UserSession, error) {
-	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, getSessionByPrevHashSQL, prevRefreshTokenHash))
+	session, err := scanUserSession(rep.QueryRunner(ctx).QueryRow(ctx, getSessionByPrevHashSQL, prevRefreshTokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrSessionNotFound
 	}
@@ -50,7 +50,7 @@ func (rep *Repository) RevokeUserSession(ctx context.Context, sessionID, revoked
 	if !revokeReason.Valid() {
 		return fmt.Errorf("repository.RevokeUserSession: invalid revoke reason: %s", revokeReason)
 	}
-	tag, err := rep.queryRunner(ctx).Exec(ctx, revokeUserSessionSQL, revokeReason, revokedByUserID, sessionID)
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, revokeUserSessionSQL, revokeReason, revokedByUserID, sessionID)
 	if err != nil {
 		return fmt.Errorf("repository.RevokeUserSession: %w", err)
 	}
@@ -66,7 +66,7 @@ func (rep *Repository) RevokeAllUserSessions(ctx context.Context, userID string,
 	if !revokeReason.Valid() {
 		return fmt.Errorf("repository.RevokeAllUserSessions: invalid revoke reason: %s", revokeReason)
 	}
-	_, err := rep.queryRunner(ctx).Exec(ctx, revokeAllUserSessionsSQL, revokeReason, revokedByUserID, userID)
+	_, err := rep.QueryRunner(ctx).Exec(ctx, revokeAllUserSessionsSQL, revokeReason, revokedByUserID, userID)
 	if err != nil {
 		return fmt.Errorf("repository.RevokeAllUserSessions: %w", err)
 	}
@@ -76,7 +76,7 @@ func (rep *Repository) RevokeAllUserSessions(ctx context.Context, userID string,
 
 // GetActiveSessionsByUserID returns all non-revoked sessions for the given user.
 func (rep *Repository) GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
-	rows, err := rep.queryRunner(ctx).Query(ctx, getActiveUserSessionSQL, userID)
+	rows, err := rep.QueryRunner(ctx).Query(ctx, getActiveUserSessionSQL, userID)
 	if err != nil {
 		return nil, fmt.Errorf("repository.GetActiveSessionsByUserID: %w", err)
 	}
@@ -101,7 +101,7 @@ func (rep *Repository) GetActiveSessionsByUserID(ctx context.Context, userID str
 
 // UpdateSessionToken replaces the refresh token hash for a session (token rotation).
 func (rep *Repository) UpdateSessionToken(ctx context.Context, sessionID, tokenHash, userAgent, ipAddress string) error {
-	tag, err := rep.queryRunner(ctx).Exec(ctx, updateSessionTokenSQL, sessionID, tokenHash, userAgent, ipAddress)
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateSessionTokenSQL, sessionID, tokenHash, userAgent, ipAddress)
 	if err != nil {
 		return fmt.Errorf("repository.UpdateSessionToken: %w", err)
 	}
@@ -114,7 +114,7 @@ func (rep *Repository) UpdateSessionToken(ctx context.Context, sessionID, tokenH
 
 // UpdateFailedLoginAttempts increments the failed attempt counter and locks the session when the limit is reached.
 func (rep *Repository) UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error {
-	tag, err := rep.queryRunner(ctx).Exec(ctx, updateFailedLoginAttemptsSQL, sessionID, loginCountLimit, lockInterval)
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateFailedLoginAttemptsSQL, sessionID, loginCountLimit, lockInterval)
 	if err != nil {
 		return fmt.Errorf("repository.UpdateFailedLoginAttempts: %w", err)
 	}
@@ -127,7 +127,7 @@ func (rep *Repository) UpdateFailedLoginAttempts(ctx context.Context, sessionID,
 
 // GetAllSessionsByUserID returns all sessions belonging to the given user.
 func (rep *Repository) GetAllSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
-	rows, err := rep.queryRunner(ctx).Query(ctx, getAllUserSessionSQL, userID)
+	rows, err := rep.QueryRunner(ctx).Query(ctx, getAllUserSessionSQL, userID)
 	if err != nil {
 		return nil, fmt.Errorf("repository.GetAllSessionsByUserID: %w", err)
 	}

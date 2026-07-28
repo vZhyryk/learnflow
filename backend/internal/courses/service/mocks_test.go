@@ -105,11 +105,13 @@ func newTestService(repo *mockCourseRepoRepo, outbox *events.OutboxWriter) *Serv
 	return New(repo, &testutil.NoopTransactor{}, outbox)
 }
 
-func AlwaysError(_ context.Context, _ string) (*coursedomain.Course, error) {
+// alwaysError is a getCourseByID/getCourseBySlug stub that always fails.
+func alwaysError(_ context.Context, _ string) (*coursedomain.Course, error) {
 	return nil, testutil.ErrDBUnexpected
 }
 
-func AlwaysFailsErr(_ context.Context, _ *coursedomain.Course) error {
+// alwaysFailsErr is an updateCourse stub that always fails.
+func alwaysFailsErr(_ context.Context, _ *coursedomain.Course) error {
 	return testutil.ErrDBUnexpected
 }
 

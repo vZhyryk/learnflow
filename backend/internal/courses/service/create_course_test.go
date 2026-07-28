@@ -14,7 +14,7 @@ func TestCreateCourse(t *testing.T) {
 	Convey("Create Course", t, func() {
 		Convey("GetCourseBySlug error", func() {
 			cRepo := &mockCourseRepoRepo{
-				getCourseBySlug: AlwaysError,
+				getCourseBySlug: alwaysError,
 			}
 
 			srv := newTestService(cRepo, nil)

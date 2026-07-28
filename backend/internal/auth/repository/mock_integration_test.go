@@ -34,11 +34,11 @@ func newTestUser(t *testing.T, ctx context.Context, repo *Repository) string {
 	So(err, ShouldBeNil)
 
 	t.Cleanup(func() {
-		repo.queryRunner(ctx).Exec(ctx, "DELETE FROM email_verification_tokens WHERE user_id = $1", userId)
-		repo.queryRunner(ctx).Exec(ctx, "DELETE FROM password_reset_tokens WHERE user_id = $1", userId)
-		repo.queryRunner(ctx).Exec(ctx, "DELETE FROM email_change_tokens WHERE user_id = $1", userId)
-		repo.queryRunner(ctx).Exec(ctx, "DELETE FROM account_recovery_tokens WHERE user_id = $1", userId)
-		repo.queryRunner(ctx).Exec(ctx, "DELETE FROM users WHERE id = $1", userId)
+		repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM email_verification_tokens WHERE user_id = $1", userId)
+		repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM password_reset_tokens WHERE user_id = $1", userId)
+		repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM email_change_tokens WHERE user_id = $1", userId)
+		repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM account_recovery_tokens WHERE user_id = $1", userId)
+		repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM users WHERE id = $1", userId)
 	})
 
 	return userId

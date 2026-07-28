@@ -26,12 +26,12 @@ func newChangePasswordFixture() *changePasswordFixture {
 			return f.svcErr
 		},
 	}
-	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/users/auth/password/change")
+	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/auth/password/change")
 	return f
 }
 
 func TestChangePasswordRequestValidation(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/password/change — request validation", t, func() {
+	Convey("PUT /api/v1/auth/password/change — request validation", t, func() {
 		f := newChangePasswordFixture()
 
 		Convey("Empty body → 400", func() {
@@ -74,7 +74,7 @@ func TestChangePasswordRequestValidation(t *testing.T) {
 }
 
 func TestChangePasswordServiceOutcomes(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/password/change — service outcomes", t, func() {
+	Convey("PUT /api/v1/auth/password/change — service outcomes", t, func() {
 		f := newChangePasswordFixture()
 
 		Convey("Service ErrWrongPassword → 422", func() {

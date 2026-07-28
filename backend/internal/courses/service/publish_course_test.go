@@ -23,7 +23,7 @@ func TestPublishCourse(t *testing.T) {
 	Convey("PublishCourse Course", t, func() {
 		Convey("PublishCourse - GetCourseByID error", func() {
 			cRepo := &mockCourseRepoRepo{
-				getCourseByID: AlwaysError,
+				getCourseByID: alwaysError,
 			}
 
 			srv := newTestService(cRepo, nil)

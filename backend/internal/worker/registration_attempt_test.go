@@ -9,42 +9,19 @@ import (
 )
 
 func TestValidateRegistrationAttemptsPayload(t *testing.T) {
-	Convey("Given an RegistrationAttemptPayload payload", t, func() {
-		Convey("When all required fields are present", func() {
-			payload := events.RegistrationAttemptPayload{
-				UserID: "user-123",
-				Email:  "user@example.com",
-			}
-
-			err := ValidateRegistrationAttemptsPayload(payload)
-
-			So(err, ShouldBeNil)
-		})
-
-		Convey("When required fields are missing", func() {
-			payload := events.RegistrationAttemptPayload{
-				UserID: "user-123",
-			}
-
-			err := ValidateRegistrationAttemptsPayload(payload)
-
-			So(err, ShouldNotBeNil)
-		})
-	})
+	runValidatePayloadTest(t, "RegistrationAttemptPayload",
+		events.RegistrationAttemptPayload{UserID: "user-123", Email: "user@example.com"},
+		events.RegistrationAttemptPayload{UserID: "user-123"},
+		ValidateRegistrationAttemptsPayload,
+	)
 }
 
 func TestGenerateRegistrationAttemptsIdempotencyKey(t *testing.T) {
-	Convey("Given an RegistrationAttemptPayload payload", t, func() {
-		payload := events.RegistrationAttemptPayload{
-			UserID: "user-123",
-			Email:  "user@example.com",
-		}
-
-		Convey("When generating the idempotency key", func() {
-			key := GenerateRegistrationAttemptsIdempotencyKey(payload)
-			So(key, ShouldEqual, "processed:registration_attempt:user-123")
-		})
-	})
+	runIdempotencyKeyTest(t, "RegistrationAttemptPayload",
+		events.RegistrationAttemptPayload{UserID: "user-123", Email: "user@example.com"},
+		GenerateRegistrationAttemptsIdempotencyKey,
+		"processed:registration_attempt:user-123",
+	)
 }
 
 func TestHandleRegistrationAttemptsProcess(t *testing.T) {

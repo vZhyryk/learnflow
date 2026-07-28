@@ -9,44 +9,19 @@ import (
 )
 
 func TestValidateAccountRecoveryPayload(t *testing.T) {
-	Convey("Given an InitAccountRecoveryToken payload", t, func() {
-		Convey("When all required fields are present", func() {
-			payload := events.InitAccountRecoveryToken{
-				UserID:   "user-123",
-				Email:    "user@example.com",
-				RawToken: "token",
-			}
-
-			err := ValidateAccountRecoveryPayload(payload)
-
-			So(err, ShouldBeNil)
-		})
-
-		Convey("When required fields are missing", func() {
-			payload := events.InitAccountRecoveryToken{
-				UserID: "user-123",
-				Email:  "user@example.com",
-			}
-
-			err := ValidateAccountRecoveryPayload(payload)
-
-			So(err, ShouldNotBeNil)
-		})
-	})
+	runValidatePayloadTest(t, "InitAccountRecoveryToken",
+		events.InitAccountRecoveryToken{UserID: "user-123", Email: "user@example.com", RawToken: "token"},
+		events.InitAccountRecoveryToken{UserID: "user-123", Email: "user@example.com"},
+		ValidateAccountRecoveryPayload,
+	)
 }
 
 func TestGenerateInitAccountRecoveryIdempotencyKey(t *testing.T) {
-	Convey("Given an InitAccountRecoveryToken payload", t, func() {
-		payload := events.InitAccountRecoveryToken{
-			UserID:   "user-123",
-			RawToken: "token",
-		}
-
-		Convey("When generating the idempotency key", func() {
-			key := GenerateInitAccountRecoveryIdempotencyKey(payload)
-			So(key, ShouldEqual, "processed:account_recovery:user-123:token")
-		})
-	})
+	runIdempotencyKeyTest(t, "InitAccountRecoveryToken",
+		events.InitAccountRecoveryToken{UserID: "user-123", RawToken: "token"},
+		GenerateInitAccountRecoveryIdempotencyKey,
+		"processed:account_recovery:user-123:token",
+	)
 }
 
 func TestHandleInitAccountRecoveryProcess(t *testing.T) {

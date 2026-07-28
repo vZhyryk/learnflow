@@ -9,53 +9,24 @@ import (
 )
 
 func TestValidateInitEmailChangePayload(t *testing.T) {
-	Convey("Given an InitEmailChangeToken payload", t, func() {
-		Convey("When all required fields are present", func() {
-			payload := events.InitEmailChangeToken{
-				UserID:   "user-123",
-				Email:    "user@example.com",
-				RawToken: "token",
-			}
-
-			err := ValidateInitEmailChangePayload(payload)
-
-			So(err, ShouldBeNil)
-		})
-
-		Convey("When required fields are missing", func() {
-			payload := events.InitEmailChangeToken{
-				UserID: "user-123",
-				Email:  "user@example.com",
-			}
-
-			err := ValidateInitEmailChangePayload(payload)
-
-			So(err, ShouldNotBeNil)
-		})
-	})
+	runValidatePayloadTest(t, "InitEmailChangeToken",
+		events.InitEmailChangeToken{UserID: "user-123", Email: "user@example.com", RawToken: "token"},
+		events.InitEmailChangeToken{UserID: "user-123", Email: "user@example.com"},
+		ValidateInitEmailChangePayload,
+	)
 }
 
 func TestGenerateInitEmailChangeIdempotencyKey(t *testing.T) {
-	Convey("Given an InitEmailChangeToken payload", t, func() {
-		payload := events.InitEmailChangeToken{
-			UserID:   "user-123",
-			RawToken: "token",
-		}
-
-		Convey("When generating the idempotency key", func() {
-			key := GenerateInitEmailChangeIdempotencyKey(payload)
-			So(key, ShouldEqual, "processed:email_change:user-123:token")
-		})
-	})
+	runIdempotencyKeyTest(t, "InitEmailChangeToken",
+		events.InitEmailChangeToken{UserID: "user-123", RawToken: "token"},
+		GenerateInitEmailChangeIdempotencyKey,
+		"processed:email_change:user-123:token",
+	)
 }
 
 func TestHandleInitEmailChangeProcess(t *testing.T) {
 	Convey("Given an InitEmailChangeToken payload", t, func() {
-		payload := events.InitEmailChangeToken{
-			UserID:   "user-123",
-			UserName: "John Doe",
-			Email:    "user@example.com",
-		}
+		payload := events.InitEmailChangeToken{UserID: "user-123", UserName: "John Doe", Email: "user@example.com"}
 		baseURL := "https://example.com"
 
 		Convey("When sending the email change email", func() {

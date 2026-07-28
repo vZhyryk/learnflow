@@ -1,25 +1,14 @@
 package courserepository
 
 import (
-	"fmt"
 	coursedomain "learnflow_backend/internal/courses/domain"
+	"learnflow_backend/internal/shared/repository"
 	"learnflow_backend/internal/shared/testutil"
 	"time"
 )
 
 func newTestRepo(runner *testutil.MockQueryRunner) *Repository {
-	return &Repository{db: runner}
-}
-
-// castCourseStatus type-asserts a scan destination to *coursedomain.CourseStatus — a
-// domain-specific enum, so this stays package-local rather than in shared testutil
-// (mirrors castUserRole/castUserStatus in internal/auth/repository/mock_test.go).
-func castCourseStatus(v any, idx int) *coursedomain.CourseStatus {
-	s, ok := v.(*coursedomain.CourseStatus)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *coursedomain.CourseStatus, got %T", idx, v))
-	}
-	return s
+	return &Repository{repository.BaseRepository{DB: runner}}
 }
 
 func fakeCourse(now time.Time) *coursedomain.Course {
@@ -66,7 +55,7 @@ func fakeCourseScan(course *coursedomain.Course) func(dest ...any) error {
 		*testutil.CastPtrStr(dest[3], 3) = course.Description
 		*testutil.CastPtrStr(dest[4], 4) = course.ThumbnailURL
 		*testutil.CastPtrStr(dest[5], 5) = course.PreviewVideoURL
-		*castCourseStatus(dest[6], 6) = course.Status
+		*testutil.CastEnum[coursedomain.CourseStatus](dest[6], 6) = course.Status
 		*testutil.CastPtrInt(dest[7], 7) = course.EstimatedMinutes
 		*testutil.CastPtrStr(dest[8], 8) = course.SeoTitle
 		*testutil.CastPtrStr(dest[9], 9) = course.SeoDescription

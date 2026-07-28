@@ -40,7 +40,7 @@ func HandleInitEmailChangeProcess(p events.InitEmailChangeToken, baseURL string,
 	data := map[string]string{
 		"name":            p.UserName,
 		"newEmail":        p.Email,
-		"confirmationUrl": fmt.Sprintf("%s/api/v1/users/auth/email/change?token=%s", baseURL, p.RawToken),
+		"confirmationUrl": fmt.Sprintf("%s/api/v1/auth/email/change?token=%s", baseURL, p.RawToken),
 		"expirationTime":  p.ExpiresAt.UTC().Format("2 Jan 2006, 15:04 UTC"),
 	}
 

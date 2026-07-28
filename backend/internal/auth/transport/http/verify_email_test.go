@@ -24,12 +24,12 @@ func newVerifyEmailFixture() *verifyEmailFixture {
 			return f.svcResult, f.svcErr
 		},
 	}
-	f.httpFixture = newHTTPFixture(svc, http.MethodPost, "/api/v1/users/auth/email/verify")
+	f.httpFixture = newHTTPFixture(svc, http.MethodPost, "/api/v1/auth/email/verify")
 	return f
 }
 
 func TestVerifyEmailRequestValidation(t *testing.T) {
-	Convey("POST /api/v1/users/auth/email/verify — request validation", t, func() {
+	Convey("POST /api/v1/auth/email/verify — request validation", t, func() {
 		f := newVerifyEmailFixture()
 
 		Convey("Empty body → 400", func() {
@@ -50,7 +50,7 @@ func TestVerifyEmailRequestValidation(t *testing.T) {
 }
 
 func TestVerifyEmailServiceOutcomes(t *testing.T) {
-	Convey("POST /api/v1/users/auth/email/verify — service outcomes", t, func() {
+	Convey("POST /api/v1/auth/email/verify — service outcomes", t, func() {
 		f := newVerifyEmailFixture()
 
 		Convey("Service ErrTokenExpired → 400", func() {

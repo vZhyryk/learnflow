@@ -12,6 +12,7 @@ import (
 
 	coursedomain "learnflow_backend/internal/courses/domain"
 	"learnflow_backend/internal/shared/pagination"
+	"learnflow_backend/internal/shared/repository"
 	"learnflow_backend/internal/shared/testutil"
 
 	"github.com/jackc/pgx/v5"
@@ -71,7 +72,7 @@ func TestCreateCourse_Integration(t *testing.T) {
 	Convey("Given a courses repository backed by real Postgres", t, func() {
 		Convey("When creating a course with all fields populated", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				seed := draftCourse(t, tx)
 
 				got, err := repo.CreateCourse(ctx, seed)
@@ -90,7 +91,7 @@ func TestCreateCourse_Integration(t *testing.T) {
 
 		Convey("When the slug is already taken by another course", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				seed := draftCourse(t, tx)
 				_, err := repo.CreateCourse(ctx, seed)
 				So(err, ShouldBeNil)
@@ -106,7 +107,7 @@ func TestCreateCourse_Integration(t *testing.T) {
 
 		Convey("When created_by_user_id does not reference an existing user", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				seed := draftCourse(t, tx)
 				seed.CreatedByUserID = "00000000-0000-0000-0000-000000000000"
 
@@ -121,7 +122,7 @@ func TestCreateCourse_Integration(t *testing.T) {
 
 		Convey("When title is blank (DB-level CHECK, defense-in-depth below domain validation)", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				seed := draftCourse(t, tx)
 				seed.Title = "   "
 
@@ -143,7 +144,7 @@ func TestGetCourseByID_Integration(t *testing.T) {
 	Convey("Given a courses repository backed by real Postgres", t, func() {
 		Convey("When the course exists", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				seed := draftCourse(t, tx)
 				created, err := repo.CreateCourse(ctx, seed)
 				So(err, ShouldBeNil)
@@ -158,7 +159,7 @@ func TestGetCourseByID_Integration(t *testing.T) {
 
 		Convey("When no course exists for the given ID", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 
 				_, err := repo.GetCourseByID(ctx, "00000000-0000-0000-0000-000000000000")
 
@@ -168,7 +169,7 @@ func TestGetCourseByID_Integration(t *testing.T) {
 
 		Convey("When the course is soft-deleted", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				seed := draftCourse(t, tx)
 				created, err := repo.CreateCourse(ctx, seed)
 				So(err, ShouldBeNil)
@@ -188,7 +189,7 @@ func TestGetCourseBySlug_Integration(t *testing.T) {
 	Convey("Given a courses repository backed by real Postgres", t, func() {
 		Convey("When the course exists", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				seed := draftCourse(t, tx)
 				created, err := repo.CreateCourse(ctx, seed)
 				So(err, ShouldBeNil)
@@ -202,7 +203,7 @@ func TestGetCourseBySlug_Integration(t *testing.T) {
 
 		Convey("When no course exists for the given slug", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 
 				_, err := repo.GetCourseBySlug(ctx, "does-not-exist")
 
@@ -218,7 +219,7 @@ func TestPublishCourse_Integration(t *testing.T) {
 	Convey("Given a courses repository backed by real Postgres", t, func() {
 		Convey("When publishing an existing draft course", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 				So(err, ShouldBeNil)
 
@@ -233,7 +234,7 @@ func TestPublishCourse_Integration(t *testing.T) {
 
 		Convey("When the course does not exist", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 
 				err := repo.PublishCourse(ctx, "00000000-0000-0000-0000-000000000000")
 
@@ -249,7 +250,7 @@ func TestArchiveCourse_Integration(t *testing.T) {
 	Convey("Given a courses repository backed by real Postgres", t, func() {
 		Convey("When archiving an existing draft course directly (no publish step)", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 				So(err, ShouldBeNil)
 
@@ -263,7 +264,7 @@ func TestArchiveCourse_Integration(t *testing.T) {
 
 		Convey("When the course does not exist", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 
 				err := repo.ArchiveCourse(ctx, "00000000-0000-0000-0000-000000000000")
 
@@ -279,7 +280,7 @@ func TestDeleteCourse_Integration(t *testing.T) {
 	Convey("Given a courses repository backed by real Postgres", t, func() {
 		Convey("When soft-deleting an existing course", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 				So(err, ShouldBeNil)
 
@@ -292,7 +293,7 @@ func TestDeleteCourse_Integration(t *testing.T) {
 
 		Convey("When the course is already deleted (second delete affects 0 rows)", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 				So(err, ShouldBeNil)
 				So(repo.DeleteCourse(ctx, created.ID), ShouldBeNil)
@@ -311,7 +312,7 @@ func TestUpdateCourse_Integration(t *testing.T) {
 	Convey("Given a courses repository backed by real Postgres", t, func() {
 		Convey("When updating every field of an existing course", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 				So(err, ShouldBeNil)
 
@@ -333,7 +334,7 @@ func TestUpdateCourse_Integration(t *testing.T) {
 
 		Convey("When the new slug collides with another course", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				other, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 				So(err, ShouldBeNil)
 				created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
@@ -349,7 +350,7 @@ func TestUpdateCourse_Integration(t *testing.T) {
 
 		Convey("When the course does not exist", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				ghost := draftCourse(t, tx)
 				ghost.ID = "00000000-0000-0000-0000-000000000000"
 
@@ -366,7 +367,7 @@ func TestGetAllCoursesByStatus_Integration(t *testing.T) {
 
 	Convey("Given draft, published, archived, and soft-deleted courses", t, func() {
 		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-			repo := &Repository{db: tx}
+			repo := &Repository{repository.BaseRepository{DB: tx}}
 
 			draft, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 			So(err, ShouldBeNil)
@@ -444,7 +445,7 @@ func TestCourseCreatedByUserForeignKeyRestrict_Integration(t *testing.T) {
 
 	Convey("Given a course created by an existing user", t, func() {
 		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-			repo := &Repository{db: tx}
+			repo := &Repository{repository.BaseRepository{DB: tx}}
 			created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 			So(err, ShouldBeNil)
 

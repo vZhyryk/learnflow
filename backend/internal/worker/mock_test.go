@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/mailer"
+	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 // mockMailer implements the Mailer interface via a function field.
@@ -47,4 +49,28 @@ func capturingExecFn(query *string, args *[]any) func(context.Context, string, .
 		*query, *args = sql, a
 		return pgconn.NewCommandTag("UPDATE 1"), nil
 	}
+}
+
+// runValidatePayloadTest is shared across the 5 email-worker Validate*Payload tests.
+func runValidatePayloadTest[T any](t *testing.T, tokenType string, valid, invalid T, validate func(T) error) {
+	t.Helper()
+	Convey(fmt.Sprintf("Given an %s payload", tokenType), t, func() {
+		Convey("When all required fields are present", func() {
+			So(validate(valid), ShouldBeNil)
+		})
+
+		Convey("When required fields are missing", func() {
+			So(validate(invalid), ShouldNotBeNil)
+		})
+	})
+}
+
+// runIdempotencyKeyTest is shared across the 5 email-worker Generate*IdempotencyKey tests.
+func runIdempotencyKeyTest[T any](t *testing.T, tokenType string, payload T, generate func(T) string, want string) {
+	t.Helper()
+	Convey(fmt.Sprintf("Given an %s payload", tokenType), t, func() {
+		Convey("When generating the idempotency key", func() {
+			So(generate(payload), ShouldEqual, want)
+		})
+	})
 }

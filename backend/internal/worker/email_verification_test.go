@@ -9,44 +9,19 @@ import (
 )
 
 func TestValidateEmailVerificationPayload(t *testing.T) {
-	Convey("Given an UserRegisteredPayload payload", t, func() {
-		Convey("When all required fields are present", func() {
-			payload := events.UserRegisteredPayload{
-				UserID:   "user-123",
-				Email:    "user@example.com",
-				RawToken: "token",
-			}
-
-			err := ValidateEmailVerificationPayload(payload)
-
-			So(err, ShouldBeNil)
-		})
-
-		Convey("When required fields are missing", func() {
-			payload := events.UserRegisteredPayload{
-				UserID: "user-123",
-				Email:  "user@example.com",
-			}
-
-			err := ValidateEmailVerificationPayload(payload)
-
-			So(err, ShouldNotBeNil)
-		})
-	})
+	runValidatePayloadTest(t, "UserRegisteredPayload",
+		events.UserRegisteredPayload{UserID: "user-123", Email: "user@example.com", RawToken: "token"},
+		events.UserRegisteredPayload{UserID: "user-123", Email: "user@example.com"},
+		ValidateEmailVerificationPayload,
+	)
 }
 
 func TestGenerateEmailVerificationIdempotencyKey(t *testing.T) {
-	Convey("Given an UserRegisteredPayload payload", t, func() {
-		payload := events.UserRegisteredPayload{
-			UserID:   "user-123",
-			RawToken: "token",
-		}
-
-		Convey("When generating the idempotency key", func() {
-			key := GenerateEmailVerificationIdempotencyKey(payload)
-			So(key, ShouldEqual, "processed:email_verification:user-123:token")
-		})
-	})
+	runIdempotencyKeyTest(t, "UserRegisteredPayload",
+		events.UserRegisteredPayload{UserID: "user-123", RawToken: "token"},
+		GenerateEmailVerificationIdempotencyKey,
+		"processed:email_verification:user-123:token",
+	)
 }
 
 func TestHandleEmailVerificationProcess(t *testing.T) {

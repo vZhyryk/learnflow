@@ -30,13 +30,17 @@ func (s *Service) PublishCourse(ctx context.Context, courseID string) error {
 			return fmt.Errorf("service.PublishCourse: %w", err)
 		}
 
-		// TODO(notifications module, Phase 3+): Template/recipient unset — nothing to
-		// wire to yet; fill in once the notifications module lands.
+		// TODO(notifications module, Phase 3+): recipient unset — nothing to wire to yet;
+		// NotificationWorker must build "courseUrl" from Data["slug"] + base URL (same
+		// pattern as internal/worker/email_verification.go's verificationUrl) before Send.
+		// *course.Description is safe to dereference only because ReadyToPublish above
+		// already guarantees it is non-nil/non-empty (checkDescriptionReady).
 		payload := events.NotificationSendPayload{
-			Template: "",
+			Template: "course_published.html",
 			Data: map[string]string{
 				"title":       course.Title,
 				"description": *course.Description,
+				"slug":        course.Slug,
 			},
 		}
 

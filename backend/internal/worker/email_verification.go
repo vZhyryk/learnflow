@@ -39,7 +39,7 @@ func ValidateEmailVerificationPayload(p events.UserRegisteredPayload) error {
 func HandleEmailVerificationProcess(p events.UserRegisteredPayload, baseURL string, m Mailer) error {
 	data := map[string]string{
 		"name":            p.UserName,
-		"verificationUrl": fmt.Sprintf("%s/api/v1/users/auth/email/verify?token=%s", baseURL, p.RawToken),
+		"verificationUrl": fmt.Sprintf("%s/api/v1/auth/email/verify?token=%s", baseURL, p.RawToken),
 		"expirationTime":  p.ExpiresAt.UTC().Format("2 Jan 2006, 15:04 UTC"),
 	}
 	return m.Send("email_verification.html", data, mailer.CCUser{Mail: p.Email}, nil)

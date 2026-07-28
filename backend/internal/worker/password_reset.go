@@ -39,7 +39,7 @@ func ValidatePasswordResetPayload(p events.InitPasswordResetToken) error {
 func HandlePasswordResetProcess(p events.InitPasswordResetToken, baseURL string, m Mailer) error {
 	data := map[string]string{
 		"name":           p.UserName,
-		"resetUrl":       fmt.Sprintf("%s/api/v1/users/auth/password/reset?token=%s", baseURL, p.RawToken),
+		"resetUrl":       fmt.Sprintf("%s/api/v1/auth/password/reset?token=%s", baseURL, p.RawToken),
 		"expirationTime": p.ExpiresAt.UTC().Format("2 Jan 2006, 15:04 UTC"),
 	}
 	return m.Send("password_reset.html", data, mailer.CCUser{Mail: p.Email}, nil)

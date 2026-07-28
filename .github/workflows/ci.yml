@@ -26,6 +26,12 @@ jobs:
                   go-version: "1.26.5"
                   cache-dependency-path: backend/go.sum
 
+            - name: govulncheck
+              uses: golang/govulncheck-action@v1
+              with:
+                go-version-input: "1.26.5"
+                work-dir: backend
+
             - name: Vet
               working-directory: backend
               run: go vet ./...

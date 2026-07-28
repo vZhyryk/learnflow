@@ -27,7 +27,7 @@ func TestGetCourseBySlug(t *testing.T) {
 
 		Convey("When the repository returns an error", func() {
 			cRepo := &mockCourseRepoRepo{
-				getCourseBySlug: AlwaysError,
+				getCourseBySlug: alwaysError,
 			}
 
 			srv := newTestService(cRepo, nil)

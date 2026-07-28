@@ -134,6 +134,16 @@ func CastPtrTime(v any, idx int) **time.Time {
 	return t
 }
 
+// CastEnum safely type-asserts a scan destination to *T, for domain-specific string-enum
+// columns (e.g. CourseStatus, ContentType, UserRole) that can't live in a stdlib Cast* helper.
+func CastEnum[T any](v any, idx int) *T {
+	e, ok := v.(*T)
+	if !ok {
+		panic(fmt.Sprintf("dest[%d]: expected *%T, got %T", idx, e, v))
+	}
+	return e
+}
+
 // MockRows implements pgx.Rows for controlled multi-row Scan injection in
 // repository/worker tests. Rows are consumed front-to-back by successive Scan calls.
 type MockRows struct {

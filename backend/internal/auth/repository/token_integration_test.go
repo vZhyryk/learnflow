@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/repository"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
 	"time"
@@ -34,7 +35,7 @@ func TestEmailVerificationToken_Integration(t *testing.T) {
 	Convey("EmailVerificationToken", t, func() {
 		Convey("Create and Get", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("ev")
 				expiresAt := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
@@ -55,7 +56,7 @@ func TestEmailVerificationToken_Integration(t *testing.T) {
 
 		Convey("MarkEmailVerificationTokenUsed", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("ev")
 				_, err := repo.CreateEmailVerificationToken(ctx, &authdomain.EmailVerificationToken{
@@ -76,7 +77,7 @@ func TestEmailVerificationToken_Integration(t *testing.T) {
 
 		Convey("token does not exist", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				_, err := repo.GetEmailVerificationToken(ctx, "non-existent-hash")
 				So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 
@@ -87,11 +88,11 @@ func TestEmailVerificationToken_Integration(t *testing.T) {
 
 		Convey("expired token is not returned", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("ev")
 
-				_, err := repo.queryRunner(ctx).Exec(ctx,
+				_, err := repo.QueryRunner(ctx).Exec(ctx,
 					`INSERT INTO email_verification_tokens (user_id, token_hash, created_at, expires_at)
 					 VALUES ($1, $2, now() - interval '2 hours', now() - interval '1 hour')`,
 					userId, hash)
@@ -104,7 +105,7 @@ func TestEmailVerificationToken_Integration(t *testing.T) {
 
 		Convey("invalidated token is not returned", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("ev")
 				_, err := repo.CreateEmailVerificationToken(ctx, &authdomain.EmailVerificationToken{
@@ -112,7 +113,7 @@ func TestEmailVerificationToken_Integration(t *testing.T) {
 				})
 				So(err, ShouldBeNil)
 
-				_, err = repo.queryRunner(ctx).Exec(ctx,
+				_, err = repo.QueryRunner(ctx).Exec(ctx,
 					`UPDATE email_verification_tokens SET invalidated_at = now(), invalidated_by_user_id = $2 WHERE token_hash = $1`,
 					hash, userId)
 				So(err, ShouldBeNil)
@@ -129,7 +130,7 @@ func TestPasswordResetToken_Integration(t *testing.T) {
 	Convey("PasswordResetToken", t, func() {
 		Convey("Create and Get", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("pr")
 				expiresAt := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
@@ -150,7 +151,7 @@ func TestPasswordResetToken_Integration(t *testing.T) {
 
 		Convey("MarkPasswordResetTokenUsed", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("pr")
 				_, err := repo.CreatePasswordResetToken(ctx, &authdomain.PasswordResetToken{
@@ -171,7 +172,7 @@ func TestPasswordResetToken_Integration(t *testing.T) {
 
 		Convey("token does not exist", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				_, err := repo.GetPasswordResetToken(ctx, "non-existent-hash")
 				So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 
@@ -182,11 +183,11 @@ func TestPasswordResetToken_Integration(t *testing.T) {
 
 		Convey("expired token is not returned", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("pr")
 
-				_, err := repo.queryRunner(ctx).Exec(ctx,
+				_, err := repo.QueryRunner(ctx).Exec(ctx,
 					`INSERT INTO password_reset_tokens (user_id, token_hash, created_at, expires_at)
 					 VALUES ($1, $2, now() - interval '2 hours', now() - interval '1 hour')`,
 					userId, hash)
@@ -204,7 +205,7 @@ func TestEmailChangeToken_Integration(t *testing.T) {
 	Convey("EmailChangeToken", t, func() {
 		Convey("Create and Get", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("ec")
 				newEmail := fmt.Sprintf("new-%s@example.com", hash)
@@ -229,7 +230,7 @@ func TestEmailChangeToken_Integration(t *testing.T) {
 
 		Convey("MarkEmailChangeTokenUsed", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("ec")
 				_, err := repo.CreateEmailChangeToken(ctx, &authdomain.EmailChangeToken{
@@ -251,7 +252,7 @@ func TestEmailChangeToken_Integration(t *testing.T) {
 
 		Convey("token does not exist", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				_, err := repo.GetEmailChangeToken(ctx, "non-existent-hash")
 				So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 
@@ -262,11 +263,11 @@ func TestEmailChangeToken_Integration(t *testing.T) {
 
 		Convey("expired token is not returned", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("ec")
 
-				_, err := repo.queryRunner(ctx).Exec(ctx,
+				_, err := repo.QueryRunner(ctx).Exec(ctx,
 					`INSERT INTO email_change_tokens (user_id, token_hash, new_email, created_at, expires_at)
 					 VALUES ($1, $2, $3, now() - interval '2 hours', now() - interval '1 hour')`,
 					userId, hash, fmt.Sprintf("new-%s@example.com", hash))
@@ -284,7 +285,7 @@ func TestAccountRecoveryToken_Integration(t *testing.T) {
 	Convey("AccountRecoveryToken", t, func() {
 		Convey("Create and Get", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("ar")
 				expiresAt := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
@@ -305,7 +306,7 @@ func TestAccountRecoveryToken_Integration(t *testing.T) {
 
 		Convey("MarkAccountRecoveryTokenUsed", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("ar")
 				_, err := repo.CreateAccountRecoveryToken(ctx, &authdomain.AccountRecoveryToken{
@@ -326,7 +327,7 @@ func TestAccountRecoveryToken_Integration(t *testing.T) {
 
 		Convey("token does not exist", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				_, err := repo.GetAccountRecoveryToken(ctx, "non-existent-hash")
 				So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 
@@ -337,11 +338,11 @@ func TestAccountRecoveryToken_Integration(t *testing.T) {
 
 		Convey("expired token is not returned", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				hash := uniqueTokenHash("ar")
 
-				_, err := repo.queryRunner(ctx).Exec(ctx,
+				_, err := repo.QueryRunner(ctx).Exec(ctx,
 					`INSERT INTO account_recovery_tokens (user_id, token_hash, created_at, expires_at)
 					 VALUES ($1, $2, now() - interval '2 hours', now() - interval '1 hour')`,
 					userId, hash)
@@ -359,7 +360,7 @@ func TestDeleteExpiredTokens_Integration(t *testing.T) {
 	Convey("DeleteExpiredTokens", t, func() {
 		Convey("removes only expired rows across all four token tables", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 
 				validExpiresAt := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
@@ -383,26 +384,26 @@ func TestDeleteExpiredTokens_Integration(t *testing.T) {
 				So(err, ShouldBeNil)
 
 				expiredEVHash := uniqueTokenHash("ev-expired")
-				_, err = repo.queryRunner(ctx).Exec(ctx,
+				_, err = repo.QueryRunner(ctx).Exec(ctx,
 					`INSERT INTO email_verification_tokens (user_id, token_hash, created_at, expires_at)
 					 VALUES ($1, $2, now() - interval '2 hours', now() - interval '1 hour')`, userId, expiredEVHash)
 				So(err, ShouldBeNil)
 
 				expiredPRHash := uniqueTokenHash("pr-expired")
-				_, err = repo.queryRunner(ctx).Exec(ctx,
+				_, err = repo.QueryRunner(ctx).Exec(ctx,
 					`INSERT INTO password_reset_tokens (user_id, token_hash, created_at, expires_at)
 					 VALUES ($1, $2, now() - interval '2 hours', now() - interval '1 hour')`, userId, expiredPRHash)
 				So(err, ShouldBeNil)
 
 				expiredECHash := uniqueTokenHash("ec-expired")
-				_, err = repo.queryRunner(ctx).Exec(ctx,
+				_, err = repo.QueryRunner(ctx).Exec(ctx,
 					`INSERT INTO email_change_tokens (user_id, token_hash, new_email, created_at, expires_at)
 					 VALUES ($1, $2, $3, now() - interval '2 hours', now() - interval '1 hour')`,
 					userId, expiredECHash, "expired@example.com")
 				So(err, ShouldBeNil)
 
 				expiredARHash := uniqueTokenHash("ar-expired")
-				_, err = repo.queryRunner(ctx).Exec(ctx,
+				_, err = repo.QueryRunner(ctx).Exec(ctx,
 					`INSERT INTO account_recovery_tokens (user_id, token_hash, created_at, expires_at)
 					 VALUES ($1, $2, now() - interval '2 hours', now() - interval '1 hour')`, userId, expiredARHash)
 				So(err, ShouldBeNil)
@@ -424,7 +425,7 @@ func TestDeleteExpiredTokens_Integration(t *testing.T) {
 
 		Convey("nothing to delete", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				total, err := repo.DeleteExpiredTokens(ctx)
 				So(err, ShouldBeNil)
 				So(total, ShouldEqual, 0)

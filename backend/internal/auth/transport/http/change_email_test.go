@@ -12,7 +12,7 @@ import (
 )
 
 func TestInitiateEmailChange(t *testing.T) {
-	Convey("POST /api/v1/users/auth/email/change", t, func() {
+	Convey("POST /api/v1/auth/email/change", t, func() {
 		var svcErr error
 
 		svc := &mockService{
@@ -20,7 +20,7 @@ func TestInitiateEmailChange(t *testing.T) {
 				return svcErr
 			},
 		}
-		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/users/auth/email/change")
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/auth/email/change")
 		mux, newReq := f.mux, f.newReq
 
 		Convey("Empty body → 400", func() {
@@ -78,12 +78,12 @@ func newChangeEmailFixture() *changeEmailFixture {
 			return f.svcErr
 		},
 	}
-	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/users/auth/email/change")
+	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/auth/email/change")
 	return f
 }
 
 func TestChangeEmailRequestValidation(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/email/change — request validation", t, func() {
+	Convey("PUT /api/v1/auth/email/change — request validation", t, func() {
 		f := newChangeEmailFixture()
 
 		Convey("Empty body → 400", func() {
@@ -105,7 +105,7 @@ func TestChangeEmailRequestValidation(t *testing.T) {
 }
 
 func TestChangeEmailServiceOutcomes(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/email/change — service outcomes", t, func() {
+	Convey("PUT /api/v1/auth/email/change — service outcomes", t, func() {
 		f := newChangeEmailFixture()
 
 		Convey("Service ErrTokenExpired → 400", func() {

@@ -25,6 +25,48 @@ func TestRenderEmail(t *testing.T) {
 			So(htmlBody, ShouldContainSubstring, "Alice")
 		})
 
+		Convey("content_published template renders subject, plain and html bodies", func() {
+			data := map[string]any{
+				"title":       "Intro to Go",
+				"description": "A beginner-friendly video course.",
+				"contentUrl":  "https://learnflow.dev/content/intro-to-go",
+			}
+			subject, plainBody, htmlBody, err := renderEmail("content_published.html", data)
+
+			So(err, ShouldBeNil)
+			So(subject, ShouldContainSubstring, "Intro to Go")
+			So(plainBody, ShouldContainSubstring, "Intro to Go")
+			So(htmlBody, ShouldContainSubstring, "Intro to Go")
+		})
+
+		Convey("course_published template renders subject, plain and html bodies", func() {
+			data := map[string]any{
+				"title":       "Go Fundamentals",
+				"description": "Everything you need to start with Go.",
+				"courseUrl":   "https://learnflow.dev/courses/go-fundamentals",
+			}
+			subject, plainBody, htmlBody, err := renderEmail("course_published.html", data)
+
+			So(err, ShouldBeNil)
+			So(subject, ShouldContainSubstring, "Go Fundamentals")
+			So(plainBody, ShouldContainSubstring, "Go Fundamentals")
+			So(htmlBody, ShouldContainSubstring, "Go Fundamentals")
+		})
+
+		Convey("article_published template renders subject, plain and html bodies", func() {
+			data := map[string]any{
+				"title":      "Why We Chose pgx",
+				"excerpt":    "A look at our PostgreSQL driver choice.",
+				"articleUrl": "https://learnflow.dev/articles/why-we-chose-pgx",
+			}
+			subject, plainBody, htmlBody, err := renderEmail("article_published.html", data)
+
+			So(err, ShouldBeNil)
+			So(subject, ShouldContainSubstring, "Why We Chose pgx")
+			So(plainBody, ShouldContainSubstring, "Why We Chose pgx")
+			So(htmlBody, ShouldContainSubstring, "Why We Chose pgx")
+		})
+
 		Convey("missing template file returns a parse error", func() {
 			_, _, _, err := renderEmail("does_not_exist.html", nil)
 

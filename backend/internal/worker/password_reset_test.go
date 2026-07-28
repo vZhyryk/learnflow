@@ -9,44 +9,19 @@ import (
 )
 
 func TestValidatePasswordResetPayload(t *testing.T) {
-	Convey("Given an InitPasswordResetToken payload", t, func() {
-		Convey("When all required fields are present", func() {
-			payload := events.InitPasswordResetToken{
-				UserID:   "user-123",
-				Email:    "user@example.com",
-				RawToken: "token",
-			}
-
-			err := ValidatePasswordResetPayload(payload)
-
-			So(err, ShouldBeNil)
-		})
-
-		Convey("When required fields are missing", func() {
-			payload := events.InitPasswordResetToken{
-				UserID: "user-123",
-				Email:  "user@example.com",
-			}
-
-			err := ValidatePasswordResetPayload(payload)
-
-			So(err, ShouldNotBeNil)
-		})
-	})
+	runValidatePayloadTest(t, "InitPasswordResetToken",
+		events.InitPasswordResetToken{UserID: "user-123", Email: "user@example.com", RawToken: "token"},
+		events.InitPasswordResetToken{UserID: "user-123", Email: "user@example.com"},
+		ValidatePasswordResetPayload,
+	)
 }
 
 func TestGeneratePasswordResetIdempotencyKey(t *testing.T) {
-	Convey("Given an InitPasswordResetToken payload", t, func() {
-		payload := events.InitPasswordResetToken{
-			UserID:   "user-123",
-			RawToken: "token",
-		}
-
-		Convey("When generating the idempotency key", func() {
-			key := GeneratePasswordResetIdempotencyKey(payload)
-			So(key, ShouldEqual, "processed:password_reset:user-123:token")
-		})
-	})
+	runIdempotencyKeyTest(t, "InitPasswordResetToken",
+		events.InitPasswordResetToken{UserID: "user-123", RawToken: "token"},
+		GeneratePasswordResetIdempotencyKey,
+		"processed:password_reset:user-123:token",
+	)
 }
 
 func TestHandlePasswordResetProcess(t *testing.T) {

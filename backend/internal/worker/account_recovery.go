@@ -39,7 +39,7 @@ func ValidateAccountRecoveryPayload(p events.InitAccountRecoveryToken) error {
 func HandleInitAccountRecoveryProcess(p events.InitAccountRecoveryToken, baseURL string, m Mailer) error {
 	data := map[string]string{
 		"name":           p.UserName,
-		"recoveryUrl":    fmt.Sprintf("%s/api/v1/users/auth/account/recover?token=%s", baseURL, p.RawToken),
+		"recoveryUrl":    fmt.Sprintf("%s/api/v1/auth/account/recover?token=%s", baseURL, p.RawToken),
 		"expirationTime": p.ExpiresAt.UTC().Format("2 Jan 2006, 15:04 UTC"),
 	}
 

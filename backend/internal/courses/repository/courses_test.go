@@ -3,6 +3,7 @@ package courserepository
 import (
 	"context"
 	"errors"
+	"fmt"
 	coursedomain "learnflow_backend/internal/courses/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
@@ -224,72 +225,42 @@ func TestUpdateCourse(t *testing.T) {
 	})
 }
 
-// testCourseListMethod covers the shared shape of every GetAll*Courses method
-// (getAndParseCourses: query -> scan loop -> rows.Err), per go-testing.md's
-// coverage-per-branch rule, without repeating all four branches per method.
-func testCourseListMethod(t *testing.T, methodName string, call func(*Repository, context.Context, pagination.Params) ([]*coursedomain.Course, error)) {
-	now := time.Now().UTC().Truncate(time.Second)
+// bindCourseList adapts a repository list method into the shape testutil.TestListMethod
+// expects: build a repo around the given runner, return the bound method.
+func bindCourseList(
+	call func(*Repository, context.Context, pagination.Params) ([]*coursedomain.Course, error),
+) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*coursedomain.Course, error) {
+	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*coursedomain.Course, error) {
+		repo := newTestRepo(runner)
+		return func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
+			return call(repo, ctx, params)
+		}
+	}
+}
 
-	Convey("Given a course repository", t, func() {
-		var rows *testutil.MockRows
-		var queryErr error
-		repo := newTestRepo(&testutil.MockQueryRunner{
-			QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
-				return rows, queryErr
-			},
-		})
-
-		Convey("When the query fails", func() {
-			queryErr = testutil.ErrDBUnexpected
-			_, err := call(repo, context.Background(), pagination.NewParams(1, 20))
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "repository."+methodName)
-		})
-
-		Convey("When a row fails to scan", func() {
-			rows = &testutil.MockRows{Rows: []*testutil.MockRow{
-				{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }},
-			}}
-			_, err := call(repo, context.Background(), pagination.NewParams(1, 20))
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "scan")
-		})
-
-		Convey("When rows.Err() reports a failure after iteration", func() {
-			rows = &testutil.MockRows{RowsErr: testutil.ErrDBUnexpected}
-			_, err := call(repo, context.Background(), pagination.NewParams(1, 20))
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "rows")
-		})
-
-		Convey("When rows return 2 courses", func() {
-			course1, course2 := fakeCourse(now), fakeCourse(now)
-			course1.ID, course2.ID = "course-1", "course-2"
-			rows = &testutil.MockRows{Rows: []*testutil.MockRow{
-				{ScanFn: fakeCourseScan(course1)},
-				{ScanFn: fakeCourseScan(course2)},
-			}}
-			got, err := call(repo, context.Background(), pagination.NewParams(1, 20))
-			So(err, ShouldBeNil)
-			So(got, ShouldHaveLength, 2)
-			So(got[0], ShouldResemble, course1)
-			So(got[1], ShouldResemble, course2)
-		})
-	})
+// fakeCourseN builds the nth fake Course for TestListMethod's "2 items" case.
+func fakeCourseN(n int) *coursedomain.Course {
+	course := fakeCourse(time.Now().UTC().Truncate(time.Second))
+	course.ID = fmt.Sprintf("course-%d", n)
+	return course
 }
 
 func TestGetAllPublishedCourses(t *testing.T) {
-	testCourseListMethod(t, "GetAllPublishedCourses", (*Repository).GetAllPublishedCourses)
+	testutil.TestListMethod(t, "GetAllPublishedCourses",
+		bindCourseList((*Repository).GetAllPublishedCourses), fakeCourseN, fakeCourseScan)
 }
 
 func TestGetAllDraftCourses(t *testing.T) {
-	testCourseListMethod(t, "GetAllDraftCourses", (*Repository).GetAllDraftCourses)
+	testutil.TestListMethod(t, "GetAllDraftCourses",
+		bindCourseList((*Repository).GetAllDraftCourses), fakeCourseN, fakeCourseScan)
 }
 
 func TestGetAllArchivedCourses(t *testing.T) {
-	testCourseListMethod(t, "GetAllArchivedCourses", (*Repository).GetAllArchivedCourses)
+	testutil.TestListMethod(t, "GetAllArchivedCourses",
+		bindCourseList((*Repository).GetAllArchivedCourses), fakeCourseN, fakeCourseScan)
 }
 
 func TestGetAllCourses(t *testing.T) {
-	testCourseListMethod(t, "GetAllCourses", (*Repository).GetAllCourses)
+	testutil.TestListMethod(t, "GetAllCourses",
+		bindCourseList((*Repository).GetAllCourses), fakeCourseN, fakeCourseScan)
 }

@@ -126,8 +126,9 @@ func TestGetActiveSessionsByUserID(t *testing.T) {
 			row = &testutil.MockRow{ScanFn: fakeScanUserSession(now)}
 			got, err := repo.GetActiveSessionsByUserID(context.Background(), "user-123")
 			userSession := fakeUserSession(now)
+			So(err, ShouldBeNil)
+			So(got, ShouldHaveLength, 1)
 			for _, session := range got {
-				So(err, ShouldBeNil)
 				So(session.ID, ShouldEqual, userSession.ID)
 				So(session.UserID, ShouldEqual, userSession.UserID)
 				So(session.RefreshHash, ShouldEqual, userSession.RefreshHash)

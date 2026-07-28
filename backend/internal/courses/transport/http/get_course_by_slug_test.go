@@ -23,10 +23,9 @@ func TestGetCourseBySlug(t *testing.T) {
 		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/courses/{slug}")
 		mux, newReq := f.mux, f.newReq
 
-		Convey("No user in context → panics (middleware invariant violated)", func() {
-			So(func() {
-				testutil.ServeHTTP(mux, newReq("", nil))
-			}, ShouldPanic)
+		Convey("No user in context → still succeeds (public route)", func() {
+			w := testutil.ServeHTTP(mux, newReq("", nil))
+			So(w.Code, ShouldEqual, http.StatusOK)
 		})
 
 		Convey("Unexpected service error → 500", func() {
