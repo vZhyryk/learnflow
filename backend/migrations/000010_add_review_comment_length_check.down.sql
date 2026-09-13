@@ -1,0 +1,2 @@
+ALTER TABLE course_reviews DROP CONSTRAINT if EXISTS course_reviews_comment_length_check;
+ALTER TABLE content_reviews DROP CONSTRAINT if EXISTS content_reviews_comment_length_check;

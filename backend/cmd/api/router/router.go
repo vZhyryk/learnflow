@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"learnflow_backend/cmd/api/app"
+	"learnflow_backend/internal/access"
 	"learnflow_backend/internal/article"
 	articlerepository "learnflow_backend/internal/article/repository"
 	articleservice "learnflow_backend/internal/article/service"
@@ -25,6 +26,9 @@ import (
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/helpers"
+	"learnflow_backend/internal/review"
+	reviewrepository "learnflow_backend/internal/review/repository"
+	reviewservice "learnflow_backend/internal/review/service"
 	appcontext "learnflow_backend/internal/shared/context"
 	"learnflow_backend/internal/shared/tokens"
 	"learnflow_backend/internal/users"
@@ -94,20 +98,23 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	// Course Routes
 	courseRepo := courserepository.NewRepository(a.DB)
 	courseSvc := courseservice.New(courseRepo, transactor, outbox)
-
 	courses.RegisterCourseRoutes(router, courseSvc, chains.Static, adminStaticWithAuth, a.Logger)
 
 	// Content Routes
 	contentRepo := contentrepository.NewRepository(a.DB)
 	contentSvc := contentservice.New(contentRepo, transactor, outbox)
-
 	content.RegisterContentRoutes(router, contentSvc, chains.Static, adminStaticWithAuth, a.Logger)
 
 	// Article Routes
 	articleRepo := articlerepository.NewRepository(a.DB)
 	articleSvc := articleservice.New(articleRepo, transactor, outbox)
-
 	article.RegisterArticleRoutes(router, articleSvc, chains.Static, adminStaticWithAuth, a.Logger)
+
+	// Review Routes
+	reviewRepo := reviewrepository.NewRepository(a.DB)
+	accessChecker := access.New(a.DB)
+	reviewSvc := reviewservice.New(reviewRepo, reviewRepo, transactor, accessChecker)
+	review.RegisterReviewRoutes(router, reviewSvc, chains.Static, chains.StaticWithAuth, adminStaticWithAuth, a.Logger)
 
 	// Helper routes
 	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

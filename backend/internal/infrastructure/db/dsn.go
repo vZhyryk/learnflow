@@ -33,10 +33,15 @@ func BuildDSNFromEnv() (string, error) {
 }
 
 // MaskDSN redacts dsn's password for logging (CWE-532: the field sanitizer misses
-// credentials inline in a URL). Returns dsn unchanged if unparseable or password-less.
+// credentials inline in a URL). Fails closed: returns a fixed redacted sentinel if
+// dsn is unparseable (never the raw dsn, which may contain a plaintext password).
+// Returns dsn unchanged only if it parses cleanly and has no userinfo component.
 func MaskDSN(dsn string) string {
 	u, err := url.Parse(dsn)
-	if err != nil || u.User == nil {
+	if err != nil {
+		return "<unparseable dsn, redacted>"
+	}
+	if u.User == nil {
 		return dsn
 	}
 	if _, hasPassword := u.User.Password(); hasPassword {

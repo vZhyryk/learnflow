@@ -71,7 +71,7 @@ func TestRenderEmail(t *testing.T) {
 			_, _, _, err := renderEmail("does_not_exist.html", nil)
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "renderEmail parse template")
+			So(err.Error(), ShouldContainSubstring, "renderEmail: parse template")
 		})
 
 		Convey("data incompatible with template fields returns an execute error", func() {
@@ -112,7 +112,7 @@ func TestMailerSendDialFailure(t *testing.T) {
 			err := m.Send("does_not_exist.html", nil, CCUser{Mail: "user@example.com", Username: "Alice"}, nil)
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "renderEmail parse template")
+			So(err.Error(), ShouldContainSubstring, "renderEmail: parse template")
 		})
 	})
 }

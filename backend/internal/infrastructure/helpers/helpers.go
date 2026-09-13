@@ -101,9 +101,13 @@ func parseJSONError(err error) error {
 		return fmt.Errorf("body must not be larger than %d bytes", maxBytesError.Limit)
 
 	case errors.As(err, &invalidUnmarshalError):
-		return fmt.Errorf("invalid unmarshal target: %w", err)
+		// err.Error() here embeds the Go destination type name (json.InvalidUnmarshalError) —
+		// never expose that to the client; log server-side, return a generic message.
+		return errors.New("invalid request body")
 
 	default:
-		return fmt.Errorf("error parsing JSON: %w", err)
+		// Catch-all: don't forward an unrecognized decoder error verbatim to the client —
+		// a future custom UnmarshalJSON could leak internal detail through this branch.
+		return errors.New("invalid request body")
 	}
 }

@@ -76,3 +76,51 @@ func InsertTestUser(t *testing.T, tx pgx.Tx, email string) string {
 	}
 	return id
 }
+
+// RandomTestSlug generates a unique slug, prefixed by the caller's package/purpose
+// (e.g. "content-repo-integration"). Mirrors RandomTestEmail's shape for slug columns.
+func RandomTestSlug(t *testing.T, prefix string) string {
+	t.Helper()
+
+	buf := make([]byte, 8)
+	if _, err := rand.Read(buf); err != nil {
+		t.Fatalf("testutil.RandomTestSlug: %v", err)
+	}
+	return fmt.Sprintf("%s-%s", prefix, hex.EncodeToString(buf))
+}
+
+const insertTestCourseSQL = `
+	INSERT INTO courses (slug, title, status, created_by_user_id)
+	VALUES ($1, 'Integration Test Course', 'draft', $2)
+	RETURNING id`
+
+// InsertTestCourse inserts a minimal draft course (and its owning user) to satisfy a
+// courses(id) foreign key.
+func InsertTestCourse(t *testing.T, tx pgx.Tx) string {
+	t.Helper()
+
+	userID := InsertTestUser(t, tx, RandomTestEmail(t, "course-fixture"))
+	var id string
+	if err := tx.QueryRow(context.Background(), insertTestCourseSQL, RandomTestSlug(t, "course-fixture"), userID).Scan(&id); err != nil {
+		t.Fatalf("testutil.InsertTestCourse: %v", err)
+	}
+	return id
+}
+
+const insertTestContentItemSQL = `
+	INSERT INTO content_items (slug, title, content_type, status, created_by_user_id)
+	VALUES ($1, 'Integration Test Content', 'video', 'draft', $2)
+	RETURNING id`
+
+// InsertTestContentItem inserts a minimal draft content item (and its owning user) to
+// satisfy a content_items(id) foreign key.
+func InsertTestContentItem(t *testing.T, tx pgx.Tx) string {
+	t.Helper()
+
+	userID := InsertTestUser(t, tx, RandomTestEmail(t, "content-fixture"))
+	var id string
+	if err := tx.QueryRow(context.Background(), insertTestContentItemSQL, RandomTestSlug(t, "content-fixture"), userID).Scan(&id); err != nil {
+		t.Fatalf("testutil.InsertTestContentItem: %v", err)
+	}
+	return id
+}

@@ -96,6 +96,15 @@ func CastInt(v any, idx int) *int {
 	return s
 }
 
+// CastFloat64 safely type-asserts a scan destination to *float64.
+func CastFloat64(v any, idx int) *float64 {
+	s, ok := v.(*float64)
+	if !ok {
+		panic(fmt.Sprintf("dest[%d]: expected *float64, got %T", idx, v))
+	}
+	return s
+}
+
 // CastPgtypeDate safely type-asserts a scan destination to *pgtype.Date — used for
 // nullable `date` columns since pgx v5 can't scan `date` into *string.
 func CastPgtypeDate(v any, idx int) *pgtype.Date {

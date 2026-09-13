@@ -74,7 +74,7 @@ var templateFS embed.FS
 func renderEmail(templateFile string, data any) (subject, plainBody, htmlBody string, err error) {
 	tmpl, err := template.New("email").ParseFS(templateFS, "templates/"+templateFile)
 	if err != nil {
-		return "", "", "", fmt.Errorf("mailer.renderEmail parse template: %w", err)
+		return "", "", "", fmt.Errorf("mailer.renderEmail: parse template: %w", err)
 	}
 
 	var buf bytes.Buffer

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -35,7 +35,7 @@ func main() {
 
 	baseURL := env.GetStringEnv("BASE_URL", "")
 	if baseURL == "" {
-		jsonLogger.Fatal(fmt.Errorf("base url is not valid"), nil)
+		jsonLogger.Fatal(errors.New("BASE_URL env var is required and must not be empty"), nil)
 	}
 
 	workers := []worker.Worker{
@@ -96,19 +96,19 @@ func getMailerConfig(cfg *Config, environment string) error {
 	}
 
 	if cfg.SMTP.Host == "" || (cfg.SMTP.Host == "stub" && environment == "production") {
-		return fmt.Errorf("smtp host is not valid")
+		return errors.New("SMTP_HOST env var is required in production and must not be the stub value")
 	}
 
 	if cfg.SMTP.Username == "" {
-		return fmt.Errorf("smtp username is not valid")
+		return errors.New("SMTP_USERNAME env var is required and must not be empty")
 	}
 
 	if cfg.SMTP.Password == "" {
-		return fmt.Errorf("smtp password is not valid")
+		return errors.New("SMTP_PASSWORD env var is required and must not be empty")
 	}
 
 	if cfg.SMTP.Sender == "" {
-		return fmt.Errorf("smtp sender is not valid")
+		return errors.New("SMTP_SENDER env var is required and must not be empty")
 	}
 
 	return nil

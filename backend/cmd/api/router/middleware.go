@@ -212,7 +212,7 @@ func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request, key, obj string) error {
 	blocked, err := route.App.Redis.Exists(r.Context(), key+obj).Result()
 	if err != nil {
-		wrapped := fmt.Errorf("AuthenticateUser: %s %w", key, err)
+		wrapped := fmt.Errorf("AuthenticateUser: %s: %w", key, err)
 		route.App.Logger.Error(wrapped, map[string]any{
 			"method":     r.Method,
 			"path":       r.URL.Path,
@@ -230,7 +230,7 @@ func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request,
 		helpers.LogRespondError(route.App.Logger, r, "auth_blocked_response_write", map[string]any{"method": r.Method}, func() error {
 			return helpers.InvalidCredentialsResponse(w)
 		})
-		return fmt.Errorf("%s invalid credentials", key)
+		return fmt.Errorf("%s: session or account blocked", key)
 	}
 
 	return nil

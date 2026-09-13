@@ -7,7 +7,7 @@ import (
 	"learnflow_backend/internal/shared/pagination"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/smartystreets/goconvey/convey"
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 // TestListMethod covers the shared shape of every GetAll*/List repository method
@@ -24,7 +24,7 @@ func TestListMethod[T any](
 	makeFake func(n int) T,
 	scanFake func(T) func(dest ...any) error,
 ) {
-	convey.Convey("Given a repository", t, func() {
+	Convey("Given a repository", t, func() {
 		var rows *MockRows
 		var queryErr error
 		call := bind(&MockQueryRunner{
@@ -33,40 +33,95 @@ func TestListMethod[T any](
 			},
 		})
 
-		convey.Convey("When the query fails", func() {
+		Convey("When the query fails", func() {
 			queryErr = ErrDBUnexpected
 			_, err := call(context.Background(), pagination.NewParams(1, 20))
-			convey.So(err, convey.ShouldNotBeNil)
-			convey.So(err.Error(), convey.ShouldContainSubstring, "repository."+methodName)
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "repository."+methodName)
 		})
 
-		convey.Convey("When a row fails to scan", func() {
+		Convey("When a row fails to scan", func() {
 			rows = &MockRows{Rows: []*MockRow{
 				{ScanFn: func(_ ...any) error { return ErrDBUnexpected }},
 			}}
 			_, err := call(context.Background(), pagination.NewParams(1, 20))
-			convey.So(err, convey.ShouldNotBeNil)
-			convey.So(err.Error(), convey.ShouldContainSubstring, "scan")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "scan")
 		})
 
-		convey.Convey("When rows.Err() reports a failure after iteration", func() {
+		Convey("When rows.Err() reports a failure after iteration", func() {
 			rows = &MockRows{RowsErr: ErrDBUnexpected}
 			_, err := call(context.Background(), pagination.NewParams(1, 20))
-			convey.So(err, convey.ShouldNotBeNil)
-			convey.So(err.Error(), convey.ShouldContainSubstring, "rows")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "rows")
 		})
 
-		convey.Convey("When rows return 2 items", func() {
+		Convey("When rows return 2 items", func() {
 			item1, item2 := makeFake(1), makeFake(2)
 			rows = &MockRows{Rows: []*MockRow{
 				{ScanFn: scanFake(item1)},
 				{ScanFn: scanFake(item2)},
 			}}
 			got, err := call(context.Background(), pagination.NewParams(1, 20))
-			convey.So(err, convey.ShouldBeNil)
-			convey.So(got, convey.ShouldHaveLength, 2)
-			convey.So(got[0], convey.ShouldResemble, item1)
-			convey.So(got[1], convey.ShouldResemble, item2)
+			So(err, ShouldBeNil)
+			So(got, ShouldHaveLength, 2)
+			So(got[0], ShouldResemble, item1)
+			So(got[1], ShouldResemble, item2)
+		})
+	})
+}
+
+func TestListMethodWithStringArg[T any](
+	t *testing.T,
+	methodName string,
+	bind func(*MockQueryRunner) func(context.Context, pagination.Params, string) ([]T, error),
+	makeFake func(n int) T,
+	scanFake func(T) func(dest ...any) error,
+) {
+	Convey("Given a repository", t, func() {
+		var rows *MockRows
+		var queryErr error
+		id := "test_id"
+		call := bind(&MockQueryRunner{
+			QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
+				return rows, queryErr
+			},
+		})
+
+		Convey("When the query fails", func() {
+			queryErr = ErrDBUnexpected
+			_, err := call(context.Background(), pagination.NewParams(1, 20), id)
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "repository."+methodName)
+		})
+
+		Convey("When a row fails to scan", func() {
+			rows = &MockRows{Rows: []*MockRow{
+				{ScanFn: func(_ ...any) error { return ErrDBUnexpected }},
+			}}
+			_, err := call(context.Background(), pagination.NewParams(1, 20), id)
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "scan")
+		})
+
+		Convey("When rows.Err() reports a failure after iteration", func() {
+			rows = &MockRows{RowsErr: ErrDBUnexpected}
+			_, err := call(context.Background(), pagination.NewParams(1, 20), id)
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "rows")
+		})
+
+		Convey("When rows return 2 items", func() {
+			item1, item2 := makeFake(1), makeFake(2)
+			rows = &MockRows{Rows: []*MockRow{
+				{ScanFn: scanFake(item1)},
+				{ScanFn: scanFake(item2)},
+			}}
+			got, err := call(context.Background(), pagination.NewParams(1, 20), id)
+			So(err, ShouldBeNil)
+			So(got, ShouldHaveLength, 2)
+			So(got[0], ShouldResemble, item1)
+			So(got[1], ShouldResemble, item2)
 		})
 	})
 }

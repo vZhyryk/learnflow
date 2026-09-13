@@ -1,0 +1,223 @@
+package reviewhttp_test
+
+import (
+	"context"
+	reviewdomain "learnflow_backend/internal/review/domain"
+	"learnflow_backend/internal/shared/testutil"
+	"net/http"
+	"testing"
+
+	. "github.com/smartystreets/goconvey/convey"
+)
+
+const validCourseID = "22222222-2222-2222-2222-222222222222"
+const validContentID = "33333333-3333-3333-3333-333333333333"
+
+func TestCreateCourseReview(t *testing.T) {
+	Convey("POST /api/v1/courses/reviews", t, func() {
+		var svcErr error
+		svc := &mockService{
+			createCourseReview: func(_ context.Context, _ reviewdomain.CreateCourseReviewRequest) error {
+				return svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/courses/reviews")
+		mux, newReq := f.mux, f.newReq
+		validBody := `{"course_id":"` + validCourseID + `","rating":5}`
+
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(mux, newReq(validBody, nil))
+			}, ShouldPanic)
+		})
+
+		Convey("invalid course_id → 400 (request validation, before it reaches the service)", func() {
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(`{"course_id":"---","rating":5}`, nil)))
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		})
+
+		Convey("invalid rating → 400 (request validation, before it reaches the service)", func() {
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(`{"course_id":"`+validCourseID+`","rating":9}`, nil)))
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		})
+
+		Convey("already reviewed → 422", func() {
+			svcErr = reviewdomain.ErrAlreadyReviewed
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
+		})
+
+		Convey("no permission → 403", func() {
+			svcErr = reviewdomain.ErrNoPermission
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusForbidden)
+		})
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 201 with message", func() {
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusCreated)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["message"], ShouldEqual, "Course review created successfully")
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withValidUUIDUser(newReq(validBody, nil)))
+			}, ShouldNotPanic)
+		})
+	})
+}
+
+func TestCreateContentReview(t *testing.T) {
+	Convey("POST /api/v1/content/reviews", t, func() {
+		var svcErr error
+		svc := &mockService{
+			createContentReview: func(_ context.Context, _ reviewdomain.CreateContentReviewRequest) error {
+				return svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/content/reviews")
+		mux, newReq := f.mux, f.newReq
+		validBody := `{"content_id":"` + validContentID + `","rating":4}`
+
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(mux, newReq(validBody, nil))
+			}, ShouldPanic)
+		})
+
+		Convey("invalid content_id → 400 (request validation, before it reaches the service)", func() {
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(`{"content_id":"---","rating":4}`, nil)))
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		})
+
+		Convey("no permission → 403", func() {
+			svcErr = reviewdomain.ErrNoPermission
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusForbidden)
+		})
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 201 with message", func() {
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusCreated)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["message"], ShouldEqual, "Content review created successfully")
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withValidUUIDUser(newReq(validBody, nil)))
+			}, ShouldNotPanic)
+		})
+	})
+}
+
+func TestCreateCourseReviewAdmin(t *testing.T) {
+	Convey("POST /api/v1/admin/courses/reviews", t, func() {
+		var svcErr error
+		svc := &mockService{
+			createCourseReviewAdmin: func(_ context.Context, _ reviewdomain.CreateCourseReviewRequest) error {
+				return svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/admin/courses/reviews")
+		mux, newReq := f.mux, f.newReq
+		validBody := `{"course_id":"` + validCourseID + `","user_id":"` + validUserID + `","rating":5}`
+
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(mux, newReq(validBody, nil))
+			}, ShouldPanic)
+		})
+
+		Convey("invalid user_id in body → 400 (admin does not override user_id; request validation)", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"course_id":"`+validCourseID+`","user_id":"---","rating":5}`, nil)))
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		})
+
+		Convey("already reviewed → 422", func() {
+			svcErr = reviewdomain.ErrAlreadyReviewed
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
+		})
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 201 with message", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusCreated)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["message"], ShouldEqual, "Course review created successfully")
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withUser(newReq(validBody, nil)))
+			}, ShouldNotPanic)
+		})
+	})
+}
+
+func TestCreateContentReviewAdmin(t *testing.T) {
+	Convey("POST /api/v1/admin/content/reviews", t, func() {
+		var svcErr error
+		svc := &mockService{
+			createContentReviewAdmin: func(_ context.Context, _ reviewdomain.CreateContentReviewRequest) error {
+				return svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/admin/content/reviews")
+		mux, newReq := f.mux, f.newReq
+		validBody := `{"content_id":"` + validContentID + `","user_id":"` + validUserID + `","rating":4}`
+
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(mux, newReq(validBody, nil))
+			}, ShouldPanic)
+		})
+
+		Convey("invalid user_id in body → 400 (admin does not override user_id; request validation)", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"content_id":"`+validContentID+`","user_id":"---","rating":4}`, nil)))
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		})
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 201 with message", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusCreated)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["message"], ShouldEqual, "Content review created successfully")
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withUser(newReq(validBody, nil)))
+			}, ShouldNotPanic)
+		})
+	})
+}

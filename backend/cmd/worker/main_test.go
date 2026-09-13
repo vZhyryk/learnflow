@@ -42,7 +42,7 @@ func TestGetMailerConfig(t *testing.T) {
 			err := getMailerConfig(cfg, "production")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "smtp host")
+			So(err.Error(), ShouldContainSubstring, "SMTP_HOST")
 		})
 
 		Convey("When SMTP_HOST is unset outside production, it falls back to the stub host", func() {
@@ -66,7 +66,7 @@ func TestGetMailerConfig(t *testing.T) {
 			err := getMailerConfig(cfg, "production")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "smtp username")
+			So(err.Error(), ShouldContainSubstring, "SMTP_USERNAME")
 		})
 
 		Convey("When SMTP_PASSWORD is missing, it errors", func() {
@@ -77,7 +77,7 @@ func TestGetMailerConfig(t *testing.T) {
 			err := getMailerConfig(cfg, "production")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "smtp password")
+			So(err.Error(), ShouldContainSubstring, "SMTP_PASSWORD")
 		})
 
 		Convey("When SMTP_SENDER is missing, it errors", func() {
@@ -88,7 +88,7 @@ func TestGetMailerConfig(t *testing.T) {
 			err := getMailerConfig(cfg, "production")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "smtp sender")
+			So(err.Error(), ShouldContainSubstring, "SMTP_SENDER")
 		})
 	})
 }
@@ -125,7 +125,7 @@ func TestGetAppConfig(t *testing.T) {
 			_, err := getAppConfig("production")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "smtp")
+			So(err.Error(), ShouldContainSubstring, "SMTP_")
 		})
 	})
 }

@@ -30,6 +30,8 @@ func RunWithRecovery(ctx context.Context, log *logger.Logger, w Worker) {
 
 func handleRecover(log *logger.Logger) {
 	if r := recover(); r != nil {
-		log.Error(fmt.Errorf("worker panic: %v\n%s", r, debug.Stack()), nil)
+		log.Error(fmt.Errorf("worker panic: %v", r), map[string]any{
+			"stack": string(debug.Stack()),
+		})
 	}
 }

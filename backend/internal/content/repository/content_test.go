@@ -246,21 +246,17 @@ func fakeContentItemN(n int) *contentdomain.ContentItem {
 }
 
 func TestGetAllPublishedContentItems(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllPublishedContentItems",
-		bindContentItemList((*Repository).GetAllPublishedContentItems), fakeContentItemN, fakeContentItemScan)
+	testutil.TestListMethod(t, "GetAllPublishedContentItems", bindContentItemList((*Repository).GetAllPublishedContentItems), fakeContentItemN, fakeContentItemScan)
 }
 
 func TestGetAllDraftContentItems(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllDraftContentItems",
-		bindContentItemList((*Repository).GetAllDraftContentItems), fakeContentItemN, fakeContentItemScan)
+	testutil.TestListMethod(t, "GetAllDraftContentItems", bindContentItemList((*Repository).GetAllDraftContentItems), fakeContentItemN, fakeContentItemScan)
 }
 
 func TestGetAllArchivedContentItems(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllArchivedContentItems",
-		bindContentItemList((*Repository).GetAllArchivedContentItems), fakeContentItemN, fakeContentItemScan)
+	testutil.TestListMethod(t, "GetAllArchivedContentItems", bindContentItemList((*Repository).GetAllArchivedContentItems), fakeContentItemN, fakeContentItemScan)
 }
 
 func TestGetAllContentItems(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllContentItems",
-		bindContentItemList((*Repository).GetAllContentItems), fakeContentItemN, fakeContentItemScan)
+	testutil.TestListMethod(t, "GetAllContentItems", bindContentItemList((*Repository).GetAllContentItems), fakeContentItemN, fakeContentItemScan)
 }

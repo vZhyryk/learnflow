@@ -117,7 +117,7 @@ func (p *Poller[T]) getList(ctx context.Context) ([]PollerEntry[T], error) {
 
 func (p *Poller[T]) handleEntry(ctx context.Context, entry PollerEntry[T]) {
 	if !events.IsKnownEventType(entry.EventType) {
-		p.markEntryFailed(ctx, fmt.Errorf("%s: unknown event_type: %s", p.actionName, entry.EventType), entry.ID)
+		p.markEntryFailed(ctx, fmt.Errorf("%s.poll: unknown event_type: %s", p.actionName, entry.EventType), entry.ID)
 		return
 	}
 

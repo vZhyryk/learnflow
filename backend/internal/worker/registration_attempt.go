@@ -29,8 +29,15 @@ func NewRegistrationAttemptsWorker(
 
 // ValidateRegistrationAttemptsPayload checks that all required fields are present in the payload.
 func ValidateRegistrationAttemptsPayload(p events.RegistrationAttemptPayload) error {
-	if p.UserID == "" || p.Email == "" {
-		return fmt.Errorf("registrationAttempt: invalid payload: missing fields")
+	var missing []string
+	if p.UserID == "" {
+		missing = append(missing, "UserID")
+	}
+	if p.Email == "" {
+		missing = append(missing, "Email")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("registration_attempt: invalid payload: missing fields: %v", missing)
 	}
 	return nil
 }

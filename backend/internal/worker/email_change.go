@@ -29,8 +29,18 @@ func NewEmailChangeWorker(
 
 // ValidateInitEmailChangePayload checks that all required fields are present in the payload.
 func ValidateInitEmailChangePayload(p events.InitEmailChangeToken) error {
-	if p.UserID == "" || p.Email == "" || p.RawToken == "" {
-		return fmt.Errorf("emailChangeWorker: invalid payload: missing fields")
+	var missing []string
+	if p.UserID == "" {
+		missing = append(missing, "UserID")
+	}
+	if p.Email == "" {
+		missing = append(missing, "Email")
+	}
+	if p.RawToken == "" {
+		missing = append(missing, "RawToken")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("email_change: invalid payload: missing fields: %v", missing)
 	}
 	return nil
 }
