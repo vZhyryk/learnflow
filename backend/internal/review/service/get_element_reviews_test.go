@@ -16,26 +16,42 @@ func TestGetCourseReviews(t *testing.T) {
 		cRepo := &mockReviewRepo{}
 		srv := newTestService(cRepo, nil, nil)
 		params := pagination.NewParams(1, 20)
+		noFilter := reviewdomain.ReviewFilter{}
 
 		Convey("repository error", func() {
-			cRepo.getCourseReviewList = func(_ context.Context, _ pagination.Params, _ string) ([]*reviewdomain.CourseReview, error) {
+			cRepo.getCourseReviewList = func(_ context.Context, _ pagination.Params, _ string, _ reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			_, err := srv.GetCourseReviews(context.Background(), params, "course-1")
+			_, err := srv.GetCourseReviews(context.Background(), params, "course-1", noFilter)
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
 
 		Convey("success", func() {
 			want := []*reviewdomain.CourseReview{{ID: "review-1"}, {ID: "review-2"}}
-			cRepo.getCourseReviewList = func(_ context.Context, _ pagination.Params, _ string) ([]*reviewdomain.CourseReview, error) {
+			cRepo.getCourseReviewList = func(_ context.Context, _ pagination.Params, _ string, _ reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error) {
 				return want, nil
 			}
 
-			got, err := srv.GetCourseReviews(context.Background(), params, "course-1")
+			got, err := srv.GetCourseReviews(context.Background(), params, "course-1", noFilter)
 			So(err, ShouldBeNil)
 			So(got, ShouldResemble, want)
+		})
+
+		Convey("success with rating filter — passed through to repository unchanged", func() {
+			want := []*reviewdomain.CourseReview{{ID: "review-1", Rating: 5}}
+			filter := reviewdomain.ReviewFilter{Op: "gte", Rating: 4}
+			var gotFilter reviewdomain.ReviewFilter
+			cRepo.getCourseReviewList = func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error) {
+				gotFilter = f
+				return want, nil
+			}
+
+			got, err := srv.GetCourseReviews(context.Background(), params, "course-1", filter)
+			So(err, ShouldBeNil)
+			So(got, ShouldResemble, want)
+			So(gotFilter, ShouldResemble, filter)
 		})
 	})
 }
@@ -45,26 +61,42 @@ func TestGetContentReviews(t *testing.T) {
 		cRepo := &mockReviewRepo{}
 		srv := newTestService(nil, cRepo, nil)
 		params := pagination.NewParams(1, 20)
+		noFilter := reviewdomain.ReviewFilter{}
 
 		Convey("repository error", func() {
-			cRepo.getContentReviewList = func(_ context.Context, _ pagination.Params, _ string) ([]*reviewdomain.ContentReview, error) {
+			cRepo.getContentReviewList = func(_ context.Context, _ pagination.Params, _ string, _ reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			_, err := srv.GetContentReviews(context.Background(), params, "content-1")
+			_, err := srv.GetContentReviews(context.Background(), params, "content-1", noFilter)
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
 
 		Convey("success", func() {
 			want := []*reviewdomain.ContentReview{{ID: "review-1"}}
-			cRepo.getContentReviewList = func(_ context.Context, _ pagination.Params, _ string) ([]*reviewdomain.ContentReview, error) {
+			cRepo.getContentReviewList = func(_ context.Context, _ pagination.Params, _ string, _ reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error) {
 				return want, nil
 			}
 
-			got, err := srv.GetContentReviews(context.Background(), params, "content-1")
+			got, err := srv.GetContentReviews(context.Background(), params, "content-1", noFilter)
 			So(err, ShouldBeNil)
 			So(got, ShouldResemble, want)
+		})
+
+		Convey("success with rating filter — passed through to repository unchanged", func() {
+			want := []*reviewdomain.ContentReview{{ID: "review-1", Rating: 2}}
+			filter := reviewdomain.ReviewFilter{Op: "lte", Rating: 2}
+			var gotFilter reviewdomain.ReviewFilter
+			cRepo.getContentReviewList = func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error) {
+				gotFilter = f
+				return want, nil
+			}
+
+			got, err := srv.GetContentReviews(context.Background(), params, "content-1", filter)
+			So(err, ShouldBeNil)
+			So(got, ShouldResemble, want)
+			So(gotFilter, ShouldResemble, filter)
 		})
 	})
 }

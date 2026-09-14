@@ -11,7 +11,7 @@
 --         notifications, announcements, activity_log, event_outbox, failed_jobs,
 --         admin_actions, support_chats, support_messages,
 --         account_recovery_tokens, articles, gift_coupons, user_sessions
--- Synced through: migration 000008
+-- Synced through: migration 000010
 
 -- Index naming convention: idx_{table}_{col1}_{col2}[_{qualifier}]
 --   qualifier = domain condition key: active, available, booked, pending, open, unread, unresolved, unused
@@ -246,7 +246,8 @@ CREATE TABLE course_reviews (
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now(),
     deleted_at  timestamptz,
-    CONSTRAINT course_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at)
+    CONSTRAINT course_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    CONSTRAINT course_reviews_comment_length_check CHECK (comment IS NULL OR char_length(comment) <= 2000)
 );
 
 CREATE UNIQUE INDEX idx_course_reviews_user_id_course_id_active_unique
@@ -267,7 +268,8 @@ CREATE TABLE content_reviews (
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now(),
     deleted_at      timestamptz,
-    CONSTRAINT content_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at)
+    CONSTRAINT content_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    CONSTRAINT content_reviews_comment_length_check CHECK (comment IS NULL OR char_length(comment) <= 2000)
 );
 
 CREATE UNIQUE INDEX idx_content_reviews_user_id_content_item_id_active_unique

@@ -213,12 +213,12 @@ func fakeCourse(n int) *reviewdomain.CourseReview {
 }
 
 func bindCourseReview(
-	call func(*Repository, context.Context, pagination.Params, string) ([]*reviewdomain.CourseReview, error),
+	call func(*Repository, context.Context, pagination.Params, string, reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error),
 ) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*reviewdomain.CourseReview, error) {
 	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*reviewdomain.CourseReview, error) {
 		repo := newTestRepo(runner)
 		return func(ctx context.Context, params pagination.Params, stringArg string) ([]*reviewdomain.CourseReview, error) {
-			return call(repo, ctx, params, stringArg)
+			return call(repo, ctx, params, stringArg, reviewdomain.ReviewFilter{})
 		}
 	}
 }
@@ -234,12 +234,12 @@ func fakeContentItem(n int) *reviewdomain.ContentReview {
 }
 
 func bindContentReview(
-	call func(*Repository, context.Context, pagination.Params, string) ([]*reviewdomain.ContentReview, error),
+	call func(*Repository, context.Context, pagination.Params, string, reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error),
 ) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*reviewdomain.ContentReview, error) {
 	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*reviewdomain.ContentReview, error) {
 		repo := newTestRepo(runner)
 		return func(ctx context.Context, params pagination.Params, stringArg string) ([]*reviewdomain.ContentReview, error) {
-			return call(repo, ctx, params, stringArg)
+			return call(repo, ctx, params, stringArg, reviewdomain.ReviewFilter{})
 		}
 	}
 }

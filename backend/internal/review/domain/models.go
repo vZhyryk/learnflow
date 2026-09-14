@@ -292,3 +292,27 @@ func (r UpdateContentReviewRequest) applyComment(p *ContentReview) {
 		p.Comment = r.Comment
 	}
 }
+
+type ReviewFilter struct {
+	Rating int
+	Op     string
+}
+
+func (f *ReviewFilter) IsUsed() bool {
+	validOps := map[string]bool{
+		"gt":  true,
+		"lt":  true,
+		"eq":  true,
+		"gte": true,
+		"lte": true,
+	}
+	if !validOps[f.Op] {
+		return false
+	}
+
+	if f.Rating < 1 || f.Rating > 5 {
+		return false
+	}
+
+	return true
+}

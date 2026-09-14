@@ -1,6 +1,6 @@
 Project LearnFlowDatabase {
   database_type: "PostgreSQL"
-  Note: 'Synchronized with backend/migrations through migration 000009. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
+  Note: 'Synchronized with backend/migrations through migration 000010. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
 }
 
 Table users {
@@ -189,7 +189,7 @@ Table course_reviews {
   course_id uuid [not null, ref: > courses.id]
   user_id uuid [not null, ref: > users.id]
   rating integer [not null, note: 'CHECK: 1..5']
-  comment text
+  comment text [note: 'CHECK (added in 000010): NULL or <= 2000 chars — prevents spam comments']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   deleted_at timestamptz
@@ -205,7 +205,7 @@ Table content_reviews {
   content_item_id uuid [not null, ref: > content_items.id]
   user_id uuid [not null, ref: > users.id]
   rating integer [not null, note: 'CHECK: 1..5']
-  comment text
+  comment text [note: 'CHECK (added in 000010): NULL or <= 2000 chars — prevents spam comments']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   deleted_at timestamptz

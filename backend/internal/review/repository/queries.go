@@ -1,5 +1,9 @@
 package reviewrepository
 
+import "fmt"
+
+const filterPlace = "{Filter}"
+
 const (
 	courseReviewColumns  = `id, course_id, user_id, rating, comment, created_at, updated_at, deleted_at`
 	contentReviewColumns = `id, content_item_id, user_id, rating, comment, created_at, updated_at, deleted_at`
@@ -45,6 +49,7 @@ const (
 	getCourseReviewByCourseIDSQL = `
 		SELECT ` + courseReviewColumns + `
 		FROM course_reviews WHERE course_id = $1 AND deleted_at IS NULL
+		` + filterPlace + `
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
@@ -52,6 +57,7 @@ const (
 	getContentReviewByContentIDSQL = `
 		SELECT ` + contentReviewColumns + `
 		FROM content_reviews WHERE content_item_id = $1 AND deleted_at IS NULL
+		` + filterPlace + `
 		ORDER BY created_at DESC
 		LIMIT $2 OFFSET $3
 	`
@@ -100,3 +106,27 @@ const (
 	courseReviewsUserCourseUniqueConstraint   = "idx_course_reviews_user_id_course_id_active_unique"
 	contentReviewsUserContentUniqueConstraint = "idx_content_reviews_user_id_content_item_id_active_unique"
 )
+
+func (rep *Repository) GenerateFilterQuery(op string) string {
+	var val string
+	switch op {
+	case "eq":
+		val = "="
+	case "gt":
+		val = ">"
+	case "lt":
+		val = "<"
+	case "gte":
+		val = ">="
+	case "lte":
+		val = "<="
+	default:
+		return ""
+	}
+
+	return fmt.Sprintf(`
+		AND rating %s $2
+		ORDER BY created_at DESC
+		LIMIT $3 OFFSET $4
+	`, val)
+}

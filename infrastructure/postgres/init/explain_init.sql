@@ -1,6 +1,6 @@
 -- LearnFlow database initialization — annotated version
 -- PostgreSQL 17+; run once on empty volume via /docker-entrypoint-initdb.d/
--- Synced through: migration 000008
+-- Synced through: migration 000010
 --
 -- GLOBAL DESIGN DECISIONS
 -- ───────────────────────
@@ -463,7 +463,11 @@ CREATE TABLE course_reviews (
     comment     text,
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now(),
-    deleted_at  timestamptz
+    deleted_at  timestamptz,
+    CONSTRAINT course_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    -- [comment_length CHECK]: added in migration 000010 — prevents comment spam.
+    -- Limits review comments to 2000 characters. NULL is allowed (rating-only reviews).
+    CONSTRAINT course_reviews_comment_length_check CHECK (comment IS NULL OR char_length(comment) <= 2000)
 );
 
 -- [Partial unique WHERE deleted_at IS NULL]: One active review per user per course.
@@ -496,7 +500,11 @@ CREATE TABLE content_reviews (
     comment         text,
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now(),
-    deleted_at      timestamptz
+    deleted_at      timestamptz,
+    CONSTRAINT content_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    -- [comment_length CHECK]: added in migration 000010 — prevents comment spam.
+    -- Limits review comments to 2000 characters. NULL is allowed (rating-only reviews).
+    CONSTRAINT content_reviews_comment_length_check CHECK (comment IS NULL OR char_length(comment) <= 2000)
 );
 
 -- [Partial unique WHERE deleted_at IS NULL]: Same rationale as course_reviews —

@@ -8,6 +8,7 @@ import (
 	reviewdomain "learnflow_backend/internal/review/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/repository"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -54,10 +55,18 @@ func (rep *Repository) DeleteContentReview(ctx context.Context, reviewID string)
 }
 
 // GetContentReviewList returns a paginated list of non-deleted reviews for a content item.
-func (rep *Repository) GetContentReviewList(ctx context.Context, params pagination.Params, contentID string) ([]*reviewdomain.ContentReview, error) {
+func (rep *Repository) GetContentReviewList(ctx context.Context, params pagination.Params, contentID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error) {
 	args := make([]any, 1)
 	args[0] = contentID
-	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getContentReviewByContentIDSQL, "GetContentReviewList", params, scanContentReview, args)
+	var query string = getCourseReviewByCourseIDSQL
+	if filter.IsUsed() {
+		query = query[:strings.Index(query, filterPlace)] + rep.GenerateFilterQuery(filter.Op)
+		args = append(args, filter.Rating)
+	} else {
+		query = strings.Replace(query, filterPlace, "", 1)
+	}
+
+	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, query, "GetContentReviewList", params, scanContentReview, args)
 }
 
 // GetContentReviewByID retrieves a non-deleted content review by ID.

@@ -48,7 +48,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, staticChain, StaticWithAuth
 	mux.Handle("GET /api/v1/courses/{id}/reviews", staticChain.ThenFunc(h.listCourseReviews))
 	mux.Handle("GET /api/v1/content/{id}/reviews", staticChain.ThenFunc(h.listContentReviews))
 
+	mux.Handle("GET /api/v1/admin/courses/{id}/reviews", adminChain.ThenFunc(h.listCourseReviewsAdmin))
+	mux.Handle("GET /api/v1/admin/content/{id}/reviews", adminChain.ThenFunc(h.listContentReviewsAdmin))
+
 	mux.Handle("GET /api/v1/courses/{id}/reviews/stats", staticChain.ThenFunc(h.courseReviewStats))
 	mux.Handle("GET /api/v1/content/{id}/reviews/stats", staticChain.ThenFunc(h.contentReviewStats))
-
 }

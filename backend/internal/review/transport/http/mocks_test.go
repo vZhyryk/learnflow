@@ -79,8 +79,8 @@ type mockService struct {
 	updateCourseReviewAdmin  func(ctx context.Context, req reviewdomain.UpdateCourseReviewRequest) error
 	updateContentReviewAdmin func(ctx context.Context, req reviewdomain.UpdateContentReviewRequest) error
 
-	getCourseReviews         func(ctx context.Context, params pagination.Params, courseID string) ([]*reviewdomain.CourseReview, error)
-	getContentReviews        func(ctx context.Context, params pagination.Params, contentID string) ([]*reviewdomain.ContentReview, error)
+	getCourseReviews         func(ctx context.Context, params pagination.Params, courseID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error)
+	getContentReviews        func(ctx context.Context, params pagination.Params, contentID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error)
 	getCourseReviewStats     func(ctx context.Context, courseID string) (rating float64, count int, err error)
 	getContentReviewStats    func(ctx context.Context, contentID string) (rating float64, count int, err error)
 	deleteCourseReview       func(ctx context.Context, reviewID, userID string) error
@@ -145,18 +145,18 @@ func (m *mockService) UpdateContentReviewAdmin(ctx context.Context, req reviewdo
 	return m.updateContentReviewAdmin(ctx, req)
 }
 
-func (m *mockService) GetCourseReviews(ctx context.Context, params pagination.Params, courseID string) ([]*reviewdomain.CourseReview, error) {
+func (m *mockService) GetCourseReviews(ctx context.Context, params pagination.Params, courseID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error) {
 	if m.getCourseReviews == nil {
 		panic("mockService.getCourseReviews not set")
 	}
-	return m.getCourseReviews(ctx, params, courseID)
+	return m.getCourseReviews(ctx, params, courseID, filter)
 }
 
-func (m *mockService) GetContentReviews(ctx context.Context, params pagination.Params, contentID string) ([]*reviewdomain.ContentReview, error) {
+func (m *mockService) GetContentReviews(ctx context.Context, params pagination.Params, contentID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error) {
 	if m.getContentReviews == nil {
 		panic("mockService.getContentReviews not set")
 	}
-	return m.getContentReviews(ctx, params, contentID)
+	return m.getContentReviews(ctx, params, contentID, filter)
 }
 
 func (m *mockService) GetCourseReviewStats(ctx context.Context, courseID string) (rating float64, count int, err error) {
