@@ -164,7 +164,7 @@ func TestGetArticleByID_Integration(t *testing.T) {
 				seed := draftArticle(t, tx)
 				created, err := repo.CreateArticle(ctx, seed)
 				So(err, ShouldBeNil)
-				So(repo.DeleteArticle(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteArticle(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				_, err = repo.GetArticleByID(ctx, created.ID)
 
@@ -214,7 +214,7 @@ func TestPublishArticle_Integration(t *testing.T) {
 				created, err := repo.CreateArticle(ctx, draftArticle(t, tx))
 				So(err, ShouldBeNil)
 
-				So(repo.PublishArticle(ctx, created.ID), ShouldBeNil)
+				So(repo.PublishArticle(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				got, err := repo.GetArticleByID(ctx, created.ID)
 				So(err, ShouldBeNil)
@@ -227,7 +227,7 @@ func TestPublishArticle_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 
-				err := repo.PublishArticle(ctx, "00000000-0000-0000-0000-000000000000")
+				err := repo.PublishArticle(ctx, "00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000000")
 
 				So(errors.Is(err, articledomain.ErrArticleNotFound), ShouldBeTrue)
 			})
@@ -245,7 +245,7 @@ func TestArchiveArticle_Integration(t *testing.T) {
 				created, err := repo.CreateArticle(ctx, draftArticle(t, tx))
 				So(err, ShouldBeNil)
 
-				So(repo.ArchiveArticle(ctx, created.ID), ShouldBeNil)
+				So(repo.ArchiveArticle(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				got, err := repo.GetArticleByID(ctx, created.ID)
 				So(err, ShouldBeNil)
@@ -257,7 +257,7 @@ func TestArchiveArticle_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 
-				err := repo.ArchiveArticle(ctx, "00000000-0000-0000-0000-000000000000")
+				err := repo.ArchiveArticle(ctx, "00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000000")
 
 				So(errors.Is(err, articledomain.ErrArticleNotFound), ShouldBeTrue)
 			})
@@ -275,7 +275,7 @@ func TestDeleteArticle_Integration(t *testing.T) {
 				created, err := repo.CreateArticle(ctx, draftArticle(t, tx))
 				So(err, ShouldBeNil)
 
-				So(repo.DeleteArticle(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteArticle(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				_, err = repo.GetArticleByID(ctx, created.ID)
 				So(errors.Is(err, articledomain.ErrArticleNotFound), ShouldBeTrue)
@@ -287,9 +287,9 @@ func TestDeleteArticle_Integration(t *testing.T) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 				created, err := repo.CreateArticle(ctx, draftArticle(t, tx))
 				So(err, ShouldBeNil)
-				So(repo.DeleteArticle(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteArticle(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
-				err = repo.DeleteArticle(ctx, created.ID)
+				err = repo.DeleteArticle(ctx, created.ID, created.CreatedByUserID)
 
 				So(errors.Is(err, articledomain.ErrArticleNotFound), ShouldBeTrue)
 			})
@@ -310,7 +310,7 @@ func TestUpdateArticle_Integration(t *testing.T) {
 				created.Slug = randomTestSlug(t)
 				created.Title = "Updated Title"
 
-				err = repo.UpdateArticle(ctx, created)
+				err = repo.UpdateArticle(ctx, created, created.CreatedByUserID)
 				So(err, ShouldBeNil)
 
 				got, err := repo.GetArticleByID(ctx, created.ID)
@@ -330,7 +330,7 @@ func TestUpdateArticle_Integration(t *testing.T) {
 
 				created.Slug = other.Slug
 
-				err = repo.UpdateArticle(ctx, created)
+				err = repo.UpdateArticle(ctx, created, created.CreatedByUserID)
 
 				So(errors.Is(err, articledomain.ErrInvalidSlug), ShouldBeTrue)
 			})
@@ -342,7 +342,7 @@ func TestUpdateArticle_Integration(t *testing.T) {
 				ghost := draftArticle(t, tx)
 				ghost.ID = "00000000-0000-0000-0000-000000000000"
 
-				err := repo.UpdateArticle(ctx, ghost)
+				err := repo.UpdateArticle(ctx, ghost, ghost.CreatedByUserID)
 
 				So(errors.Is(err, articledomain.ErrArticleNotFound), ShouldBeTrue)
 			})
@@ -362,15 +362,15 @@ func TestGetAllArticlesByStatus_Integration(t *testing.T) {
 
 			published, err := repo.CreateArticle(ctx, draftArticle(t, tx))
 			So(err, ShouldBeNil)
-			So(repo.PublishArticle(ctx, published.ID), ShouldBeNil)
+			So(repo.PublishArticle(ctx, published.ID, published.CreatedByUserID), ShouldBeNil)
 
 			archived, err := repo.CreateArticle(ctx, draftArticle(t, tx))
 			So(err, ShouldBeNil)
-			So(repo.ArchiveArticle(ctx, archived.ID), ShouldBeNil)
+			So(repo.ArchiveArticle(ctx, archived.ID, archived.CreatedByUserID), ShouldBeNil)
 
 			deleted, err := repo.CreateArticle(ctx, draftArticle(t, tx))
 			So(err, ShouldBeNil)
-			So(repo.DeleteArticle(ctx, deleted.ID), ShouldBeNil)
+			So(repo.DeleteArticle(ctx, deleted.ID, deleted.CreatedByUserID), ShouldBeNil)
 
 			params := pagination.NewParams(1, 100)
 
@@ -394,7 +394,7 @@ func TestGetAllArticlesByStatus_Integration(t *testing.T) {
 			Convey("GetAllArchivedArticles includes the soft-deleted archived article too", func() {
 				// GetAllArchivedArticles intentionally omits `deleted_at IS NULL` — it's an
 				// admin "including soft-deleted ones" query per db-conventions.md.
-				So(repo.DeleteArticle(ctx, archived.ID), ShouldBeNil)
+				So(repo.DeleteArticle(ctx, archived.ID, archived.CreatedByUserID), ShouldBeNil)
 
 				got, err := repo.GetAllArchivedArticles(ctx, params)
 				So(err, ShouldBeNil)

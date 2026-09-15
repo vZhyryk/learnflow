@@ -29,23 +29,23 @@ func (rep *Repository) CreateCourse(ctx context.Context, course *coursedomain.Co
 }
 
 // PublishCourse marks a course as published.
-func (rep *Repository) PublishCourse(ctx context.Context, courseID string) error {
-	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, publishCourseSQL, "PublishCourse", courseID, coursedomain.ErrCourseNotFound)
+func (rep *Repository) PublishCourse(ctx context.Context, courseID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, publishCourseSQL, "PublishCourse", courseID, userID, coursedomain.ErrCourseNotFound)
 }
 
 // ArchiveCourse marks a course as archived.
-func (rep *Repository) ArchiveCourse(ctx context.Context, courseID string) error {
-	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, archiveCourseSQL, "ArchiveCourse", courseID, coursedomain.ErrCourseNotFound)
+func (rep *Repository) ArchiveCourse(ctx context.Context, courseID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, archiveCourseSQL, "ArchiveCourse", courseID, userID, coursedomain.ErrCourseNotFound)
 }
 
 // DeleteCourse soft-deletes a course.
-func (rep *Repository) DeleteCourse(ctx context.Context, courseID string) error {
-	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, deleteCourseSQL, "DeleteCourse", courseID, coursedomain.ErrCourseNotFound)
+func (rep *Repository) DeleteCourse(ctx context.Context, courseID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, deleteCourseSQL, "DeleteCourse", courseID, userID, coursedomain.ErrCourseNotFound)
 }
 
 // UpdateCourse persists changes to an existing course.
-func (rep *Repository) UpdateCourse(ctx context.Context, course *coursedomain.Course) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateCourseSQL, course.ID, course.Slug, course.Title, course.Description, course.ThumbnailURL, course.PreviewVideoURL, course.EstimatedMinutes, course.SeoTitle, course.SeoDescription, course.OgImageURL, course.CanonicalURL, course.IsIndexable)
+func (rep *Repository) UpdateCourse(ctx context.Context, course *coursedomain.Course, userID string) error {
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateCourseSQL, course.ID, course.Slug, course.Title, course.Description, course.ThumbnailURL, course.PreviewVideoURL, course.EstimatedMinutes, course.SeoTitle, course.SeoDescription, course.OgImageURL, course.CanonicalURL, course.IsIndexable, userID)
 	if db.IsUniqueViolation(err, coursesSlugUniqueConstraint) {
 		return coursedomain.ErrInvalidSlug
 	}

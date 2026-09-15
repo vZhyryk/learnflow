@@ -28,8 +28,13 @@ func scanContentItem(row repository.RowScanner) (*contentdomain.ContentItem, err
 		&content.CreatedByUserID,
 		&content.CreatedAt,
 		&content.UpdatedAt,
+		&content.UpdatedByUserID,
 		&content.PublishedAt,
+		&content.PublishedByUserID,
 		&content.DeletedAt,
+		&content.DeletedByUserID,
+		&content.ArchivedAt,
+		&content.ArchivedByUserID,
 	)
 	if err != nil {
 		return nil, err

@@ -27,7 +27,7 @@ func TestPublishCourse(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishCourse(context.Background(), "course_ID")
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -40,7 +40,7 @@ func TestPublishCourse(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishCourse(context.Background(), "course_ID")
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, coursedomain.ErrInvalidCourseStatus), ShouldBeTrue)
 		})
@@ -53,7 +53,7 @@ func TestPublishCourse(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishCourse(context.Background(), "course_ID")
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "service.ReadyToPublish")
 		})
@@ -61,11 +61,11 @@ func TestPublishCourse(t *testing.T) {
 		Convey("PublishCourse - publish error", func() {
 			cRepo := &mockCourseRepoRepo{
 				getCourseByID: validGetCourseByID,
-				publishCourse: testutil.AlwaysFailsDB,
+				publishCourse: testutil.AlwaysFailsDB2,
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishCourse(context.Background(), "course_ID")
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "service.PublishCourse")
 		})
@@ -73,11 +73,11 @@ func TestPublishCourse(t *testing.T) {
 		Convey("PublishCourse - outbox emit error", func() {
 			cRepo := &mockCourseRepoRepo{
 				getCourseByID: validGetCourseByID,
-				publishCourse: testutil.AlwaysNil,
+				publishCourse: testutil.AlwaysNil2,
 			}
 
 			srv := newTestService(cRepo, testutil.NewFailingOutbox(testutil.ErrDBUnexpected))
-			err := srv.PublishCourse(context.Background(), "course_ID")
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -85,12 +85,12 @@ func TestPublishCourse(t *testing.T) {
 		Convey("Successful", func() {
 			cRepo := &mockCourseRepoRepo{
 				getCourseByID: validGetCourseByID,
-				publishCourse: testutil.AlwaysNil,
+				publishCourse: testutil.AlwaysNil2,
 			}
 			var captured []any
 
 			srv := newTestService(cRepo, testutil.NewCapturingOutbox(&captured))
-			err := srv.PublishCourse(context.Background(), "course_ID")
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldBeNil)
 		})
 	})

@@ -10,10 +10,10 @@ import (
 
 type mockContentItemRepo struct {
 	createContentItem           func(ctx context.Context, contentItem *contentdomain.ContentItem) (*contentdomain.ContentItem, error)
-	publishContentItem          func(ctx context.Context, contentItemID string) error
-	archiveContentItem          func(ctx context.Context, contentItemID string) error
-	deleteContentItem           func(ctx context.Context, contentItemID string) error
-	updateContentItem           func(ctx context.Context, contentItem *contentdomain.ContentItem) error
+	publishContentItem          func(ctx context.Context, contentItemID, userID string) error
+	archiveContentItem          func(ctx context.Context, contentItemID, userID string) error
+	deleteContentItem           func(ctx context.Context, contentItemID, userID string) error
+	updateContentItem           func(ctx context.Context, contentItem *contentdomain.ContentItem, userID string) error
 	getAllPublishedContentItems func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
 	getAllDraftContentItems     func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
 	getAllArchivedContentItems  func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
@@ -29,33 +29,33 @@ func (m *mockContentItemRepo) CreateContentItem(ctx context.Context, contentItem
 
 	return m.createContentItem(ctx, contentItem)
 }
-func (m *mockContentItemRepo) PublishContentItem(ctx context.Context, contentItemID string) error {
+func (m *mockContentItemRepo) PublishContentItem(ctx context.Context, contentItemID, userID string) error {
 	if m.publishContentItem == nil {
 		panic("mockContentItemRepo.PublishContentItem not set")
 	}
 
-	return m.publishContentItem(ctx, contentItemID)
+	return m.publishContentItem(ctx, contentItemID, userID)
 }
-func (m *mockContentItemRepo) ArchiveContentItem(ctx context.Context, contentItemID string) error {
+func (m *mockContentItemRepo) ArchiveContentItem(ctx context.Context, contentItemID, userID string) error {
 	if m.archiveContentItem == nil {
 		panic("mockContentItemRepo.ArchiveContentItem not set")
 	}
 
-	return m.archiveContentItem(ctx, contentItemID)
+	return m.archiveContentItem(ctx, contentItemID, userID)
 }
-func (m *mockContentItemRepo) DeleteContentItem(ctx context.Context, contentItemID string) error {
+func (m *mockContentItemRepo) DeleteContentItem(ctx context.Context, contentItemID, userID string) error {
 	if m.deleteContentItem == nil {
 		panic("mockContentItemRepo.DeleteContentItem not set")
 	}
 
-	return m.deleteContentItem(ctx, contentItemID)
+	return m.deleteContentItem(ctx, contentItemID, userID)
 }
-func (m *mockContentItemRepo) UpdateContentItem(ctx context.Context, contentItem *contentdomain.ContentItem) error {
+func (m *mockContentItemRepo) UpdateContentItem(ctx context.Context, contentItem *contentdomain.ContentItem, userID string) error {
 	if m.updateContentItem == nil {
 		panic("mockContentItemRepo.UpdateContentItem not set")
 	}
 
-	return m.updateContentItem(ctx, contentItem)
+	return m.updateContentItem(ctx, contentItem, userID)
 }
 func (m *mockContentItemRepo) GetAllPublishedContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error) {
 	if m.getAllPublishedContentItems == nil {
@@ -110,10 +110,10 @@ func alwaysError(_ context.Context, _ string) (*contentdomain.ContentItem, error
 }
 
 // alwaysFailsErr is an updateContentItem stub that always fails.
-func alwaysFailsErr(_ context.Context, _ *contentdomain.ContentItem) error {
+func alwaysFailsErr(_ context.Context, _ *contentdomain.ContentItem, _ string) error {
 	return testutil.ErrDBUnexpected
 }
 
-func alwaysSucceedsUpdate(_ context.Context, _ *contentdomain.ContentItem) error {
+func alwaysSucceedsUpdate(_ context.Context, _ *contentdomain.ContentItem, _ string) error {
 	return nil
 }

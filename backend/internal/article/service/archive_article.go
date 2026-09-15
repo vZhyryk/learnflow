@@ -6,8 +6,8 @@ import (
 )
 
 // ArchiveArticle marks a article as archived.
-func (s *Service) ArchiveArticle(ctx context.Context, articleID string) error {
-	err := s.articleRepo.ArchiveArticle(ctx, articleID)
+func (s *Service) ArchiveArticle(ctx context.Context, articleID, userID string) error {
+	err := s.articleRepo.ArchiveArticle(ctx, articleID, userID)
 	if err != nil {
 		return fmt.Errorf("service.ArchiveArticle: %w", err)
 	}

@@ -57,20 +57,20 @@ func newHTTPFixture(svc *mockService, method, path string) *httpFixture {
 }
 
 type mockService struct {
-	archiveArticle   func(ctx context.Context, articleID string) error
+	archiveArticle   func(ctx context.Context, articleID, userID string) error
 	createArticle    func(ctx context.Context, req articledomain.CreateArticleRequest) (string, error)
-	deleteArticle    func(ctx context.Context, articleID string) error
+	deleteArticle    func(ctx context.Context, articleID, userID string) error
 	getArticleBySlug func(ctx context.Context, slug string) (*articledomain.Article, error)
-	publishArticle   func(ctx context.Context, articleID string) error
-	updateArticle    func(ctx context.Context, req articledomain.UpdateArticleRequest) error
+	publishArticle   func(ctx context.Context, articleID, userID string) error
+	updateArticle    func(ctx context.Context, req articledomain.UpdateArticleRequest, userID string) error
 	getAllArticles   func(ctx context.Context, getType articledomain.ArticleStatus, params pagination.Params) (articleList []*articledomain.Article, err error)
 }
 
-func (m *mockService) ArchiveArticle(ctx context.Context, articleID string) error {
+func (m *mockService) ArchiveArticle(ctx context.Context, articleID, userID string) error {
 	if m.archiveArticle == nil {
 		panic("mockService.archiveArticle not set")
 	}
-	return m.archiveArticle(ctx, articleID)
+	return m.archiveArticle(ctx, articleID, userID)
 }
 func (m *mockService) CreateArticle(ctx context.Context, req articledomain.CreateArticleRequest) (string, error) {
 	if m.createArticle == nil {
@@ -79,11 +79,11 @@ func (m *mockService) CreateArticle(ctx context.Context, req articledomain.Creat
 	return m.createArticle(ctx, req)
 }
 
-func (m *mockService) DeleteArticle(ctx context.Context, articleID string) error {
+func (m *mockService) DeleteArticle(ctx context.Context, articleID, userID string) error {
 	if m.deleteArticle == nil {
 		panic("mockService.deleteArticle not set")
 	}
-	return m.deleteArticle(ctx, articleID)
+	return m.deleteArticle(ctx, articleID, userID)
 }
 
 func (m *mockService) GetArticleBySlug(ctx context.Context, slug string) (*articledomain.Article, error) {
@@ -92,17 +92,17 @@ func (m *mockService) GetArticleBySlug(ctx context.Context, slug string) (*artic
 	}
 	return m.getArticleBySlug(ctx, slug)
 }
-func (m *mockService) PublishArticle(ctx context.Context, articleID string) error {
+func (m *mockService) PublishArticle(ctx context.Context, articleID, userID string) error {
 	if m.publishArticle == nil {
 		panic("mockService.publishArticle not set")
 	}
-	return m.publishArticle(ctx, articleID)
+	return m.publishArticle(ctx, articleID, userID)
 }
-func (m *mockService) UpdateArticle(ctx context.Context, req articledomain.UpdateArticleRequest) error {
+func (m *mockService) UpdateArticle(ctx context.Context, req articledomain.UpdateArticleRequest, userID string) error {
 	if m.updateArticle == nil {
 		panic("mockService.updateArticle not set")
 	}
-	return m.updateArticle(ctx, req)
+	return m.updateArticle(ctx, req, userID)
 }
 func (m *mockService) GetAllArticles(ctx context.Context, getType articledomain.ArticleStatus, params pagination.Params) (articleList []*articledomain.Article, err error) {
 	if m.getAllArticles == nil {

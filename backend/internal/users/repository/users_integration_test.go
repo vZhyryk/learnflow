@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"learnflow_backend/internal/shared/repository"
 	"learnflow_backend/internal/shared/testutil"
 	usersdomain "learnflow_backend/internal/users/domain"
 
@@ -76,7 +77,7 @@ func TestGetUserProfileByID_Integration(t *testing.T) {
 	Convey("Given a users repository backed by real Postgres", t, func() {
 		Convey("When the profile has all fields populated", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userID := insertTestUser(t, tx)
 				seed := fullTestProfile(userID)
 				insertTestProfile(t, ctx, tx, seed)
@@ -104,7 +105,7 @@ func TestGetUserProfileByID_Integration(t *testing.T) {
 
 		Convey("When date_of_birth and other optional fields are NULL", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userID := insertTestUser(t, tx)
 				seed := &usersdomain.UserProfile{
 					UserID:     userID,
@@ -124,7 +125,7 @@ func TestGetUserProfileByID_Integration(t *testing.T) {
 
 		Convey("When no profile exists for the given ID", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 
 				_, err := repo.GetUserProfileByID(ctx, "00000000-0000-0000-0000-000000000000")
 
@@ -134,7 +135,7 @@ func TestGetUserProfileByID_Integration(t *testing.T) {
 
 		Convey("When the owning user is soft-deleted", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userID := insertTestUser(t, tx)
 				seed := fullTestProfile(userID)
 				insertTestProfile(t, ctx, tx, seed)
@@ -155,7 +156,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 	Convey("Given a users repository backed by real Postgres", t, func() {
 		Convey("When updating an existing profile's fields", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userID := insertTestUser(t, tx)
 				insertTestProfile(t, ctx, tx, &usersdomain.UserProfile{UserID: userID, UILanguage: "uk"})
 
@@ -177,7 +178,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 
 		Convey("When nulling out a previously-set date_of_birth", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userID := insertTestUser(t, tx)
 				insertTestProfile(t, ctx, tx, fullTestProfile(userID))
 
@@ -193,7 +194,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 
 		Convey("When no profile row matches the user ID", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 
 				update := fullTestProfile("00000000-0000-0000-0000-000000000000")
 				err := repo.UpdateUserProfile(ctx, update)
@@ -204,7 +205,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 
 		Convey("When the update violates a CHECK constraint at the DB level", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userID := insertTestUser(t, tx)
 				insertTestProfile(t, ctx, tx, &usersdomain.UserProfile{UserID: userID, UILanguage: "uk"})
 
@@ -223,7 +224,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 
 			Convey("When the update violates the country CHECK constraint", func() {
 				testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-					repo := &Repository{db: tx}
+					repo := &Repository{repository.BaseRepository{DB: tx}}
 					userID := insertTestUser(t, tx)
 					insertTestProfile(t, ctx, tx, &usersdomain.UserProfile{UserID: userID, UILanguage: "uk"})
 
@@ -243,7 +244,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 
 			Convey("When the update violates the date_of_birth not-future CHECK constraint", func() {
 				testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-					repo := &Repository{db: tx}
+					repo := &Repository{repository.BaseRepository{DB: tx}}
 					userID := insertTestUser(t, tx)
 					insertTestProfile(t, ctx, tx, &usersdomain.UserProfile{UserID: userID, UILanguage: "uk"})
 
@@ -263,7 +264,7 @@ func TestUpdateUserProfile_Integration(t *testing.T) {
 
 			Convey("When the update violates the date_of_birth min CHECK constraint", func() {
 				testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-					repo := &Repository{db: tx}
+					repo := &Repository{repository.BaseRepository{DB: tx}}
 					userID := insertTestUser(t, tx)
 					insertTestProfile(t, ctx, tx, &usersdomain.UserProfile{UserID: userID, UILanguage: "uk"})
 

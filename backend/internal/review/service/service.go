@@ -8,6 +8,7 @@ import (
 type Service struct {
 	courseRepo    reviewdomain.CourseReviewRepository
 	contentRepo   reviewdomain.ContentReviewRepository
+	articleRepo   reviewdomain.ArticleReviewRepository
 	transactor    reviewdomain.Transactor
 	accessChecker reviewdomain.AccessChecker
 }
@@ -15,6 +16,6 @@ type Service struct {
 var _ reviewdomain.Service = (*Service)(nil)
 
 // New returns a new Service wired to the given repository.
-func New(courseRepo reviewdomain.CourseReviewRepository, contentRepo reviewdomain.ContentReviewRepository, transactor reviewdomain.Transactor, accessChecker reviewdomain.AccessChecker) *Service {
-	return &Service{courseRepo: courseRepo, contentRepo: contentRepo, transactor: transactor, accessChecker: accessChecker}
+func New(courseRepo reviewdomain.CourseReviewRepository, contentRepo reviewdomain.ContentReviewRepository, articleRepo reviewdomain.ArticleReviewRepository, transactor reviewdomain.Transactor, accessChecker reviewdomain.AccessChecker) *Service {
+	return &Service{courseRepo: courseRepo, contentRepo: contentRepo, articleRepo: articleRepo, transactor: transactor, accessChecker: accessChecker}
 }

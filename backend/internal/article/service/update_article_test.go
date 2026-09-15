@@ -24,7 +24,7 @@ func TestUpdateArticle(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id"})
+			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id"}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -37,7 +37,7 @@ func TestUpdateArticle(t *testing.T) {
 
 			srv := newTestService(cRepo, nil)
 			slug := "New Slug"
-			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id", Slug: &slug})
+			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -52,7 +52,7 @@ func TestUpdateArticle(t *testing.T) {
 
 			srv := newTestService(cRepo, nil)
 			slug := "New Slug"
-			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id", Slug: &slug})
+			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, articledomain.ErrInvalidSlug), ShouldBeTrue)
 		})
@@ -66,7 +66,7 @@ func TestUpdateArticle(t *testing.T) {
 
 			srv := newTestService(cRepo, nil)
 			slug := "New Slug"
-			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id", Slug: &slug})
+			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -79,7 +79,7 @@ func TestUpdateArticle(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id", Slug: nil})
+			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id", Slug: nil}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -92,7 +92,7 @@ func TestUpdateArticle(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id", Slug: nil})
+			err := srv.UpdateArticle(context.Background(), articledomain.UpdateArticleRequest{ID: "article_id", Slug: nil}, "user-1")
 			So(err, ShouldBeNil)
 		})
 	})

@@ -21,27 +21,34 @@ func fakeContentItem(now time.Time) *contentdomain.ContentItem {
 	ogImageURL := "https://example.com/og.png"
 	canonicalURL := "https://example.com/content-item"
 	publishedAt := now
+	updatedByUserID := "user-456"
+	publishedByUserID := "user-456"
 
 	return &contentdomain.ContentItem{
-		ID:               "content-item-123",
-		Slug:             "some-slug",
-		Title:            "Some Title",
-		ContentType:      contentdomain.VideoContent,
-		Description:      &description,
-		VideoURL:         &videoURL,
-		EstimatedMinutes: &estimatedMinutes,
-		ThumbnailURL:     &thumbnailURL,
-		SeoTitle:         &seoTitle,
-		SeoDescription:   &seoDescription,
-		OgImageURL:       &ogImageURL,
-		CanonicalURL:     &canonicalURL,
-		IsIndexable:      true,
-		Status:           contentdomain.PublishedStatus,
-		CreatedByUserID:  "user-123",
-		CreatedAt:        now,
-		UpdatedAt:        now,
-		PublishedAt:      &publishedAt,
-		DeletedAt:        nil,
+		ID:                "content-item-123",
+		Slug:              "some-slug",
+		Title:             "Some Title",
+		ContentType:       contentdomain.VideoContent,
+		Description:       &description,
+		VideoURL:          &videoURL,
+		EstimatedMinutes:  &estimatedMinutes,
+		ThumbnailURL:      &thumbnailURL,
+		SeoTitle:          &seoTitle,
+		SeoDescription:    &seoDescription,
+		OgImageURL:        &ogImageURL,
+		CanonicalURL:      &canonicalURL,
+		IsIndexable:       true,
+		Status:            contentdomain.PublishedStatus,
+		CreatedByUserID:   "user-123",
+		CreatedAt:         now,
+		UpdatedAt:         &now,
+		UpdatedByUserID:   &updatedByUserID,
+		PublishedAt:       &publishedAt,
+		PublishedByUserID: &publishedByUserID,
+		DeletedAt:         nil,
+		DeletedByUserID:   nil,
+		ArchivedAt:        nil,
+		ArchivedByUserID:  nil,
 	}
 }
 
@@ -69,9 +76,14 @@ func fakeContentItemScan(item *contentdomain.ContentItem) func(dest ...any) erro
 		*testutil.CastEnum[contentdomain.ContentItemStatus](dest[16], 16) = item.Status
 		*testutil.CastStr(dest[17], 17) = item.CreatedByUserID
 		*testutil.CastTime(dest[18], 18) = item.CreatedAt
-		*testutil.CastTime(dest[19], 19) = item.UpdatedAt
-		*testutil.CastPtrTime(dest[20], 20) = item.PublishedAt
-		*testutil.CastPtrTime(dest[21], 21) = item.DeletedAt
+		*testutil.CastPtrTime(dest[19], 19) = item.UpdatedAt
+		*testutil.CastPtrStr(dest[20], 20) = item.UpdatedByUserID
+		*testutil.CastPtrTime(dest[21], 21) = item.PublishedAt
+		*testutil.CastPtrStr(dest[22], 22) = item.PublishedByUserID
+		*testutil.CastPtrTime(dest[23], 23) = item.DeletedAt
+		*testutil.CastPtrStr(dest[24], 24) = item.DeletedByUserID
+		*testutil.CastPtrTime(dest[25], 25) = item.ArchivedAt
+		*testutil.CastPtrStr(dest[26], 26) = item.ArchivedByUserID
 		return nil
 	}
 }

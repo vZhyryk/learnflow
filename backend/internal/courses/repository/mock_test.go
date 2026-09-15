@@ -21,26 +21,33 @@ func fakeCourse(now time.Time) *coursedomain.Course {
 	canonicalURL := "https://example.com/course"
 	estimatedMinutes := 42
 	publishedAt := now
+	updatedByUserID := "user-456"
+	publishedByUserID := "user-456"
 
 	return &coursedomain.Course{
-		ID:               "course-123",
-		Slug:             "some-slug",
-		Title:            "Some Title",
-		Description:      &description,
-		ThumbnailURL:     &thumbnailURL,
-		PreviewVideoURL:  &previewVideoURL,
-		Status:           coursedomain.PublishedStatus,
-		EstimatedMinutes: &estimatedMinutes,
-		SeoTitle:         &seoTitle,
-		SeoDescription:   &seoDescription,
-		OgImageURL:       &ogImageURL,
-		CanonicalURL:     &canonicalURL,
-		IsIndexable:      true,
-		CreatedByUserID:  "user-123",
-		CreatedAt:        now,
-		UpdatedAt:        now,
-		PublishedAt:      &publishedAt,
-		DeletedAt:        nil,
+		ID:                "course-123",
+		Slug:              "some-slug",
+		Title:             "Some Title",
+		Description:       &description,
+		ThumbnailURL:      &thumbnailURL,
+		PreviewVideoURL:   &previewVideoURL,
+		Status:            coursedomain.PublishedStatus,
+		EstimatedMinutes:  &estimatedMinutes,
+		SeoTitle:          &seoTitle,
+		SeoDescription:    &seoDescription,
+		OgImageURL:        &ogImageURL,
+		CanonicalURL:      &canonicalURL,
+		IsIndexable:       true,
+		CreatedByUserID:   "user-123",
+		CreatedAt:         now,
+		UpdatedAt:         &now,
+		UpdatedByUserID:   &updatedByUserID,
+		PublishedAt:       &publishedAt,
+		PublishedByUserID: &publishedByUserID,
+		DeletedAt:         nil,
+		DeletedByUserID:   nil,
+		ArchivedAt:        nil,
+		ArchivedByUserID:  nil,
 	}
 }
 
@@ -64,9 +71,14 @@ func fakeCourseScan(course *coursedomain.Course) func(dest ...any) error {
 		*testutil.CastBool(dest[12], 12) = course.IsIndexable
 		*testutil.CastStr(dest[13], 13) = course.CreatedByUserID
 		*testutil.CastTime(dest[14], 14) = course.CreatedAt
-		*testutil.CastTime(dest[15], 15) = course.UpdatedAt
-		*testutil.CastPtrTime(dest[16], 16) = course.PublishedAt
-		*testutil.CastPtrTime(dest[17], 17) = course.DeletedAt
+		*testutil.CastPtrTime(dest[15], 15) = course.UpdatedAt
+		*testutil.CastPtrStr(dest[16], 16) = course.UpdatedByUserID
+		*testutil.CastPtrTime(dest[17], 17) = course.PublishedAt
+		*testutil.CastPtrStr(dest[18], 18) = course.PublishedByUserID
+		*testutil.CastPtrTime(dest[19], 19) = course.DeletedAt
+		*testutil.CastPtrStr(dest[20], 20) = course.DeletedByUserID
+		*testutil.CastPtrTime(dest[21], 21) = course.ArchivedAt
+		*testutil.CastPtrStr(dest[22], 22) = course.ArchivedByUserID
 		return nil
 	}
 }

@@ -10,10 +10,10 @@ import (
 
 type mockArticleRepo struct {
 	createArticle           func(ctx context.Context, Article *articledomain.Article) (*articledomain.Article, error)
-	publishArticle          func(ctx context.Context, ArticleID string) error
-	archiveArticle          func(ctx context.Context, ArticleID string) error
-	deleteArticle           func(ctx context.Context, ArticleID string) error
-	updateArticle           func(ctx context.Context, Article *articledomain.Article) error
+	publishArticle          func(ctx context.Context, ArticleID, userID string) error
+	archiveArticle          func(ctx context.Context, ArticleID, userID string) error
+	deleteArticle           func(ctx context.Context, ArticleID, userID string) error
+	updateArticle           func(ctx context.Context, Article *articledomain.Article, userID string) error
 	getAllPublishedArticles func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
 	getAllDraftArticles     func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
 	getAllArchivedArticles  func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
@@ -29,33 +29,33 @@ func (m *mockArticleRepo) CreateArticle(ctx context.Context, article *articledom
 
 	return m.createArticle(ctx, article)
 }
-func (m *mockArticleRepo) PublishArticle(ctx context.Context, articleID string) error {
+func (m *mockArticleRepo) PublishArticle(ctx context.Context, articleID, userID string) error {
 	if m.publishArticle == nil {
 		panic("mockArticleRepo.publishArticle not set")
 	}
 
-	return m.publishArticle(ctx, articleID)
+	return m.publishArticle(ctx, articleID, userID)
 }
-func (m *mockArticleRepo) ArchiveArticle(ctx context.Context, articleID string) error {
+func (m *mockArticleRepo) ArchiveArticle(ctx context.Context, articleID, userID string) error {
 	if m.archiveArticle == nil {
 		panic("mockArticleRepo.archiveArticle not set")
 	}
 
-	return m.archiveArticle(ctx, articleID)
+	return m.archiveArticle(ctx, articleID, userID)
 }
-func (m *mockArticleRepo) DeleteArticle(ctx context.Context, articleID string) error {
+func (m *mockArticleRepo) DeleteArticle(ctx context.Context, articleID, userID string) error {
 	if m.deleteArticle == nil {
 		panic("mockArticleRepo.deleteArticle not set")
 	}
 
-	return m.deleteArticle(ctx, articleID)
+	return m.deleteArticle(ctx, articleID, userID)
 }
-func (m *mockArticleRepo) UpdateArticle(ctx context.Context, article *articledomain.Article) error {
+func (m *mockArticleRepo) UpdateArticle(ctx context.Context, article *articledomain.Article, userID string) error {
 	if m.updateArticle == nil {
 		panic("mockArticleRepo.updateArticle not set")
 	}
 
-	return m.updateArticle(ctx, article)
+	return m.updateArticle(ctx, article, userID)
 }
 func (m *mockArticleRepo) GetAllPublishedArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error) {
 	if m.getAllPublishedArticles == nil {
@@ -110,10 +110,10 @@ func alwaysError(_ context.Context, _ string) (*articledomain.Article, error) {
 }
 
 // alwaysFailsErr is an updateArticle stub that always fails.
-func alwaysFailsErr(_ context.Context, _ *articledomain.Article) error {
+func alwaysFailsErr(_ context.Context, _ *articledomain.Article, _ string) error {
 	return testutil.ErrDBUnexpected
 }
 
-func alwaysSucceedsUpdate(_ context.Context, _ *articledomain.Article) error {
+func alwaysSucceedsUpdate(_ context.Context, _ *articledomain.Article, _ string) error {
 	return nil
 }

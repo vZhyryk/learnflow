@@ -87,6 +87,15 @@ type mockService struct {
 	deleteContentReview      func(ctx context.Context, reviewID, userID string) error
 	deleteCourseReviewAdmin  func(ctx context.Context, reviewID, userID string) error
 	deleteContentReviewAdmin func(ctx context.Context, reviewID, userID string) error
+
+	createArticleReview      func(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) error
+	createArticleReviewAdmin func(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) error
+	updateArticleReview      func(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error
+	updateArticleReviewAdmin func(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error
+	getArticleReviews        func(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error)
+	getArticleReviewStats    func(ctx context.Context, articleID string) (rating float64, count int, err error)
+	deleteArticleReview      func(ctx context.Context, reviewID, userID string) error
+	deleteArticleReviewAdmin func(ctx context.Context, reviewID, userID string) error
 }
 
 func (m *mockService) CreateCourseReview(ctx context.Context, req reviewdomain.CreateCourseReviewRequest) error {
@@ -199,4 +208,60 @@ func (m *mockService) DeleteContentReviewAdmin(ctx context.Context, reviewID, us
 		panic("mockService.deleteContentReviewAdmin not set")
 	}
 	return m.deleteContentReviewAdmin(ctx, reviewID, userID)
+}
+
+func (m *mockService) CreateArticleReview(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) error {
+	if m.createArticleReview == nil {
+		panic("mockService.createArticleReview not set")
+	}
+	return m.createArticleReview(ctx, req)
+}
+
+func (m *mockService) CreateArticleReviewAdmin(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) error {
+	if m.createArticleReviewAdmin == nil {
+		panic("mockService.createArticleReviewAdmin not set")
+	}
+	return m.createArticleReviewAdmin(ctx, req)
+}
+
+func (m *mockService) UpdateArticleReview(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error {
+	if m.updateArticleReview == nil {
+		panic("mockService.updateArticleReview not set")
+	}
+	return m.updateArticleReview(ctx, req)
+}
+
+func (m *mockService) UpdateArticleReviewAdmin(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error {
+	if m.updateArticleReviewAdmin == nil {
+		panic("mockService.updateArticleReviewAdmin not set")
+	}
+	return m.updateArticleReviewAdmin(ctx, req)
+}
+
+func (m *mockService) GetArticleReviews(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
+	if m.getArticleReviews == nil {
+		panic("mockService.getArticleReviews not set")
+	}
+	return m.getArticleReviews(ctx, params, articleID, filter)
+}
+
+func (m *mockService) GetArticleReviewStats(ctx context.Context, articleID string) (rating float64, count int, err error) {
+	if m.getArticleReviewStats == nil {
+		panic("mockService.getArticleReviewStats not set")
+	}
+	return m.getArticleReviewStats(ctx, articleID)
+}
+
+func (m *mockService) DeleteArticleReview(ctx context.Context, reviewID, userID string) error {
+	if m.deleteArticleReview == nil {
+		panic("mockService.deleteArticleReview not set")
+	}
+	return m.deleteArticleReview(ctx, reviewID, userID)
+}
+
+func (m *mockService) DeleteArticleReviewAdmin(ctx context.Context, reviewID, userID string) error {
+	if m.deleteArticleReviewAdmin == nil {
+		panic("mockService.deleteArticleReviewAdmin not set")
+	}
+	return m.deleteArticleReviewAdmin(ctx, reviewID, userID)
 }

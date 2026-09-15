@@ -14,7 +14,7 @@ func TestPublishCourse(t *testing.T) {
 		var svcErr error
 
 		svc := &mockService{
-			publishCourse: func(_ context.Context, _ string) error {
+			publishCourse: func(_ context.Context, _, _ string) error {
 				return svcErr
 			},
 		}

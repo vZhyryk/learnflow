@@ -64,3 +64,31 @@ func TestGetContentReviewStats(t *testing.T) {
 		})
 	})
 }
+
+func TestGetArticleReviewStats(t *testing.T) {
+	Convey("Get ArticleReviewStats", t, func() {
+		aRepo := &mockReviewRepo{}
+		srv := newTestServiceWithArticleRepo(aRepo)
+
+		Convey("repository error", func() {
+			aRepo.getArticleReviewStats = func(_ context.Context, _ string) (float64, int, error) {
+				return 0, 0, testutil.ErrDBUnexpected
+			}
+
+			_, _, err := srv.GetArticleReviewStats(context.Background(), "article-1")
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("success", func() {
+			aRepo.getArticleReviewStats = func(_ context.Context, _ string) (float64, int, error) {
+				return 4.1, 7, nil
+			}
+
+			rating, count, err := srv.GetArticleReviewStats(context.Background(), "article-1")
+			So(err, ShouldBeNil)
+			So(rating, ShouldEqual, 4.1)
+			So(count, ShouldEqual, 7)
+		})
+	})
+}

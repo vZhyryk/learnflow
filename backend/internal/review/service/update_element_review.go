@@ -95,3 +95,39 @@ func (s *Service) UpdateContentReviewAdmin(ctx context.Context, req reviewdomain
 		return nil
 	})
 }
+
+func (s *Service) UpdateArticleReview(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error {
+	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		currentReview, err := s.articleRepo.GetArticleReviewByID(ctx, req.ReviewID)
+		if err != nil {
+			return fmt.Errorf("service.UpdateArticleReview: fetch review: %w", err)
+		}
+
+		if currentReview.UserID != req.UserID {
+			return reviewdomain.ErrReviewNotFound
+		}
+
+		req.Apply(currentReview)
+
+		if err = s.articleRepo.UpdateArticleReview(ctx, currentReview); err != nil {
+			return fmt.Errorf("service.UpdateArticleReview: %w", err)
+		}
+		return nil
+	})
+}
+
+func (s *Service) UpdateArticleReviewAdmin(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error {
+	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		currentReview, err := s.articleRepo.GetArticleReviewByID(ctx, req.ReviewID)
+		if err != nil {
+			return fmt.Errorf("service.UpdateArticleReviewAdmin: fetch review: %w", err)
+		}
+
+		req.Apply(currentReview)
+
+		if err := s.articleRepo.UpdateArticleReview(ctx, currentReview); err != nil {
+			return fmt.Errorf("service.UpdateArticleReviewAdmin: %w", err)
+		}
+		return nil
+	})
+}

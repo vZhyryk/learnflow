@@ -6,7 +6,8 @@ const (
 	courseColumns = `
 	    id, slug, title, description, thumbnail_url, preview_video_url, status, estimated_minutes,
 		seo_title, seo_description, og_image_url, canonical_url, is_indexable,
-		created_by_user_id, created_at, updated_at, published_at, deleted_at
+		created_by_user_id, created_at, updated_at, updated_by_user_id, published_at, published_by_user_id,
+		deleted_at, deleted_by_user_id, archived_at, archived_by_user_id
 	`
 
 	createDraftCourseSQL = `
@@ -17,19 +18,23 @@ const (
 	publishCourseSQL = `
 		UPDATE courses
 		SET status = 'published',
-		published_at = now()
+		published_at = now(),
+		published_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
 	archiveCourseSQL = `
 		UPDATE courses
-		SET status = 'archived'
+		SET status = 'archived',
+		archived_at = now(),
+		archived_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
 	deleteCourseSQL = `
 		UPDATE courses
-		SET deleted_at = now()
+		SET deleted_at = now(),
+		deleted_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
@@ -47,6 +52,7 @@ const (
 			og_image_url = $10,
 			canonical_url = $11,
 			is_indexable = $12,
+			updated_by_user_id = $13,
 			updated_at = now()
 		WHERE id = $1 AND deleted_at IS NULL
 	`

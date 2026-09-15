@@ -12,6 +12,7 @@ import (
 
 const validCourseID = "22222222-2222-2222-2222-222222222222"
 const validContentID = "33333333-3333-3333-3333-333333333333"
+const validArticleID = "44444444-4444-4444-4444-444444444444"
 
 func TestCreateCourseReview(t *testing.T) {
 	Convey("POST /api/v1/courses/reviews", t, func() {

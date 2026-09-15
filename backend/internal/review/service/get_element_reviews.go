@@ -22,3 +22,11 @@ func (s *Service) GetContentReviews(ctx context.Context, params pagination.Param
 	}
 	return reviews, nil
 }
+
+func (s *Service) GetArticleReviews(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
+	reviews, err := s.articleRepo.GetArticleReviewList(ctx, params, articleID, filter)
+	if err != nil {
+		return nil, fmt.Errorf("service.GetArticleReviews: %w", err)
+	}
+	return reviews, nil
+}

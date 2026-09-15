@@ -12,21 +12,21 @@ func TestArchiveCourse(t *testing.T) {
 	Convey("Given a course service", t, func() {
 		Convey("When ArchiveCourse succeeds", func() {
 			cRepo := &mockCourseRepoRepo{
-				archiveCourse: testutil.AlwaysNil,
+				archiveCourse: testutil.AlwaysNil2,
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.ArchiveCourse(context.Background(), "courseID")
+			err := srv.ArchiveCourse(context.Background(), "courseID", "user-1")
 			So(err, ShouldBeNil)
 		})
 
 		Convey("When the repository returns an error", func() {
 			cRepo := &mockCourseRepoRepo{
-				archiveCourse: testutil.AlwaysFailsDB,
+				archiveCourse: testutil.AlwaysFailsDB2,
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.ArchiveCourse(context.Background(), "courseID")
+			err := srv.ArchiveCourse(context.Background(), "courseID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})

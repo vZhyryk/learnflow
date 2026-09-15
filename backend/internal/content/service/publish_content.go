@@ -9,7 +9,7 @@ import (
 
 // PublishContentItem publishes a draft contentItem, provided its content is ready, and emits a
 // notification event in the same transaction.
-func (s *Service) PublishContentItem(ctx context.Context, contentItemID string) error {
+func (s *Service) PublishContentItem(ctx context.Context, contentItemID, userID string) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		contentItem, err := s.contentRepo.GetContentItemByID(ctx, contentItemID)
 		if err != nil {
@@ -25,7 +25,7 @@ func (s *Service) PublishContentItem(ctx context.Context, contentItemID string) 
 			return fmt.Errorf("service.ReadyToPublish: %w", err)
 		}
 
-		err = s.contentRepo.PublishContentItem(ctx, contentItemID)
+		err = s.contentRepo.PublishContentItem(ctx, contentItemID, userID)
 		if err != nil {
 			return fmt.Errorf("service.PublishContentItem: %w", err)
 		}

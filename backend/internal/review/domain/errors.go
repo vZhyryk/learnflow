@@ -14,6 +14,7 @@ var (
 
 	ErrInvalidContentItemID = errors.New("invalid contentItem ID")
 	ErrInvalidCourseID      = errors.New("invalid course ID")
+	ErrInvalidArticleID     = errors.New("invalid article ID")
 
 	ErrInvalidReviewID = errors.New("invalid review ID")
 

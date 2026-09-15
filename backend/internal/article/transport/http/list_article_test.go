@@ -11,7 +11,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func AestListarticle(t *testing.T) {
+func TestListArticle(t *testing.T) {
 	Convey("GET /api/v1/articles", t, func() {
 		var svcErr error
 

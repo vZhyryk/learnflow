@@ -229,3 +229,107 @@ func TestDeleteContentReviewAdmin(t *testing.T) {
 		})
 	})
 }
+
+func TestDeleteArticleReview(t *testing.T) {
+	Convey("DELETE /api/v1/articles/reviews/{id}", t, func() {
+		var svcErr error
+		svc := &mockService{
+			deleteArticleReview: func(_ context.Context, _, _ string) error {
+				return svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodDelete, "/api/v1/articles/reviews/"+validReviewID)
+		mux, newReq := f.mux, f.newReq
+
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(mux, newReq("", nil))
+			}, ShouldPanic)
+		})
+
+		Convey("invalid review id → 422", func() {
+			f := newHTTPFixture(svc, http.MethodDelete, "/api/v1/articles/reviews/---")
+			mux, newReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
+		})
+
+		Convey("review not found → 404", func() {
+			svcErr = reviewdomain.ErrReviewNotFound
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusNotFound)
+		})
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 200 with message", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["message"], ShouldEqual, "Article review deleted successfully")
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withUser(newReq("", nil)))
+			}, ShouldNotPanic)
+		})
+	})
+}
+
+func TestDeleteArticleReviewAdmin(t *testing.T) {
+	Convey("DELETE /api/v1/admin/articles/reviews/{id}", t, func() {
+		var svcErr error
+		svc := &mockService{
+			deleteArticleReviewAdmin: func(_ context.Context, _, _ string) error {
+				return svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodDelete, "/api/v1/admin/articles/reviews/"+validReviewID)
+		mux, newReq := f.mux, f.newReq
+
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(mux, newReq("", nil))
+			}, ShouldPanic)
+		})
+
+		Convey("invalid review id → 422", func() {
+			f := newHTTPFixture(svc, http.MethodDelete, "/api/v1/admin/articles/reviews/---")
+			mux, newReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
+		})
+
+		Convey("review not found → 404", func() {
+			svcErr = reviewdomain.ErrReviewNotFound
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusNotFound)
+		})
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 200 with message", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["message"], ShouldEqual, "Article review deleted successfully")
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withUser(newReq("", nil)))
+			}, ShouldNotPanic)
+		})
+	})
+}

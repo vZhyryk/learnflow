@@ -35,6 +35,7 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 		errors.Is(err, reviewdomain.ErrInvalidComment),
 		errors.Is(err, reviewdomain.ErrInvalidContentItemID),
 		errors.Is(err, reviewdomain.ErrInvalidCourseID),
+		errors.Is(err, reviewdomain.ErrInvalidArticleID),
 		errors.Is(err, reviewdomain.ErrInvalidReviewID),
 		errors.Is(err, reviewdomain.ErrInvalidUserID),
 		errors.Is(err, reviewdomain.ErrAlreadyReviewed):

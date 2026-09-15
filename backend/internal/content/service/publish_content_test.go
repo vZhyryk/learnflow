@@ -36,7 +36,7 @@ func TestPublishContentItem(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishContentItem(context.Background(), "content_item_ID")
+			err := srv.PublishContentItem(context.Background(), "content_item_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -49,7 +49,7 @@ func TestPublishContentItem(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishContentItem(context.Background(), "content_item_ID")
+			err := srv.PublishContentItem(context.Background(), "content_item_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, contentdomain.ErrInvalidContentItemStatus), ShouldBeTrue)
 		})
@@ -62,7 +62,7 @@ func TestPublishContentItem(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishContentItem(context.Background(), "content_item_ID")
+			err := srv.PublishContentItem(context.Background(), "content_item_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "service.ReadyToPublish")
 		})
@@ -70,11 +70,11 @@ func TestPublishContentItem(t *testing.T) {
 		Convey("PublishContentItem - publish error", func() {
 			cRepo := &mockContentItemRepo{
 				getContentItemByID: validGetContentItemByID,
-				publishContentItem: testutil.AlwaysFailsDB,
+				publishContentItem: testutil.AlwaysFailsDB2,
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishContentItem(context.Background(), "content_item_ID")
+			err := srv.PublishContentItem(context.Background(), "content_item_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "service.PublishContentItem")
 		})
@@ -82,11 +82,11 @@ func TestPublishContentItem(t *testing.T) {
 		Convey("PublishContentItem - outbox emit error", func() {
 			cRepo := &mockContentItemRepo{
 				getContentItemByID: validGetContentItemByID,
-				publishContentItem: testutil.AlwaysNil,
+				publishContentItem: testutil.AlwaysNil2,
 			}
 
 			srv := newTestService(cRepo, testutil.NewFailingOutbox(testutil.ErrDBUnexpected))
-			err := srv.PublishContentItem(context.Background(), "content_item_ID")
+			err := srv.PublishContentItem(context.Background(), "content_item_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -94,12 +94,12 @@ func TestPublishContentItem(t *testing.T) {
 		Convey("Successful", func() {
 			cRepo := &mockContentItemRepo{
 				getContentItemByID: validGetContentItemByID,
-				publishContentItem: testutil.AlwaysNil,
+				publishContentItem: testutil.AlwaysNil2,
 			}
 			var captured []any
 
 			srv := newTestService(cRepo, testutil.NewCapturingOutbox(&captured))
-			err := srv.PublishContentItem(context.Background(), "content_item_ID")
+			err := srv.PublishContentItem(context.Background(), "content_item_ID", "user-1")
 			So(err, ShouldBeNil)
 		})
 	})

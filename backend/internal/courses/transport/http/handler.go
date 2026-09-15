@@ -9,7 +9,7 @@ import (
 	"net/http"
 )
 
-func (h *Handler) handleSimpleAction(w http.ResponseWriter, r *http.Request, action func(ctx context.Context, courseID string) error, successMsg string) {
+func (h *Handler) handleSimpleAction(w http.ResponseWriter, r *http.Request, action func(ctx context.Context, courseID, userID string) error, successMsg string) {
 	courseID := r.PathValue("id")
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
@@ -19,7 +19,7 @@ func (h *Handler) handleSimpleAction(w http.ResponseWriter, r *http.Request, act
 		return
 	}
 
-	err := action(ctx, courseID)
+	err := action(ctx, courseID, user.ID)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return

@@ -14,7 +14,7 @@ func TestDeleteArticle(t *testing.T) {
 		var svcErr error
 
 		svc := &mockService{
-			deleteArticle: func(_ context.Context, _ string) error {
+			deleteArticle: func(_ context.Context, _, _ string) error {
 				return svcErr
 			},
 		}

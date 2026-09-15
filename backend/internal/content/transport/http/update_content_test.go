@@ -16,7 +16,7 @@ func TestUpdateContentItem(t *testing.T) {
 		validBody := `{"id":"11111111-1111-1111-1111-111111111111"}`
 
 		svc := &mockService{
-			updateContentItem: func(_ context.Context, _ contentdomain.UpdateContentItemRequest) error {
+			updateContentItem: func(_ context.Context, _ contentdomain.UpdateContentItemRequest, _ string) error {
 				return svcErr
 			},
 		}

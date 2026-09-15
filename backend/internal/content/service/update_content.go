@@ -8,7 +8,7 @@ import (
 )
 
 // UpdateContentItem applies a partial update to an existing content item, re-checking slug uniqueness if it changed.
-func (s *Service) UpdateContentItem(ctx context.Context, req contentdomain.UpdateContentItemRequest) error {
+func (s *Service) UpdateContentItem(ctx context.Context, req contentdomain.UpdateContentItemRequest, userID string) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		contentItem, err := s.contentRepo.GetContentItemByID(ctx, req.ID)
 		if err != nil {
@@ -25,7 +25,7 @@ func (s *Service) UpdateContentItem(ctx context.Context, req contentdomain.Updat
 			}
 		}
 		req.Apply(contentItem)
-		if err := s.contentRepo.UpdateContentItem(ctx, contentItem); err != nil {
+		if err := s.contentRepo.UpdateContentItem(ctx, contentItem, userID); err != nil {
 			return fmt.Errorf("service.UpdateContentItem: update: %w", err)
 		}
 		return nil

@@ -295,6 +295,149 @@ func (r UpdateContentReviewRequest) applyComment(p *ContentReview) {
 	}
 }
 
+type ArticleReview struct {
+	ID              string     `json:"id"`
+	ArticleID       string     `json:"article_id"`
+	UserID          string     `json:"user_id"`
+	Rating          int        `json:"rating"`
+	Comment         *string    `json:"comment"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	DeletedAt       *time.Time `json:"deleted_at"`
+	DeletedByUserID *string    `json:"deleted_by_user_id"`
+}
+
+// CreateArticleReviewRequest is the input for creating a ArticleReview.
+type CreateArticleReviewRequest struct {
+	ArticleID string  `json:"article_id"`
+	UserID    string  `json:"user_id"`
+	Rating    int     `json:"rating"`
+	Comment   *string `json:"comment"`
+}
+
+// Validate checks that all fields of the request are valid.
+func (req *CreateArticleReviewRequest) Validate() error {
+	checks := []func() error{
+		req.validateArticleID,
+		req.validateRating,
+		req.validateComment,
+		req.validateUserID,
+	}
+
+	for _, check := range checks {
+		if err := check(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (req *CreateArticleReviewRequest) validateArticleID() error {
+	if req.ArticleID == "" || !validator.IsValidUUID(req.ArticleID) {
+		return ErrInvalidArticleID
+	}
+	return nil
+}
+func (req *CreateArticleReviewRequest) validateRating() error {
+	if req.Rating < 1 || req.Rating > 5 {
+		return ErrInvalidRating
+	}
+	return nil
+}
+
+func (req *CreateArticleReviewRequest) validateComment() error {
+	if req.Comment == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*req.Comment)
+	if trimmed == "" || utf8.RuneCountInString(trimmed) > 2000 {
+		return ErrInvalidComment
+	}
+	return nil
+}
+
+func (req *CreateArticleReviewRequest) validateUserID() error {
+	if req.UserID == "" || !validator.IsValidUUID(req.UserID) {
+		return ErrInvalidUserID
+	}
+	return nil
+}
+
+// UpdateArticleReviewRequest is the input for updating a ArticleReview.
+type UpdateArticleReviewRequest struct {
+	ReviewID string  `json:"review_id"`
+	UserID   string  `json:"user_id"`
+	Rating   *int    `json:"rating"`
+	Comment  *string `json:"comment"`
+}
+
+// Validate checks that all fields of the request are valid.
+func (req *UpdateArticleReviewRequest) Validate() error {
+	checks := []func() error{
+		req.validateReviewID,
+		req.validateRating,
+		req.validateComment,
+	}
+
+	for _, check := range checks {
+		if err := check(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (req *UpdateArticleReviewRequest) validateReviewID() error {
+	if req.ReviewID == "" || !validator.IsValidUUID(req.ReviewID) {
+		return ErrInvalidReviewID
+	}
+	return nil
+}
+
+func (req *UpdateArticleReviewRequest) validateRating() error {
+	if req.Rating != nil && (*req.Rating < 1 || *req.Rating > 5) {
+		return ErrInvalidRating
+	}
+	return nil
+}
+
+func (req *UpdateArticleReviewRequest) validateComment() error {
+	if req.Comment == nil {
+		return nil
+	}
+
+	trimmed := strings.TrimSpace(*req.Comment)
+	if trimmed == "" || utf8.RuneCountInString(trimmed) > 2000 {
+		return ErrInvalidComment
+	}
+	return nil
+}
+
+func (r UpdateArticleReviewRequest) Apply(p *ArticleReview) {
+	appliers := []func(*ArticleReview){
+		r.applyRating,
+		r.applyComment,
+	}
+	for _, apply := range appliers {
+		apply(p)
+	}
+}
+
+func (r UpdateArticleReviewRequest) applyRating(p *ArticleReview) {
+	if r.Rating != nil {
+		p.Rating = *r.Rating
+	}
+}
+
+func (r UpdateArticleReviewRequest) applyComment(p *ArticleReview) {
+	if r.Comment != nil {
+		p.Comment = r.Comment
+	}
+}
+
 type ReviewFilter struct {
 	Rating int
 	Op     string

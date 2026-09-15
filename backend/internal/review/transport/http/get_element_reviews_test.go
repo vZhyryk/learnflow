@@ -214,3 +214,90 @@ func TestListContentReviewsAdmin(t *testing.T) {
 		})
 	})
 }
+
+func TestListArticleReviews(t *testing.T) {
+	Convey("GET /api/v1/articles/{id}/reviews (public — filter always ignored)", t, func() {
+		var svcErr error
+		var gotFilter reviewdomain.ReviewFilter
+		svc := &mockService{
+			getArticleReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
+				gotFilter = f
+				return []*reviewdomain.ArticleReview{}, svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/articles/"+validArticleID+"/reviews")
+		mux, newReq := f.mux, f.newReq
+
+		Convey("No user in context → still succeeds (public route)", func() {
+			w := testutil.ServeHTTP(mux, newReq("", nil))
+			So(w.Code, ShouldEqual, http.StatusOK)
+		})
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, newReq("", nil))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 200 with reviews", func() {
+			w := testutil.ServeHTTP(mux, newReq("", nil))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["reviews"], ShouldNotBeNil)
+		})
+
+		Convey("?rating=3&op=gte is ignored — public route never filters", func() {
+			w := testutil.ServeHTTP(mux, newReq("", map[string]string{"rating": "3"}))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			So(gotFilter, ShouldResemble, reviewdomain.ReviewFilter{})
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, newReq("", nil))
+			}, ShouldNotPanic)
+		})
+	})
+}
+
+func TestListArticleReviewsAdmin(t *testing.T) {
+	Convey("GET /api/v1/admin/articles/{id}/reviews (rating filter supported)", t, func() {
+		var svcErr error
+		var gotFilter reviewdomain.ReviewFilter
+		svc := &mockService{
+			getArticleReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
+				gotFilter = f
+				return []*reviewdomain.ArticleReview{}, svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/admin/articles/"+validArticleID+"/reviews")
+		mux, newReq := f.mux, f.newReq
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, newReq("", nil))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("?rating=3&op=gte query params parsed into filter", func() {
+			w := testutil.ServeHTTP(mux, newReq("", map[string]string{"rating": "3"}))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			So(gotFilter.Rating, ShouldEqual, 3)
+		})
+
+		Convey("Valid request → 200 with reviews", func() {
+			w := testutil.ServeHTTP(mux, newReq("", nil))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["reviews"], ShouldNotBeNil)
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, newReq("", nil))
+			}, ShouldNotPanic)
+		})
+	})
+}

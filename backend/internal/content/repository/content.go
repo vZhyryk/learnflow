@@ -29,23 +29,23 @@ func (rep *Repository) CreateContentItem(ctx context.Context, contentItem *conte
 }
 
 // PublishContentItem marks a ContentItem as published.
-func (rep *Repository) PublishContentItem(ctx context.Context, contentItemID string) error {
-	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, publishContentItemSQL, "PublishContentItem", contentItemID, contentdomain.ErrContentItemNotFound)
+func (rep *Repository) PublishContentItem(ctx context.Context, contentItemID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, publishContentItemSQL, "PublishContentItem", contentItemID, userID, contentdomain.ErrContentItemNotFound)
 }
 
 // ArchiveContentItem marks a ContentItem as archived.
-func (rep *Repository) ArchiveContentItem(ctx context.Context, contentItemID string) error {
-	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, archiveContentItemSQL, "ArchiveContentItem", contentItemID, contentdomain.ErrContentItemNotFound)
+func (rep *Repository) ArchiveContentItem(ctx context.Context, contentItemID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, archiveContentItemSQL, "ArchiveContentItem", contentItemID, userID, contentdomain.ErrContentItemNotFound)
 }
 
 // DeleteContentItem soft-deletes a ContentItem.
-func (rep *Repository) DeleteContentItem(ctx context.Context, contentItemID string) error {
-	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, deleteContentItemSQL, "DeleteContentItem", contentItemID, contentdomain.ErrContentItemNotFound)
+func (rep *Repository) DeleteContentItem(ctx context.Context, contentItemID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, deleteContentItemSQL, "DeleteContentItem", contentItemID, userID, contentdomain.ErrContentItemNotFound)
 }
 
 // UpdateContentItem persists changes to an existing ContentItem.
-func (rep *Repository) UpdateContentItem(ctx context.Context, contentItem *contentdomain.ContentItem) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateContentItemSQL, contentItem.ID, contentItem.Slug, contentItem.Title, contentItem.Description, contentItem.Body, contentItem.VideoURL, contentItem.FileURL, contentItem.EstimatedMinutes, contentItem.EstimatedPages, contentItem.ThumbnailURL, contentItem.SeoTitle, contentItem.SeoDescription, contentItem.OgImageURL, contentItem.CanonicalURL, contentItem.IsIndexable)
+func (rep *Repository) UpdateContentItem(ctx context.Context, contentItem *contentdomain.ContentItem, userID string) error {
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateContentItemSQL, contentItem.ID, contentItem.Slug, contentItem.Title, contentItem.Description, contentItem.Body, contentItem.VideoURL, contentItem.FileURL, contentItem.EstimatedMinutes, contentItem.EstimatedPages, contentItem.ThumbnailURL, contentItem.SeoTitle, contentItem.SeoDescription, contentItem.OgImageURL, contentItem.CanonicalURL, contentItem.IsIndexable, userID)
 	if db.IsUniqueViolation(err, contentItemsSlugUniqueConstraint) {
 		return contentdomain.ErrInvalidSlug
 	}

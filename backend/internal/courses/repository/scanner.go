@@ -24,8 +24,13 @@ func scanCourse(row repository.RowScanner) (*coursedomain.Course, error) {
 		&course.CreatedByUserID,
 		&course.CreatedAt,
 		&course.UpdatedAt,
+		&course.UpdatedByUserID,
 		&course.PublishedAt,
+		&course.PublishedByUserID,
 		&course.DeletedAt,
+		&course.DeletedByUserID,
+		&course.ArchivedAt,
+		&course.ArchivedByUserID,
 	)
 	if err != nil {
 		return nil, err

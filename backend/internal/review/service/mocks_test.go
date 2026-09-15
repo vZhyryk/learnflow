@@ -22,6 +22,13 @@ type mockReviewRepo struct {
 	getContentReviewByID               func(ctx context.Context, reviewID string) (*reviewdomain.ContentReview, error)
 	getContentReviewByUserAndContentID func(ctx context.Context, userID, contentID string) (*reviewdomain.ContentReview, error)
 	getContentReviewStats              func(ctx context.Context, contentID string) (rating float64, count int, err error)
+	createArticleReview                func(ctx context.Context, articleReview *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error)
+	updateArticleReview                func(ctx context.Context, articleReview *reviewdomain.ArticleReview) error
+	deleteArticleReview                func(ctx context.Context, reviewID, userID string) error
+	getArticleReviewList               func(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error)
+	getArticleReviewByID               func(ctx context.Context, reviewID string) (*reviewdomain.ArticleReview, error)
+	getArticleReviewByUserAndArticleID func(ctx context.Context, userID, articleID string) (*reviewdomain.ArticleReview, error)
+	getArticleReviewStats              func(ctx context.Context, articleID string) (rating float64, count int, err error)
 }
 
 type mockAccessChecker struct {
@@ -129,6 +136,56 @@ func (m *mockReviewRepo) GetContentReviewStats(ctx context.Context, contentID st
 	return m.getContentReviewStats(ctx, contentID)
 }
 
+func (m *mockReviewRepo) CreateArticleReview(ctx context.Context, articleReview *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error) {
+	if m.createArticleReview == nil {
+		panic("mockReviewRepo.CreateArticleReview not set")
+	}
+
+	return m.createArticleReview(ctx, articleReview)
+}
+func (m *mockReviewRepo) UpdateArticleReview(ctx context.Context, articleReview *reviewdomain.ArticleReview) error {
+	if m.updateArticleReview == nil {
+		panic("mockReviewRepo.UpdateArticleReview not set")
+	}
+
+	return m.updateArticleReview(ctx, articleReview)
+}
+func (m *mockReviewRepo) DeleteArticleReview(ctx context.Context, reviewID, userID string) error {
+	if m.deleteArticleReview == nil {
+		panic("mockReviewRepo.DeleteArticleReview not set")
+	}
+
+	return m.deleteArticleReview(ctx, reviewID, userID)
+}
+func (m *mockReviewRepo) GetArticleReviewList(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
+	if m.getArticleReviewList == nil {
+		panic("mockReviewRepo.GetArticleReviewList not set")
+	}
+
+	return m.getArticleReviewList(ctx, params, articleID, filter)
+}
+func (m *mockReviewRepo) GetArticleReviewByID(ctx context.Context, reviewID string) (*reviewdomain.ArticleReview, error) {
+	if m.getArticleReviewByID == nil {
+		panic("mockReviewRepo.GetArticleReviewByID not set")
+	}
+
+	return m.getArticleReviewByID(ctx, reviewID)
+}
+func (m *mockReviewRepo) GetArticleReviewByUserAndArticleID(ctx context.Context, userID, articleID string) (*reviewdomain.ArticleReview, error) {
+	if m.getArticleReviewByUserAndArticleID == nil {
+		panic("mockReviewRepo.GetArticleReviewByUserAndArticleID not set")
+	}
+
+	return m.getArticleReviewByUserAndArticleID(ctx, userID, articleID)
+}
+func (m *mockReviewRepo) GetArticleReviewStats(ctx context.Context, articleID string) (rating float64, count int, err error) {
+	if m.getArticleReviewStats == nil {
+		panic("mockReviewRepo.GetArticleReviewStats not set")
+	}
+
+	return m.getArticleReviewStats(ctx, articleID)
+}
+
 func (m *mockAccessChecker) HasAccessCourse(ctx context.Context, userID, courseID string) (bool, error) {
 	if m.hasAccessCourse == nil {
 		panic("mockAccessChecker.HasAccessCourse not set")
@@ -146,5 +203,9 @@ func (m *mockAccessChecker) HasAccessContent(ctx context.Context, userID, conten
 }
 
 func newTestService(courseRepo *mockReviewRepo, contentRepo *mockReviewRepo, accessChecker *mockAccessChecker) *Service {
-	return New(courseRepo, contentRepo, &testutil.NoopTransactor{}, accessChecker)
+	return New(courseRepo, contentRepo, &mockReviewRepo{}, &testutil.NoopTransactor{}, accessChecker)
+}
+
+func newTestServiceWithArticleRepo(articleRepo *mockReviewRepo) *Service {
+	return New(&mockReviewRepo{}, &mockReviewRepo{}, articleRepo, &testutil.NoopTransactor{}, &mockAccessChecker{})
 }

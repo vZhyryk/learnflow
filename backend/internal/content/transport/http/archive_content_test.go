@@ -14,7 +14,7 @@ func TestArchiveContentItem(t *testing.T) {
 		var svcErr error
 
 		svc := &mockService{
-			archiveContentItem: func(_ context.Context, _ string) error {
+			archiveContentItem: func(_ context.Context, _, _ string) error {
 				return svcErr
 			},
 		}

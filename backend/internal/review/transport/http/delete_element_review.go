@@ -93,3 +93,47 @@ func (h *Handler) deleteContentReview(w http.ResponseWriter, r *http.Request) {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
 }
+
+func (h *Handler) deleteArticleReviewAdmin(w http.ResponseWriter, r *http.Request) {
+	reviewID := r.PathValue("id")
+	ctx := r.Context()
+	user := appcontext.MustUserFromContext(ctx)
+
+	if !validator.IsValidUUID(reviewID) {
+		h.handleErrorResponse(w, r, reviewdomain.ErrInvalidReviewID)
+		return
+	}
+
+	err := h.svc.DeleteArticleReviewAdmin(ctx, reviewID, user.ID)
+	if err != nil {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
+
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "Article review deleted successfully"}, nil)
+	if err != nil {
+		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
+	}
+}
+
+func (h *Handler) deleteArticleReview(w http.ResponseWriter, r *http.Request) {
+	reviewID := r.PathValue("id")
+	ctx := r.Context()
+	user := appcontext.MustUserFromContext(ctx)
+
+	if !validator.IsValidUUID(reviewID) {
+		h.handleErrorResponse(w, r, reviewdomain.ErrInvalidReviewID)
+		return
+	}
+
+	err := h.svc.DeleteArticleReview(ctx, reviewID, user.ID)
+	if err != nil {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
+
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "Article review deleted successfully"}, nil)
+	if err != nil {
+		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
+	}
+}

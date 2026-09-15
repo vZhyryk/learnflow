@@ -100,3 +100,33 @@ func TestGetContentReviews(t *testing.T) {
 		})
 	})
 }
+
+func TestGetArticleReviews(t *testing.T) {
+	Convey("Get ArticleReviews", t, func() {
+		aRepo := &mockReviewRepo{}
+		srv := newTestServiceWithArticleRepo(aRepo)
+		params := pagination.NewParams(1, 20)
+		noFilter := reviewdomain.ReviewFilter{}
+
+		Convey("repository error", func() {
+			aRepo.getArticleReviewList = func(_ context.Context, _ pagination.Params, _ string, _ reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
+				return nil, testutil.ErrDBUnexpected
+			}
+
+			_, err := srv.GetArticleReviews(context.Background(), params, "article-1", noFilter)
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("success", func() {
+			want := []*reviewdomain.ArticleReview{{ID: "review-1"}}
+			aRepo.getArticleReviewList = func(_ context.Context, _ pagination.Params, _ string, _ reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
+				return want, nil
+			}
+
+			got, err := srv.GetArticleReviews(context.Background(), params, "article-1", noFilter)
+			So(err, ShouldBeNil)
+			So(got, ShouldResemble, want)
+		})
+	})
+}

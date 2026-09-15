@@ -3,7 +3,8 @@ package articlerepository
 const (
 	articleColumns = `
     id, slug, title, description, body, seo_title, seo_description, og_image_url, is_indexable,
-	status, created_by_user_id, created_at, updated_at, published_at, deleted_at
+	status, created_by_user_id, created_at, updated_at, updated_by_user_id, published_at, published_by_user_id,
+	deleted_at, deleted_by_user_id, archived_at, archived_by_user_id
 	`
 
 	createDraftArticleSQL = `
@@ -14,19 +15,23 @@ const (
 	publishArticleSQL = `
 		UPDATE articles
 		SET status = 'published',
-		published_at = now()
+		published_at = now(),
+		published_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
 	archiveArticleSQL = `
 		UPDATE articles
-		SET status = 'archived'
+		SET status = 'archived',
+		archived_at = now(),
+		archived_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
 	deleteArticleSQL = `
 		UPDATE articles
-		SET deleted_at = now()
+		SET deleted_at = now(),
+		deleted_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
@@ -41,6 +46,7 @@ const (
 			seo_description = $7,
 			og_image_url = $8,
 			is_indexable = $9,
+			updated_by_user_id = $10,
 			updated_at = now()
 		WHERE id = $1 AND deleted_at IS NULL
 	`

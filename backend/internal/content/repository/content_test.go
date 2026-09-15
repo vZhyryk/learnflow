@@ -136,49 +136,29 @@ func TestGetContentItemBySlug(t *testing.T) {
 	})
 }
 
-// testExecContentItemMethod covers the shared shape of PublishContentItem/ArchiveContentItem/
-// DeleteContentItem: Exec, map 0 rows affected to ErrContentItemNotFound, wrap any other error.
-// Shared here instead of writing the same three Convey blocks three times over.
-func testExecContentItemMethod(t *testing.T, methodName string, call func(*Repository, context.Context, string) error) {
-	Convey("Given a content repository", t, func() {
-		var execTag pgconn.CommandTag
-		var execErr error
-		repo := newTestRepo(&testutil.MockQueryRunner{
-			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-				return execTag, execErr
-			},
-		})
-
-		Convey("When it succeeds", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 1")
-			So(call(repo, context.Background(), "content-123"), ShouldBeNil)
-		})
-
-		Convey("When no row is matched (content item not found)", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 0")
-			err := call(repo, context.Background(), "unknown")
-			So(errors.Is(err, contentdomain.ErrContentItemNotFound), ShouldBeTrue)
-		})
-
-		Convey("When the database returns an unexpected error", func() {
-			execErr = testutil.ErrDBUnexpected
-			err := call(repo, context.Background(), "content-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "repository."+methodName)
-		})
-	})
+// bindContentItemExec adapts a repository exec method into the shape testutil.TestExecMethod
+// expects: build a repo around the given runner, return the bound method.
+func bindContentItemExec(
+	call func(*Repository, context.Context, string, string) error,
+) func(*testutil.MockQueryRunner) func(context.Context, string, string) error {
+	return func(runner *testutil.MockQueryRunner) func(context.Context, string, string) error {
+		repo := newTestRepo(runner)
+		return func(ctx context.Context, id, userID string) error {
+			return call(repo, ctx, id, userID)
+		}
+	}
 }
 
 func TestPublishContentItem(t *testing.T) {
-	testExecContentItemMethod(t, "PublishContentItem", (*Repository).PublishContentItem)
+	testutil.TestExecMethod(t, "PublishContentItem", bindContentItemExec((*Repository).PublishContentItem), contentdomain.ErrContentItemNotFound)
 }
 
 func TestArchiveContentItem(t *testing.T) {
-	testExecContentItemMethod(t, "ArchiveContentItem", (*Repository).ArchiveContentItem)
+	testutil.TestExecMethod(t, "ArchiveContentItem", bindContentItemExec((*Repository).ArchiveContentItem), contentdomain.ErrContentItemNotFound)
 }
 
 func TestDeleteContentItem(t *testing.T) {
-	testExecContentItemMethod(t, "DeleteContentItem", (*Repository).DeleteContentItem)
+	testutil.TestExecMethod(t, "DeleteContentItem", bindContentItemExec((*Repository).DeleteContentItem), contentdomain.ErrContentItemNotFound)
 }
 
 func TestUpdateContentItem(t *testing.T) {
@@ -194,31 +174,31 @@ func TestUpdateContentItem(t *testing.T) {
 
 		Convey("When update succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			So(repo.UpdateContentItem(context.Background(), item), ShouldBeNil)
+			So(repo.UpdateContentItem(context.Background(), item, "user-1"), ShouldBeNil)
 		})
 
 		Convey("When no row is matched (content item not found)", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 0")
-			err := repo.UpdateContentItem(context.Background(), item)
+			err := repo.UpdateContentItem(context.Background(), item, "user-1")
 			So(errors.Is(err, contentdomain.ErrContentItemNotFound), ShouldBeTrue)
 		})
 
 		Convey("When the new slug is already taken (pg 23505)", func() {
 			execErr = &pgconn.PgError{Code: "23505", ConstraintName: "content_items_slug_unique"}
-			err := repo.UpdateContentItem(context.Background(), item)
+			err := repo.UpdateContentItem(context.Background(), item, "user-1")
 			So(errors.Is(err, contentdomain.ErrInvalidSlug), ShouldBeTrue)
 		})
 
 		Convey("When an unrelated unique violation occurs (pg 23505, different constraint)", func() {
 			execErr = &pgconn.PgError{Code: "23505", ConstraintName: "some_other_constraint"}
-			err := repo.UpdateContentItem(context.Background(), item)
+			err := repo.UpdateContentItem(context.Background(), item, "user-1")
 			So(errors.Is(err, contentdomain.ErrInvalidSlug), ShouldBeFalse)
 			So(err, ShouldNotBeNil)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
 			execErr = testutil.ErrDBUnexpected
-			err := repo.UpdateContentItem(context.Background(), item)
+			err := repo.UpdateContentItem(context.Background(), item, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "repository.UpdateContentItem")
 		})

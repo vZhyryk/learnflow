@@ -232,3 +232,105 @@ func TestUpdateContentReviewAdmin(t *testing.T) {
 		})
 	})
 }
+
+func TestUpdateArticleReview(t *testing.T) {
+	Convey("PUT /api/v1/articles/reviews", t, func() {
+		var svcErr error
+		svc := &mockService{
+			updateArticleReview: func(_ context.Context, _ reviewdomain.UpdateArticleReviewRequest) error {
+				return svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodPut, "/api/v1/articles/reviews")
+		mux, newReq := f.mux, f.newReq
+		validBody := `{"review_id":"` + validReviewID + `","rating":5}`
+
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(mux, newReq(validBody, nil))
+			}, ShouldPanic)
+		})
+
+		Convey("invalid review_id → 400 (request validation)", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"review_id":"---","rating":5}`, nil)))
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		})
+
+		Convey("review not found → 404", func() {
+			svcErr = reviewdomain.ErrReviewNotFound
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusNotFound)
+		})
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 200 with message", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["message"], ShouldEqual, "Article review updated successfully")
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withUser(newReq(validBody, nil)))
+			}, ShouldNotPanic)
+		})
+	})
+}
+
+func TestUpdateArticleReviewAdmin(t *testing.T) {
+	Convey("PUT /api/v1/admin/articles/reviews", t, func() {
+		var svcErr error
+		svc := &mockService{
+			updateArticleReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateArticleReviewRequest) error {
+				return svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodPut, "/api/v1/admin/articles/reviews")
+		mux, newReq := f.mux, f.newReq
+		validBody := `{"review_id":"` + validReviewID + `","rating":5}`
+
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(mux, newReq(validBody, nil))
+			}, ShouldPanic)
+		})
+
+		Convey("invalid review_id → 400 (request validation)", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"review_id":"---","rating":5}`, nil)))
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		})
+
+		Convey("review not found → 404", func() {
+			svcErr = reviewdomain.ErrReviewNotFound
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusNotFound)
+		})
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 200 with message", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["message"], ShouldEqual, "Article review updated successfully")
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withUser(newReq(validBody, nil)))
+			}, ShouldNotPanic)
+		})
+	})
+}

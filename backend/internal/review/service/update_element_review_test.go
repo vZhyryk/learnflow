@@ -253,3 +253,100 @@ func TestUpdateContentReviewAdmin(t *testing.T) {
 		})
 	})
 }
+
+func TestUpdateArticleReview(t *testing.T) {
+	Convey("Update ArticleReview", t, func() {
+		aRepo := &mockReviewRepo{
+			getArticleReviewByID: func(_ context.Context, _ string) (*reviewdomain.ArticleReview, error) {
+				return &reviewdomain.ArticleReview{ID: "review-1", ArticleID: "article-1", UserID: "user-1"}, nil
+			},
+		}
+		srv := newTestServiceWithArticleRepo(aRepo)
+		req := reviewdomain.UpdateArticleReviewRequest{ReviewID: "review-1", UserID: "user-1"}
+
+		Convey("fetch review error", func() {
+			aRepo.getArticleReviewByID = func(_ context.Context, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, testutil.ErrDBUnexpected
+			}
+
+			err := srv.UpdateArticleReview(context.Background(), req)
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("not the review owner", func() {
+			aRepo.getArticleReviewByID = func(_ context.Context, _ string) (*reviewdomain.ArticleReview, error) {
+				return &reviewdomain.ArticleReview{ID: "review-1", ArticleID: "article-1", UserID: "someone-else"}, nil
+			}
+
+			err := srv.UpdateArticleReview(context.Background(), req)
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
+		})
+
+		Convey("repository update error", func() {
+			aRepo.updateArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) error {
+				return testutil.ErrDBUnexpected
+			}
+
+			err := srv.UpdateArticleReview(context.Background(), req)
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("success", func() {
+			var applied *reviewdomain.ArticleReview
+			aRepo.updateArticleReview = func(_ context.Context, r *reviewdomain.ArticleReview) error {
+				applied = r
+				return nil
+			}
+			rating := 5
+			req.Rating = &rating
+
+			err := srv.UpdateArticleReview(context.Background(), req)
+			So(err, ShouldBeNil)
+			So(applied.Rating, ShouldEqual, 5)
+		})
+	})
+}
+
+func TestUpdateArticleReviewAdmin(t *testing.T) {
+	Convey("Update ArticleReview as admin", t, func() {
+		aRepo := &mockReviewRepo{
+			getArticleReviewByID: func(_ context.Context, _ string) (*reviewdomain.ArticleReview, error) {
+				return &reviewdomain.ArticleReview{ID: "review-1", ArticleID: "article-1", UserID: "user-1"}, nil
+			},
+		}
+		srv := newTestServiceWithArticleRepo(aRepo)
+		req := reviewdomain.UpdateArticleReviewRequest{ReviewID: "review-1"}
+
+		Convey("fetch review error", func() {
+			aRepo.getArticleReviewByID = func(_ context.Context, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, testutil.ErrDBUnexpected
+			}
+
+			err := srv.UpdateArticleReviewAdmin(context.Background(), req)
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("repository update error", func() {
+			aRepo.updateArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) error {
+				return testutil.ErrDBUnexpected
+			}
+
+			err := srv.UpdateArticleReviewAdmin(context.Background(), req)
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("success", func() {
+			aRepo.updateArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) error {
+				return nil
+			}
+
+			err := srv.UpdateArticleReviewAdmin(context.Background(), req)
+			So(err, ShouldBeNil)
+		})
+	})
+}

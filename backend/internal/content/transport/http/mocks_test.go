@@ -57,20 +57,20 @@ func newHTTPFixture(svc *mockService, method, path string) *httpFixture {
 }
 
 type mockService struct {
-	archiveContentItem   func(ctx context.Context, contentItemID string) error
+	archiveContentItem   func(ctx context.Context, contentItemID, userID string) error
 	createContentItem    func(ctx context.Context, req contentdomain.CreateContentItemRequest) (string, error)
-	deleteContentItem    func(ctx context.Context, contentItemID string) error
+	deleteContentItem    func(ctx context.Context, contentItemID, userID string) error
 	getContentItemBySlug func(ctx context.Context, slug string) (*contentdomain.ContentItem, error)
-	publishContentItem   func(ctx context.Context, contentItemID string) error
-	updateContentItem    func(ctx context.Context, req contentdomain.UpdateContentItemRequest) error
+	publishContentItem   func(ctx context.Context, contentItemID, userID string) error
+	updateContentItem    func(ctx context.Context, req contentdomain.UpdateContentItemRequest, userID string) error
 	getAllContentItems   func(ctx context.Context, getType contentdomain.ContentItemStatus, params pagination.Params) (contentItemList []*contentdomain.ContentItem, err error)
 }
 
-func (m *mockService) ArchiveContentItem(ctx context.Context, contentItemID string) error {
+func (m *mockService) ArchiveContentItem(ctx context.Context, contentItemID, userID string) error {
 	if m.archiveContentItem == nil {
 		panic("mockService.ArchiveContentItem not set")
 	}
-	return m.archiveContentItem(ctx, contentItemID)
+	return m.archiveContentItem(ctx, contentItemID, userID)
 }
 func (m *mockService) CreateContentItem(ctx context.Context, req contentdomain.CreateContentItemRequest) (string, error) {
 	if m.createContentItem == nil {
@@ -79,11 +79,11 @@ func (m *mockService) CreateContentItem(ctx context.Context, req contentdomain.C
 	return m.createContentItem(ctx, req)
 }
 
-func (m *mockService) DeleteContentItem(ctx context.Context, contentItemID string) error {
+func (m *mockService) DeleteContentItem(ctx context.Context, contentItemID, userID string) error {
 	if m.deleteContentItem == nil {
 		panic("mockService.DeleteContentItem not set")
 	}
-	return m.deleteContentItem(ctx, contentItemID)
+	return m.deleteContentItem(ctx, contentItemID, userID)
 }
 
 func (m *mockService) GetContentItemBySlug(ctx context.Context, slug string) (*contentdomain.ContentItem, error) {
@@ -92,17 +92,17 @@ func (m *mockService) GetContentItemBySlug(ctx context.Context, slug string) (*c
 	}
 	return m.getContentItemBySlug(ctx, slug)
 }
-func (m *mockService) PublishContentItem(ctx context.Context, contentItemID string) error {
+func (m *mockService) PublishContentItem(ctx context.Context, contentItemID, userID string) error {
 	if m.publishContentItem == nil {
 		panic("mockService.PublishContentItem not set")
 	}
-	return m.publishContentItem(ctx, contentItemID)
+	return m.publishContentItem(ctx, contentItemID, userID)
 }
-func (m *mockService) UpdateContentItem(ctx context.Context, req contentdomain.UpdateContentItemRequest) error {
+func (m *mockService) UpdateContentItem(ctx context.Context, req contentdomain.UpdateContentItemRequest, userID string) error {
 	if m.updateContentItem == nil {
 		panic("mockService.UpdateContentItem not set")
 	}
-	return m.updateContentItem(ctx, req)
+	return m.updateContentItem(ctx, req, userID)
 }
 func (m *mockService) GetAllContentItems(ctx context.Context, getType contentdomain.ContentItemStatus, params pagination.Params) (contentItemList []*contentdomain.ContentItem, err error) {
 	if m.getAllContentItems == nil {

@@ -113,7 +113,7 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	// Review Routes
 	reviewRepo := reviewrepository.NewRepository(a.DB)
 	accessChecker := access.New(a.DB)
-	reviewSvc := reviewservice.New(reviewRepo, reviewRepo, transactor, accessChecker)
+	reviewSvc := reviewservice.New(reviewRepo, reviewRepo, reviewRepo, transactor, accessChecker)
 	review.RegisterReviewRoutes(router, reviewSvc, chains.Static, chains.StaticWithAuth, adminStaticWithAuth, a.Logger)
 
 	// Helper routes

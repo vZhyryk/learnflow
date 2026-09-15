@@ -29,23 +29,23 @@ func (rep *Repository) CreateArticle(ctx context.Context, article *articledomain
 }
 
 // PublishArticle marks a Article as published.
-func (rep *Repository) PublishArticle(ctx context.Context, articleID string) error {
-	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, publishArticleSQL, "PublishArticle", articleID, articledomain.ErrArticleNotFound)
+func (rep *Repository) PublishArticle(ctx context.Context, articleID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, publishArticleSQL, "PublishArticle", articleID, userID, articledomain.ErrArticleNotFound)
 }
 
 // ArchiveArticle marks a Article as archived.
-func (rep *Repository) ArchiveArticle(ctx context.Context, articleID string) error {
-	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, archiveArticleSQL, "ArchiveArticle", articleID, articledomain.ErrArticleNotFound)
+func (rep *Repository) ArchiveArticle(ctx context.Context, articleID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, archiveArticleSQL, "ArchiveArticle", articleID, userID, articledomain.ErrArticleNotFound)
 }
 
 // DeleteArticle soft-deletes a Article.
-func (rep *Repository) DeleteArticle(ctx context.Context, articleID string) error {
-	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, deleteArticleSQL, "DeleteArticle", articleID, articledomain.ErrArticleNotFound)
+func (rep *Repository) DeleteArticle(ctx context.Context, articleID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, deleteArticleSQL, "DeleteArticle", articleID, userID, articledomain.ErrArticleNotFound)
 }
 
 // UpdateArticle persists changes to an existing Article.
-func (rep *Repository) UpdateArticle(ctx context.Context, article *articledomain.Article) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateArticleSQL, article.ID, article.Slug, article.Title, article.Description, article.Body, article.SeoTitle, article.SeoDescription, article.OgImageURL, article.IsIndexable)
+func (rep *Repository) UpdateArticle(ctx context.Context, article *articledomain.Article, userID string) error {
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateArticleSQL, article.ID, article.Slug, article.Title, article.Description, article.Body, article.SeoTitle, article.SeoDescription, article.OgImageURL, article.IsIndexable, userID)
 	if db.IsUniqueViolation(err, articleSlugUniqueConstraint) {
 		return articledomain.ErrInvalidSlug
 	}

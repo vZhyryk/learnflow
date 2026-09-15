@@ -20,3 +20,11 @@ func (s *Service) GetContentReviewStats(ctx context.Context, contentID string) (
 	}
 	return rating, count, nil
 }
+
+func (s *Service) GetArticleReviewStats(ctx context.Context, articleID string) (rating float64, count int, err error) {
+	rating, count, err = s.articleRepo.GetArticleReviewStats(ctx, articleID)
+	if err != nil {
+		return 0, 0, fmt.Errorf("service.GetArticleReviewStats: %w", err)
+	}
+	return rating, count, nil
+}

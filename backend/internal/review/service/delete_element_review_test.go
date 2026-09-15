@@ -159,3 +159,78 @@ func TestDeleteContentReviewAdmin(t *testing.T) {
 		})
 	})
 }
+
+func TestDeleteArticleReview(t *testing.T) {
+	Convey("Delete ArticleReview", t, func() {
+		aRepo := &mockReviewRepo{
+			getArticleReviewByID: func(_ context.Context, _ string) (*reviewdomain.ArticleReview, error) {
+				return &reviewdomain.ArticleReview{ID: "review-1", UserID: "user-1"}, nil
+			},
+			deleteArticleReview: func(_ context.Context, _, _ string) error {
+				return nil
+			},
+		}
+		srv := newTestServiceWithArticleRepo(aRepo)
+
+		Convey("fetch review error", func() {
+			aRepo.getArticleReviewByID = func(_ context.Context, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, testutil.ErrDBUnexpected
+			}
+
+			err := srv.DeleteArticleReview(context.Background(), "review-1", "user-1")
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("not the review owner", func() {
+			aRepo.getArticleReviewByID = func(_ context.Context, _ string) (*reviewdomain.ArticleReview, error) {
+				return &reviewdomain.ArticleReview{ID: "review-1", UserID: "someone-else"}, nil
+			}
+
+			err := srv.DeleteArticleReview(context.Background(), "review-1", "user-1")
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
+		})
+
+		Convey("repository delete error", func() {
+			aRepo.deleteArticleReview = func(_ context.Context, _, _ string) error {
+				return testutil.ErrDBUnexpected
+			}
+
+			err := srv.DeleteArticleReview(context.Background(), "review-1", "user-1")
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("success", func() {
+			err := srv.DeleteArticleReview(context.Background(), "review-1", "user-1")
+			So(err, ShouldBeNil)
+		})
+	})
+}
+
+func TestDeleteArticleReviewAdmin(t *testing.T) {
+	Convey("Delete ArticleReview as admin", t, func() {
+		aRepo := &mockReviewRepo{}
+		srv := newTestServiceWithArticleRepo(aRepo)
+
+		Convey("repository delete error", func() {
+			aRepo.deleteArticleReview = func(_ context.Context, _, _ string) error {
+				return testutil.ErrDBUnexpected
+			}
+
+			err := srv.DeleteArticleReviewAdmin(context.Background(), "review-1", "admin-1")
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("success", func() {
+			aRepo.deleteArticleReview = func(_ context.Context, _, _ string) error {
+				return nil
+			}
+
+			err := srv.DeleteArticleReviewAdmin(context.Background(), "review-1", "admin-1")
+			So(err, ShouldBeNil)
+		})
+	})
+}

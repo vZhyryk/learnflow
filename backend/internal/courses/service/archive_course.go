@@ -7,8 +7,8 @@ import (
 
 // ArchiveCourse marks a course as archived. Unlike PublishCourse, intentionally allowed
 // from any status — archiving is a takedown action, not a state-machine step.
-func (s *Service) ArchiveCourse(ctx context.Context, courseID string) error {
-	err := s.courseRepo.ArchiveCourse(ctx, courseID)
+func (s *Service) ArchiveCourse(ctx context.Context, courseID, userID string) error {
+	err := s.courseRepo.ArchiveCourse(ctx, courseID, userID)
 	if err != nil {
 		return fmt.Errorf("service.ArchiveCourse: %w", err)
 	}

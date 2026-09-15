@@ -14,7 +14,7 @@ func TestArchiveCourse(t *testing.T) {
 		var svcErr error
 
 		svc := &mockService{
-			archiveCourse: func(_ context.Context, _ string) error {
+			archiveCourse: func(_ context.Context, _, _ string) error {
 				return svcErr
 			},
 		}

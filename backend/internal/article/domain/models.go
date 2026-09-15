@@ -30,23 +30,26 @@ func (r ArticleStatus) Valid() bool {
 
 // Article represents a Article in draft, published, or archived state.
 type Article struct {
-	ID                    string        `json:"id"`
-	Slug                  string        `json:"slug"`
-	Title                 string        `json:"title"`
-	Description           *string       `json:"description"`
-	Body                  string        `json:"body"`
-	SeoTitle              *string       `json:"seo_title"`
-	SeoDescription        *string       `json:"seo_description"`
-	OgImageURL            *string       `json:"og_image_url"`
-	IsIndexable           bool          `json:"is_indexable"`
-	Status                ArticleStatus `json:"status"`
-	Announcement          *string       `json:"announcement"`
-	CreatedByUserID       string        `json:"created_by_user_id"`
-	CreatedAt             time.Time     `json:"created_at"`
-	UpdatedAt             time.Time     `json:"updated_at"`
-	PublishedAt           *time.Time    `json:"published_at"`
-	DeletedAt             *time.Time    `json:"deleted_at"`
-	AnnouncementExpiresAt *time.Time    `json:"announcement_expires_at"`
+	ID                string        `json:"id"`
+	Slug              string        `json:"slug"`
+	Title             string        `json:"title"`
+	Description       *string       `json:"description"`
+	Body              string        `json:"body"`
+	SeoTitle          *string       `json:"seo_title"`
+	SeoDescription    *string       `json:"seo_description"`
+	OgImageURL        *string       `json:"og_image_url"`
+	IsIndexable       bool          `json:"is_indexable"`
+	Status            ArticleStatus `json:"status"`
+	CreatedAt         time.Time     `json:"created_at"`
+	CreatedByUserID   string        `json:"created_by_user_id"`
+	UpdatedAt         *time.Time    `json:"updated_at"`
+	UpdatedByUserID   *string       `json:"updated_by_user_id"`
+	PublishedAt       *time.Time    `json:"published_at"`
+	PublishedByUserID *string       `json:"published_by_user_id"`
+	DeletedAt         *time.Time    `json:"deleted_at"`
+	DeletedByUserID   *string       `json:"deleted_by_user_id"`
+	ArchivedAt        *time.Time    `json:"archived_at"`
+	ArchivedByUserID  *string       `json:"archived_by_user_id"`
 }
 
 // ReadyToPublish reports whether the Article has all fields required to go public.

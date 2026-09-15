@@ -11,7 +11,7 @@
 --         notifications, announcements, activity_log, event_outbox, failed_jobs,
 --         admin_actions, support_chats, support_messages,
 --         account_recovery_tokens, articles, gift_coupons, user_sessions
--- Synced through: migration 000011
+-- Synced through: migration 000012
 
 -- Index naming convention: idx_{table}_{col1}_{col2}[_{qualifier}]
 --   qualifier = domain condition key: active, available, booked, pending, open, unread, unresolved, unused
@@ -166,11 +166,14 @@ CREATE TABLE courses (
     is_indexable        boolean     NOT NULL DEFAULT true,
     created_by_user_id  uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now(),
+    updated_at          timestamptz,
+    updated_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
     published_at        timestamptz,
+    published_by_user_id uuid       REFERENCES users(id) ON DELETE RESTRICT,
     deleted_at          timestamptz,
-    announcement        text,
-    announcement_expires_at timestamptz,
+    deleted_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    archived_at         timestamptz,
+    archived_by_user_id uuid        REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT courses_slug_unique                     UNIQUE (slug),
     CONSTRAINT courses_title_nonempty                  CHECK (btrim(title) <> ''),
     CONSTRAINT courses_slug_nonempty                   CHECK (btrim(slug) <> ''),
@@ -178,8 +181,10 @@ CREATE TABLE courses (
     CONSTRAINT courses_deleted_at_after_created        CHECK (deleted_at IS NULL OR deleted_at >= created_at),
     CONSTRAINT courses_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL),
     CONSTRAINT courses_description_nonempty             CHECK (description IS NULL OR btrim(description) <> ''),
-    CONSTRAINT courses_announcement_nonempty            CHECK (announcement IS NULL OR btrim(announcement) <> ''),
-    CONSTRAINT courses_announcement_expires_at_after_created CHECK (announcement_expires_at IS NULL OR announcement_expires_at > created_at)
+    CONSTRAINT courses_published_by_user_id_and_published_at CHECK ((published_at IS NULL) = (published_by_user_id IS NULL)),
+    CONSTRAINT courses_deleted_by_user_id_and_deleted_at CHECK ((deleted_at IS NULL) = (deleted_by_user_id IS NULL)),
+    CONSTRAINT courses_updated_by_user_id_and_updated_at CHECK ((updated_at IS NULL) = (updated_by_user_id IS NULL)),
+    CONSTRAINT courses_archived_by_user_id_and_archived_at CHECK ((archived_at IS NULL) = (archived_by_user_id IS NULL))
 );
 
 CREATE INDEX idx_courses_status ON courses(status) WHERE deleted_at IS NULL;
@@ -208,11 +213,14 @@ CREATE TABLE content_items (
     status              text        NOT NULL DEFAULT 'draft' CONSTRAINT content_items_status_check CHECK (status IN ('draft', 'published', 'archived')),
     created_by_user_id  uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now(),
+    updated_at          timestamptz,
+    updated_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
     published_at        timestamptz,
+    published_by_user_id uuid       REFERENCES users(id) ON DELETE RESTRICT,
     deleted_at          timestamptz,
-    announcement        text,
-    announcement_expires_at timestamptz,
+    deleted_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    archived_at         timestamptz,
+    archived_by_user_id uuid        REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT content_items_slug_unique                     UNIQUE (slug),
     CONSTRAINT content_items_title_nonempty                  CHECK (btrim(title) <> ''),
     CONSTRAINT content_items_slug_nonempty                   CHECK (btrim(slug) <> ''),
@@ -220,8 +228,10 @@ CREATE TABLE content_items (
     CONSTRAINT content_items_deleted_at_after_created        CHECK (deleted_at IS NULL OR deleted_at >= created_at),
     CONSTRAINT content_items_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL),
     CONSTRAINT content_items_description_nonempty             CHECK (description IS NULL OR btrim(description) <> ''),
-    CONSTRAINT content_items_announcement_nonempty            CHECK (announcement IS NULL OR btrim(announcement) <> ''),
-    CONSTRAINT content_items_announcement_expires_at_after_created CHECK (announcement_expires_at IS NULL OR announcement_expires_at > created_at)
+    CONSTRAINT content_items_published_by_user_id_and_published_at CHECK ((published_at IS NULL) = (published_by_user_id IS NULL)),
+    CONSTRAINT content_items_deleted_by_user_id_and_deleted_at CHECK ((deleted_at IS NULL) = (deleted_by_user_id IS NULL)),
+    CONSTRAINT content_items_updated_by_user_id_and_updated_at CHECK ((updated_at IS NULL) = (updated_by_user_id IS NULL)),
+    CONSTRAINT content_items_archived_by_user_id_and_archived_at CHECK ((archived_at IS NULL) = (archived_by_user_id IS NULL))
 );
 
 CREATE INDEX idx_content_items_content_type_status ON content_items(content_type, status) WHERE deleted_at IS NULL;
@@ -671,13 +681,24 @@ CREATE INDEX idx_notifications_user_id_unread
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE announcements (
-    id                 uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    title              text        NOT NULL,
-    body               text        NOT NULL,
-    created_by_user_id uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    expires_at         timestamptz,
-    created_at         timestamptz NOT NULL DEFAULT now(),
-    updated_at         timestamptz NOT NULL DEFAULT now()
+    id                   uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    title                text        NOT NULL,
+    body                 text        NOT NULL,
+    created_by_user_id   uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    expires_at           timestamptz,
+    created_at           timestamptz NOT NULL DEFAULT now(),
+    updated_at           timestamptz,
+    updated_by_user_id   uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    entity_type          text,
+    entity_id            uuid,
+    channels             text[]      NOT NULL DEFAULT '{}',
+    approved_at          timestamptz,
+    approved_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT announcements_entity_type_check CHECK (entity_type IS NULL OR entity_type IN ('course', 'content_item', 'article')),
+    CONSTRAINT announcements_entity_pairing_check CHECK ((entity_type IS NULL) = (entity_id IS NULL)),
+    CONSTRAINT announcements_channels_valid CHECK (channels <@ ARRAY['email','banner','inapp']::text[]),
+    CONSTRAINT announcements_approved_by_user_id_and_approved_at CHECK ((approved_at IS NULL) = (approved_by_user_id IS NULL)),
+    CONSTRAINT announcements_updated_by_user_id_and_updated_at CHECK ((updated_at IS NULL) = (updated_by_user_id IS NULL))
 );
 
 CREATE INDEX idx_announcements_created_at ON announcements(created_at DESC);
@@ -887,12 +908,15 @@ CREATE TABLE articles (
     is_indexable        boolean     NOT NULL DEFAULT true,
     status              text        NOT NULL DEFAULT 'draft',
     published_at        timestamptz,
+    published_by_user_id uuid       REFERENCES users(id) ON DELETE RESTRICT,
     created_by_user_id  uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     deleted_at          timestamptz,
+    deleted_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    archived_at         timestamptz,
+    archived_by_user_id uuid        REFERENCES users(id) ON DELETE RESTRICT,
     created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now(),
-    announcement        text,
-    announcement_expires_at timestamptz,
+    updated_at          timestamptz,
+    updated_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT articles_slug_unique                     UNIQUE (slug),
     CONSTRAINT articles_status_check                    CHECK (status IN ('draft', 'published', 'archived')),
     CONSTRAINT articles_title_nonempty                  CHECK (btrim(title) <> ''),
@@ -902,13 +926,34 @@ CREATE TABLE articles (
     CONSTRAINT articles_published_at_after_created      CHECK (published_at IS NULL OR published_at >= created_at),
     CONSTRAINT articles_deleted_at_after_created        CHECK (deleted_at IS NULL OR deleted_at >= created_at),
     CONSTRAINT articles_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL),
-    CONSTRAINT articles_announcement_nonempty            CHECK (announcement IS NULL OR btrim(announcement) <> ''),
-    CONSTRAINT articles_announcement_expires_at_after_created CHECK (announcement_expires_at IS NULL OR announcement_expires_at > created_at)
+    CONSTRAINT articles_published_by_user_id_and_published_at CHECK ((published_at IS NULL) = (published_by_user_id IS NULL)),
+    CONSTRAINT articles_deleted_by_user_id_and_deleted_at CHECK ((deleted_at IS NULL) = (deleted_by_user_id IS NULL)),
+    CONSTRAINT articles_archived_by_user_id_and_archived_at CHECK ((archived_at IS NULL) = (archived_by_user_id IS NULL)),
+    CONSTRAINT articles_updated_by_user_id_and_updated_at CHECK ((updated_at IS NULL) = (updated_by_user_id IS NULL))
 );
 
 CREATE INDEX idx_articles_created_at ON articles(created_at DESC);
 CREATE INDEX idx_articles_published_at
     ON articles(published_at DESC) WHERE status = 'published' AND deleted_at IS NULL;
+
+CREATE TABLE article_reviews (
+    id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    article_id      uuid        NOT NULL REFERENCES articles(id) ON DELETE RESTRICT,
+    user_id         uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    rating          integer     NOT NULL CONSTRAINT article_reviews_rating_check CHECK (rating BETWEEN 1 AND 5),
+    comment         text,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    deleted_at      timestamptz,
+    deleted_by_user_id uuid REFERENCES users(id),
+    CONSTRAINT article_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    CONSTRAINT article_reviews_comment_length_check CHECK (comment IS NULL OR char_length(comment) <= 2000)
+);
+
+CREATE UNIQUE INDEX idx_article_reviews_user_id_article_id_active_unique
+    ON article_reviews(user_id, article_id) WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_article_reviews_article_id_active ON article_reviews(article_id) WHERE deleted_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 27. GIFT COUPONS

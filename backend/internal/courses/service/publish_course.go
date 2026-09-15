@@ -9,7 +9,7 @@ import (
 
 // PublishCourse publishes a draft course, provided its content is ready, and emits a
 // notification event in the same transaction.
-func (s *Service) PublishCourse(ctx context.Context, courseID string) error {
+func (s *Service) PublishCourse(ctx context.Context, courseID, userID string) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		course, err := s.courseRepo.GetCourseByID(ctx, courseID)
 		if err != nil {
@@ -25,7 +25,7 @@ func (s *Service) PublishCourse(ctx context.Context, courseID string) error {
 			return fmt.Errorf("service.ReadyToPublish: %w", err)
 		}
 
-		err = s.courseRepo.PublishCourse(ctx, courseID)
+		err = s.courseRepo.PublishCourse(ctx, courseID, userID)
 		if err != nil {
 			return fmt.Errorf("service.PublishCourse: %w", err)
 		}

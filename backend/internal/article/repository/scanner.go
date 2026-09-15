@@ -21,8 +21,13 @@ func scanArticle(row repository.RowScanner) (*articledomain.Article, error) {
 		&article.CreatedByUserID,
 		&article.CreatedAt,
 		&article.UpdatedAt,
+		&article.UpdatedByUserID,
 		&article.PublishedAt,
+		&article.PublishedByUserID,
 		&article.DeletedAt,
+		&article.DeletedByUserID,
+		&article.ArchivedAt,
+		&article.ArchivedByUserID,
 	)
 	if err != nil {
 		return nil, err

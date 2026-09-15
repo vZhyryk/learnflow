@@ -29,28 +29,37 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, staticChain, StaticWithAuth
 
 	mux.Handle("PUT /api/v1/admin/courses/reviews", adminChain.ThenFunc(h.updateCourseReviewAdmin))
 	mux.Handle("PUT /api/v1/admin/content/reviews", adminChain.ThenFunc(h.updateContentReviewAdmin))
+	mux.Handle("PUT /api/v1/admin/articles/reviews", adminChain.ThenFunc(h.updateArticleReviewAdmin))
 
 	mux.Handle("POST /api/v1/admin/courses/reviews", adminChain.ThenFunc(h.createCourseReviewAdmin))
 	mux.Handle("POST /api/v1/admin/content/reviews", adminChain.ThenFunc(h.createContentReviewAdmin))
+	mux.Handle("POST /api/v1/admin/articles/reviews", adminChain.ThenFunc(h.createArticleReviewAdmin))
 
 	mux.Handle("DELETE /api/v1/admin/courses/reviews/{id}", adminChain.ThenFunc(h.deleteCourseReviewAdmin))
 	mux.Handle("DELETE /api/v1/admin/content/reviews/{id}", adminChain.ThenFunc(h.deleteContentReviewAdmin))
+	mux.Handle("DELETE /api/v1/admin/articles/reviews/{id}", adminChain.ThenFunc(h.deleteArticleReviewAdmin))
 
 	mux.Handle("PUT /api/v1/courses/reviews", StaticWithAuth.ThenFunc(h.updateCourseReview))
 	mux.Handle("PUT /api/v1/content/reviews", StaticWithAuth.ThenFunc(h.updateContentReview))
+	mux.Handle("PUT /api/v1/articles/reviews", StaticWithAuth.ThenFunc(h.updateArticleReview))
 
 	mux.Handle("POST /api/v1/courses/reviews", StaticWithAuth.ThenFunc(h.createCourseReview))
 	mux.Handle("POST /api/v1/content/reviews", StaticWithAuth.ThenFunc(h.createContentReview))
+	mux.Handle("POST /api/v1/articles/reviews", StaticWithAuth.ThenFunc(h.createArticleReview))
 
 	mux.Handle("DELETE /api/v1/courses/reviews/{id}", StaticWithAuth.ThenFunc(h.deleteCourseReview))
 	mux.Handle("DELETE /api/v1/content/reviews/{id}", StaticWithAuth.ThenFunc(h.deleteContentReview))
+	mux.Handle("DELETE /api/v1/articles/reviews/{id}", StaticWithAuth.ThenFunc(h.deleteArticleReview))
 
 	mux.Handle("GET /api/v1/courses/{id}/reviews", staticChain.ThenFunc(h.listCourseReviews))
 	mux.Handle("GET /api/v1/content/{id}/reviews", staticChain.ThenFunc(h.listContentReviews))
+	mux.Handle("GET /api/v1/articles/{id}/reviews", staticChain.ThenFunc(h.listArticleReviews))
 
 	mux.Handle("GET /api/v1/admin/courses/{id}/reviews", adminChain.ThenFunc(h.listCourseReviewsAdmin))
 	mux.Handle("GET /api/v1/admin/content/{id}/reviews", adminChain.ThenFunc(h.listContentReviewsAdmin))
+	mux.Handle("GET /api/v1/admin/articles/{id}/reviews", adminChain.ThenFunc(h.listArticleReviewsAdmin))
 
 	mux.Handle("GET /api/v1/courses/{id}/reviews/stats", staticChain.ThenFunc(h.courseReviewStats))
 	mux.Handle("GET /api/v1/content/{id}/reviews/stats", staticChain.ThenFunc(h.contentReviewStats))
+	mux.Handle("GET /api/v1/articles/{id}/reviews/stats", staticChain.ThenFunc(h.articleReviewStats))
 }

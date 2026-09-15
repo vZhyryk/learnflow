@@ -175,7 +175,7 @@ func TestGetContentItemByID_Integration(t *testing.T) {
 				seed := draftContentItem(t, tx)
 				created, err := repo.CreateContentItem(ctx, seed)
 				So(err, ShouldBeNil)
-				So(repo.DeleteContentItem(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteContentItem(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				_, err = repo.GetContentItemByID(ctx, created.ID)
 
@@ -225,7 +225,7 @@ func TestPublishContentItem_Integration(t *testing.T) {
 				created, err := repo.CreateContentItem(ctx, draftContentItem(t, tx))
 				So(err, ShouldBeNil)
 
-				So(repo.PublishContentItem(ctx, created.ID), ShouldBeNil)
+				So(repo.PublishContentItem(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				got, err := repo.GetContentItemByID(ctx, created.ID)
 				So(err, ShouldBeNil)
@@ -238,7 +238,7 @@ func TestPublishContentItem_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 
-				err := repo.PublishContentItem(ctx, "00000000-0000-0000-0000-000000000000")
+				err := repo.PublishContentItem(ctx, "00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000000")
 
 				So(errors.Is(err, contentdomain.ErrContentItemNotFound), ShouldBeTrue)
 			})
@@ -256,7 +256,7 @@ func TestArchiveContentItem_Integration(t *testing.T) {
 				created, err := repo.CreateContentItem(ctx, draftContentItem(t, tx))
 				So(err, ShouldBeNil)
 
-				So(repo.ArchiveContentItem(ctx, created.ID), ShouldBeNil)
+				So(repo.ArchiveContentItem(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				got, err := repo.GetContentItemByID(ctx, created.ID)
 				So(err, ShouldBeNil)
@@ -268,7 +268,7 @@ func TestArchiveContentItem_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 
-				err := repo.ArchiveContentItem(ctx, "00000000-0000-0000-0000-000000000000")
+				err := repo.ArchiveContentItem(ctx, "00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000000")
 
 				So(errors.Is(err, contentdomain.ErrContentItemNotFound), ShouldBeTrue)
 			})
@@ -286,7 +286,7 @@ func TestDeleteContentItem_Integration(t *testing.T) {
 				created, err := repo.CreateContentItem(ctx, draftContentItem(t, tx))
 				So(err, ShouldBeNil)
 
-				So(repo.DeleteContentItem(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteContentItem(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				_, err = repo.GetContentItemByID(ctx, created.ID)
 				So(errors.Is(err, contentdomain.ErrContentItemNotFound), ShouldBeTrue)
@@ -298,9 +298,9 @@ func TestDeleteContentItem_Integration(t *testing.T) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 				created, err := repo.CreateContentItem(ctx, draftContentItem(t, tx))
 				So(err, ShouldBeNil)
-				So(repo.DeleteContentItem(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteContentItem(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
-				err = repo.DeleteContentItem(ctx, created.ID)
+				err = repo.DeleteContentItem(ctx, created.ID, created.CreatedByUserID)
 
 				So(errors.Is(err, contentdomain.ErrContentItemNotFound), ShouldBeTrue)
 			})
@@ -323,7 +323,7 @@ func TestUpdateContentItem_Integration(t *testing.T) {
 				created.Title = "Updated Title"
 				created.Description = &newDescription
 
-				err = repo.UpdateContentItem(ctx, created)
+				err = repo.UpdateContentItem(ctx, created, created.CreatedByUserID)
 				So(err, ShouldBeNil)
 
 				got, err := repo.GetContentItemByID(ctx, created.ID)
@@ -344,7 +344,7 @@ func TestUpdateContentItem_Integration(t *testing.T) {
 
 				created.Slug = other.Slug
 
-				err = repo.UpdateContentItem(ctx, created)
+				err = repo.UpdateContentItem(ctx, created, created.CreatedByUserID)
 
 				So(errors.Is(err, contentdomain.ErrInvalidSlug), ShouldBeTrue)
 			})
@@ -356,7 +356,7 @@ func TestUpdateContentItem_Integration(t *testing.T) {
 				ghost := draftContentItem(t, tx)
 				ghost.ID = "00000000-0000-0000-0000-000000000000"
 
-				err := repo.UpdateContentItem(ctx, ghost)
+				err := repo.UpdateContentItem(ctx, ghost, ghost.CreatedByUserID)
 
 				So(errors.Is(err, contentdomain.ErrContentItemNotFound), ShouldBeTrue)
 			})
@@ -376,15 +376,15 @@ func TestGetAllContentItemsByStatus_Integration(t *testing.T) {
 
 			published, err := repo.CreateContentItem(ctx, draftContentItem(t, tx))
 			So(err, ShouldBeNil)
-			So(repo.PublishContentItem(ctx, published.ID), ShouldBeNil)
+			So(repo.PublishContentItem(ctx, published.ID, published.CreatedByUserID), ShouldBeNil)
 
 			archived, err := repo.CreateContentItem(ctx, draftContentItem(t, tx))
 			So(err, ShouldBeNil)
-			So(repo.ArchiveContentItem(ctx, archived.ID), ShouldBeNil)
+			So(repo.ArchiveContentItem(ctx, archived.ID, archived.CreatedByUserID), ShouldBeNil)
 
 			deleted, err := repo.CreateContentItem(ctx, draftContentItem(t, tx))
 			So(err, ShouldBeNil)
-			So(repo.DeleteContentItem(ctx, deleted.ID), ShouldBeNil)
+			So(repo.DeleteContentItem(ctx, deleted.ID, deleted.CreatedByUserID), ShouldBeNil)
 
 			params := pagination.NewParams(1, 100)
 
@@ -408,7 +408,7 @@ func TestGetAllContentItemsByStatus_Integration(t *testing.T) {
 			Convey("GetAllArchivedContentItems includes the soft-deleted archived content item too", func() {
 				// GetAllArchivedContentItems intentionally omits `deleted_at IS NULL` — it's an
 				// admin "including soft-deleted ones" query per db-conventions.md.
-				So(repo.DeleteContentItem(ctx, archived.ID), ShouldBeNil)
+				So(repo.DeleteContentItem(ctx, archived.ID, archived.CreatedByUserID), ShouldBeNil)
 
 				got, err := repo.GetAllArchivedContentItems(ctx, params)
 				So(err, ShouldBeNil)

@@ -275,3 +275,111 @@ func TestCreateContentReviewAdmin(t *testing.T) {
 		})
 	})
 }
+
+func TestCreateArticleReview(t *testing.T) {
+	Convey("Create ArticleReview", t, func() {
+		aRepo := &mockReviewRepo{}
+		srv := newTestServiceWithArticleRepo(aRepo)
+
+		Convey("GetArticleReviewByUserAndArticleID error", func() {
+			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, testutil.ErrDBUnexpected
+			}
+
+			err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("GetArticleReviewByUserAndArticleID collision", func() {
+			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
+				return &reviewdomain.ArticleReview{}, nil
+			}
+
+			err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
+		})
+
+		Convey("CreateArticleReview error", func() {
+			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, reviewdomain.ErrReviewNotFound
+			}
+
+			aRepo.createArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error) {
+				return nil, testutil.ErrDBUnexpected
+			}
+
+			err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("success", func() {
+			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, reviewdomain.ErrReviewNotFound
+			}
+
+			aRepo.createArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error) {
+				return &reviewdomain.ArticleReview{}, nil
+			}
+
+			err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			So(err, ShouldBeNil)
+		})
+	})
+}
+
+func TestCreateArticleReviewAdmin(t *testing.T) {
+	Convey("Create ArticleReview as admin", t, func() {
+		aRepo := &mockReviewRepo{}
+		srv := newTestServiceWithArticleRepo(aRepo)
+
+		Convey("GetArticleReviewByUserAndArticleID error", func() {
+			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, testutil.ErrDBUnexpected
+			}
+
+			err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("GetArticleReviewByUserAndArticleID collision", func() {
+			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
+				return &reviewdomain.ArticleReview{}, nil
+			}
+
+			err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
+		})
+
+		Convey("CreateArticleReview error", func() {
+			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, reviewdomain.ErrReviewNotFound
+			}
+
+			aRepo.createArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error) {
+				return nil, testutil.ErrDBUnexpected
+			}
+
+			err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+
+		Convey("success", func() {
+			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, reviewdomain.ErrReviewNotFound
+			}
+
+			aRepo.createArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error) {
+				return &reviewdomain.ArticleReview{}, nil
+			}
+
+			err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			So(err, ShouldBeNil)
+		})
+	})
+}

@@ -20,4 +20,5 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 var (
 	_ reviewdomain.CourseReviewRepository  = (*Repository)(nil)
 	_ reviewdomain.ContentReviewRepository = (*Repository)(nil)
+	_ reviewdomain.ArticleReviewRepository = (*Repository)(nil)
 )

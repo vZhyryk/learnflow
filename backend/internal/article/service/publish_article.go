@@ -9,7 +9,7 @@ import (
 
 // PublishArticle publishes a draft Article, provided its article is ready, and emits a
 // notification event in the same transaction.
-func (s *Service) PublishArticle(ctx context.Context, articleID string) error {
+func (s *Service) PublishArticle(ctx context.Context, articleID, userID string) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		article, err := s.articleRepo.GetArticleByID(ctx, articleID)
 		if err != nil {
@@ -25,7 +25,7 @@ func (s *Service) PublishArticle(ctx context.Context, articleID string) error {
 			return fmt.Errorf("service.PublishArticle: %w", err)
 		}
 
-		err = s.articleRepo.PublishArticle(ctx, articleID)
+		err = s.articleRepo.PublishArticle(ctx, articleID, userID)
 		if err != nil {
 			return fmt.Errorf("service.PublishArticle: %w", err)
 		}

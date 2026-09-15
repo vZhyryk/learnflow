@@ -8,7 +8,7 @@ import (
 )
 
 // UpdateCourse patches an existing course, checking any new slug is not already in use.
-func (s *Service) UpdateCourse(ctx context.Context, req coursedomain.UpdateCourseRequest) error {
+func (s *Service) UpdateCourse(ctx context.Context, req coursedomain.UpdateCourseRequest, userID string) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		course, err := s.courseRepo.GetCourseByID(ctx, req.ID)
 		if err != nil {
@@ -25,7 +25,7 @@ func (s *Service) UpdateCourse(ctx context.Context, req coursedomain.UpdateCours
 			}
 		}
 		req.Apply(course)
-		if err := s.courseRepo.UpdateCourse(ctx, course); err != nil {
+		if err := s.courseRepo.UpdateCourse(ctx, course, userID); err != nil {
 			return fmt.Errorf("service.UpdateCourse: update: %w", err)
 		}
 		return nil

@@ -11,10 +11,10 @@ import (
 // mockCourseRepoRepo implements coursedomain.CourseRepository via function fields.
 type mockCourseRepoRepo struct {
 	createCourse           func(ctx context.Context, course *coursedomain.Course) (*coursedomain.Course, error)
-	publishCourse          func(ctx context.Context, courseID string) error
-	archiveCourse          func(ctx context.Context, courseID string) error
-	deleteCourse           func(ctx context.Context, courseID string) error
-	updateCourse           func(ctx context.Context, course *coursedomain.Course) error
+	publishCourse          func(ctx context.Context, courseID, userID string) error
+	archiveCourse          func(ctx context.Context, courseID, userID string) error
+	deleteCourse           func(ctx context.Context, courseID, userID string) error
+	updateCourse           func(ctx context.Context, course *coursedomain.Course, userID string) error
 	getAllPublishedCourses func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
 	getAllDraftCourses     func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
 	getAllArchivedCourses  func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
@@ -30,33 +30,33 @@ func (m *mockCourseRepoRepo) CreateCourse(ctx context.Context, course *coursedom
 
 	return m.createCourse(ctx, course)
 }
-func (m *mockCourseRepoRepo) PublishCourse(ctx context.Context, courseID string) error {
+func (m *mockCourseRepoRepo) PublishCourse(ctx context.Context, courseID, userID string) error {
 	if m.publishCourse == nil {
 		panic("mockCourseRepo.publishCourse not set")
 	}
 
-	return m.publishCourse(ctx, courseID)
+	return m.publishCourse(ctx, courseID, userID)
 }
-func (m *mockCourseRepoRepo) ArchiveCourse(ctx context.Context, courseID string) error {
+func (m *mockCourseRepoRepo) ArchiveCourse(ctx context.Context, courseID, userID string) error {
 	if m.archiveCourse == nil {
 		panic("mockCourseRepo.archiveCourse not set")
 	}
 
-	return m.archiveCourse(ctx, courseID)
+	return m.archiveCourse(ctx, courseID, userID)
 }
-func (m *mockCourseRepoRepo) DeleteCourse(ctx context.Context, courseID string) error {
+func (m *mockCourseRepoRepo) DeleteCourse(ctx context.Context, courseID, userID string) error {
 	if m.deleteCourse == nil {
 		panic("mockCourseRepo.deleteCourse not set")
 	}
 
-	return m.deleteCourse(ctx, courseID)
+	return m.deleteCourse(ctx, courseID, userID)
 }
-func (m *mockCourseRepoRepo) UpdateCourse(ctx context.Context, course *coursedomain.Course) error {
+func (m *mockCourseRepoRepo) UpdateCourse(ctx context.Context, course *coursedomain.Course, userID string) error {
 	if m.updateCourse == nil {
 		panic("mockCourseRepo.updateCourse not set")
 	}
 
-	return m.updateCourse(ctx, course)
+	return m.updateCourse(ctx, course, userID)
 }
 func (m *mockCourseRepoRepo) GetAllPublishedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
 	if m.getAllPublishedCourses == nil {
@@ -111,10 +111,10 @@ func alwaysError(_ context.Context, _ string) (*coursedomain.Course, error) {
 }
 
 // alwaysFailsErr is an updateCourse stub that always fails.
-func alwaysFailsErr(_ context.Context, _ *coursedomain.Course) error {
+func alwaysFailsErr(_ context.Context, _ *coursedomain.Course, _ string) error {
 	return testutil.ErrDBUnexpected
 }
 
-func alwaysSucceedsUpdate(_ context.Context, _ *coursedomain.Course) error {
+func alwaysSucceedsUpdate(_ context.Context, _ *coursedomain.Course, _ string) error {
 	return nil
 }

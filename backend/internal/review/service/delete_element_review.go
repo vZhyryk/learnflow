@@ -54,3 +54,27 @@ func (s *Service) DeleteContentReviewAdmin(ctx context.Context, reviewID, userID
 	}
 	return nil
 }
+
+func (s *Service) DeleteArticleReview(ctx context.Context, reviewID, userID string) error {
+	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		currentReview, err := s.articleRepo.GetArticleReviewByID(ctx, reviewID)
+		if err != nil {
+			return fmt.Errorf("service.DeleteArticleReview: fetch review: %w", err)
+		}
+		if currentReview.UserID != userID {
+			return reviewdomain.ErrReviewNotFound
+		}
+
+		if err = s.articleRepo.DeleteArticleReview(ctx, reviewID, userID); err != nil {
+			return fmt.Errorf("service.DeleteArticleReview: %w", err)
+		}
+		return nil
+	})
+}
+
+func (s *Service) DeleteArticleReviewAdmin(ctx context.Context, reviewID, userID string) error {
+	if err := s.articleRepo.DeleteArticleReview(ctx, reviewID, userID); err != nil {
+		return fmt.Errorf("service.DeleteArticleReviewAdmin: %w", err)
+	}
+	return nil
+}

@@ -8,7 +8,7 @@ import (
 )
 
 // UpdateArticle applies a partial update to an existing article, re-checking slug uniqueness if it changed.
-func (s *Service) UpdateArticle(ctx context.Context, req articledomain.UpdateArticleRequest) error {
+func (s *Service) UpdateArticle(ctx context.Context, req articledomain.UpdateArticleRequest, userID string) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		article, err := s.articleRepo.GetArticleByID(ctx, req.ID)
 		if err != nil {
@@ -25,7 +25,7 @@ func (s *Service) UpdateArticle(ctx context.Context, req articledomain.UpdateArt
 			}
 		}
 		req.Apply(article)
-		if err := s.articleRepo.UpdateArticle(ctx, article); err != nil {
+		if err := s.articleRepo.UpdateArticle(ctx, article, userID); err != nil {
 			return fmt.Errorf("service.UpdateArticle: update: %w", err)
 		}
 		return nil

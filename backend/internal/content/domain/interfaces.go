@@ -13,10 +13,10 @@ type Transactor interface {
 // ContentRepository defines persistence operations for ContentItem.
 type ContentRepository interface {
 	CreateContentItem(ctx context.Context, contentItem *ContentItem) (*ContentItem, error)
-	PublishContentItem(ctx context.Context, contentItemID string) error
-	ArchiveContentItem(ctx context.Context, contentItemID string) error
-	DeleteContentItem(ctx context.Context, contentItemID string) error
-	UpdateContentItem(ctx context.Context, contentItem *ContentItem) error
+	PublishContentItem(ctx context.Context, contentItemID, userID string) error
+	ArchiveContentItem(ctx context.Context, contentItemID, userID string) error
+	DeleteContentItem(ctx context.Context, contentItemID, userID string) error
+	UpdateContentItem(ctx context.Context, contentItem *ContentItem, userID string) error
 	GetAllPublishedContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, error)
 	GetAllDraftContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, error)
 	GetAllArchivedContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, error)
@@ -27,11 +27,11 @@ type ContentRepository interface {
 
 // Service defines the content module's business logic operations.
 type Service interface {
-	ArchiveContentItem(ctx context.Context, contentItemID string) error
+	ArchiveContentItem(ctx context.Context, contentItemID, userID string) error
 	CreateContentItem(ctx context.Context, req CreateContentItemRequest) (string, error)
-	DeleteContentItem(ctx context.Context, contentItemID string) error
+	DeleteContentItem(ctx context.Context, contentItemID, userID string) error
 	GetContentItemBySlug(ctx context.Context, slug string) (*ContentItem, error)
-	PublishContentItem(ctx context.Context, contentItemID string) error
-	UpdateContentItem(ctx context.Context, req UpdateContentItemRequest) error
+	PublishContentItem(ctx context.Context, contentItemID, userID string) error
+	UpdateContentItem(ctx context.Context, req UpdateContentItemRequest, userID string) error
 	GetAllContentItems(ctx context.Context, getType ContentItemStatus, params pagination.Params) (contentItemList []*ContentItem, err error)
 }

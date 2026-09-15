@@ -25,7 +25,7 @@ func TestUpdateCourse(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID"})
+			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID"}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -38,7 +38,7 @@ func TestUpdateCourse(t *testing.T) {
 
 			srv := newTestService(cRepo, nil)
 			slug := "New Slug"
-			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: &slug})
+			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -53,7 +53,7 @@ func TestUpdateCourse(t *testing.T) {
 
 			srv := newTestService(cRepo, nil)
 			slug := "New Slug"
-			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: &slug})
+			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, coursedomain.ErrInvalidSlug), ShouldBeTrue)
 		})
@@ -67,7 +67,7 @@ func TestUpdateCourse(t *testing.T) {
 
 			srv := newTestService(cRepo, nil)
 			slug := "New Slug"
-			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: &slug})
+			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -80,7 +80,7 @@ func TestUpdateCourse(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: nil})
+			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: nil}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -93,7 +93,7 @@ func TestUpdateCourse(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: nil})
+			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: nil}, "user-1")
 			So(err, ShouldBeNil)
 		})
 	})

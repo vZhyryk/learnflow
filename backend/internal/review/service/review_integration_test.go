@@ -68,7 +68,7 @@ func grantContentAccess(t *testing.T, tx pgx.Tx, userID, contentID string) {
 // both backed by tx, with a NoopTransactor (see package doc comment above for why).
 func newIntegrationService(tx pgx.Tx) (*Service, *reviewrepository.Repository) {
 	repo := &reviewrepository.Repository{BaseRepository: sharedrepository.BaseRepository{DB: tx}}
-	return New(repo, repo, testutil.NoopTransactor{}, access.New(tx)), repo
+	return New(repo, repo, repo, testutil.NoopTransactor{}, access.New(tx)), repo
 }
 
 func TestCreateCourseReview_ServiceIntegration(t *testing.T) {

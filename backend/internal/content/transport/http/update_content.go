@@ -16,7 +16,7 @@ func (h *Handler) updateContentItem(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
 
-	err := h.svc.UpdateContentItem(ctx, req)
+	err := h.svc.UpdateContentItem(ctx, req, user.ID)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return

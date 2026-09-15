@@ -4,7 +4,8 @@ const (
 	contentColumns = `
     id, slug, title, content_type, description, body, video_url, file_url, estimated_minutes,
 	estimated_pages, thumbnail_url, seo_title, seo_description, og_image_url, canonical_url,
-    is_indexable, status, created_by_user_id, created_at, updated_at, published_at, deleted_at
+    is_indexable, status, created_by_user_id, created_at, updated_at, updated_by_user_id,
+	published_at, published_by_user_id, deleted_at, deleted_by_user_id, archived_at, archived_by_user_id
 	`
 
 	createDraftContentItemSQL = `
@@ -15,19 +16,23 @@ const (
 	publishContentItemSQL = `
 		UPDATE content_items
 		SET status = 'published',
-		published_at = now()
+		published_at = now(),
+		published_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
 	archiveContentItemSQL = `
 		UPDATE content_items
-		SET status = 'archived'
+		SET status = 'archived',
+		archived_at = now(),
+		archived_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
 	deleteContentItemSQL = `
 		UPDATE content_items
-		SET deleted_at = now()
+		SET deleted_at = now(),
+		deleted_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
@@ -48,6 +53,7 @@ const (
 			og_image_url = $13,
 			canonical_url = $14,
 			is_indexable = $15,
+			updated_by_user_id = $16,
 			updated_at = now()
 		WHERE id = $1 AND deleted_at IS NULL
 	`

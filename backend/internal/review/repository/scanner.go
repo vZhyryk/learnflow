@@ -16,6 +16,7 @@ func scanCourseReview(row repository.RowScanner) (*reviewdomain.CourseReview, er
 		&course.CreatedAt,
 		&course.UpdatedAt,
 		&course.DeletedAt,
+		&course.DeletedByUserID,
 	)
 	if err != nil {
 		return nil, err
@@ -34,9 +35,29 @@ func scanContentReview(row repository.RowScanner) (*reviewdomain.ContentReview, 
 		&content.CreatedAt,
 		&content.UpdatedAt,
 		&content.DeletedAt,
+		&content.DeletedByUserID,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return content, nil
+}
+
+func scanArticleReview(row repository.RowScanner) (*reviewdomain.ArticleReview, error) {
+	article := &reviewdomain.ArticleReview{}
+	err := row.Scan(
+		&article.ID,
+		&article.ArticleID,
+		&article.UserID,
+		&article.Rating,
+		&article.Comment,
+		&article.CreatedAt,
+		&article.UpdatedAt,
+		&article.DeletedAt,
+		&article.DeletedByUserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return article, nil
 }

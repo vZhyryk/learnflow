@@ -136,49 +136,29 @@ func TestGetCourseBySlug(t *testing.T) {
 	})
 }
 
-// testExecCourseMethod covers the shared shape of PublishCourse/ArchiveCourse/DeleteCourse:
-// Exec, map 0 rows affected to ErrCourseNotFound, wrap any other error. Shared here instead
-// of writing the same three Convey blocks three times over.
-func testExecCourseMethod(t *testing.T, methodName string, call func(*Repository, context.Context, string) error) {
-	Convey("Given a course repository", t, func() {
-		var execTag pgconn.CommandTag
-		var execErr error
-		repo := newTestRepo(&testutil.MockQueryRunner{
-			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-				return execTag, execErr
-			},
-		})
-
-		Convey("When it succeeds", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 1")
-			So(call(repo, context.Background(), "course-123"), ShouldBeNil)
-		})
-
-		Convey("When no row is matched (course not found)", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 0")
-			err := call(repo, context.Background(), "unknown")
-			So(errors.Is(err, coursedomain.ErrCourseNotFound), ShouldBeTrue)
-		})
-
-		Convey("When the database returns an unexpected error", func() {
-			execErr = testutil.ErrDBUnexpected
-			err := call(repo, context.Background(), "course-123")
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "repository."+methodName)
-		})
-	})
+// bindCourseExec adapts a repository exec method into the shape testutil.TestExecMethod
+// expects: build a repo around the given runner, return the bound method.
+func bindCourseExec(
+	call func(*Repository, context.Context, string, string) error,
+) func(*testutil.MockQueryRunner) func(context.Context, string, string) error {
+	return func(runner *testutil.MockQueryRunner) func(context.Context, string, string) error {
+		repo := newTestRepo(runner)
+		return func(ctx context.Context, id, userID string) error {
+			return call(repo, ctx, id, userID)
+		}
+	}
 }
 
 func TestPublishCourse(t *testing.T) {
-	testExecCourseMethod(t, "PublishCourse", (*Repository).PublishCourse)
+	testutil.TestExecMethod(t, "PublishCourse", bindCourseExec((*Repository).PublishCourse), coursedomain.ErrCourseNotFound)
 }
 
 func TestArchiveCourse(t *testing.T) {
-	testExecCourseMethod(t, "ArchiveCourse", (*Repository).ArchiveCourse)
+	testutil.TestExecMethod(t, "ArchiveCourse", bindCourseExec((*Repository).ArchiveCourse), coursedomain.ErrCourseNotFound)
 }
 
 func TestDeleteCourse(t *testing.T) {
-	testExecCourseMethod(t, "DeleteCourse", (*Repository).DeleteCourse)
+	testutil.TestExecMethod(t, "DeleteCourse", bindCourseExec((*Repository).DeleteCourse), coursedomain.ErrCourseNotFound)
 }
 
 func TestUpdateCourse(t *testing.T) {
@@ -194,31 +174,31 @@ func TestUpdateCourse(t *testing.T) {
 
 		Convey("When update succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			So(repo.UpdateCourse(context.Background(), course), ShouldBeNil)
+			So(repo.UpdateCourse(context.Background(), course, "user-1"), ShouldBeNil)
 		})
 
 		Convey("When no row is matched (course not found)", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 0")
-			err := repo.UpdateCourse(context.Background(), course)
+			err := repo.UpdateCourse(context.Background(), course, "user-1")
 			So(errors.Is(err, coursedomain.ErrCourseNotFound), ShouldBeTrue)
 		})
 
 		Convey("When the new slug is already taken (pg 23505)", func() {
 			execErr = &pgconn.PgError{Code: "23505", ConstraintName: "courses_slug_unique"}
-			err := repo.UpdateCourse(context.Background(), course)
+			err := repo.UpdateCourse(context.Background(), course, "user-1")
 			So(errors.Is(err, coursedomain.ErrInvalidSlug), ShouldBeTrue)
 		})
 
 		Convey("When an unrelated unique violation occurs (pg 23505, different constraint)", func() {
 			execErr = &pgconn.PgError{Code: "23505", ConstraintName: "some_other_constraint"}
-			err := repo.UpdateCourse(context.Background(), course)
+			err := repo.UpdateCourse(context.Background(), course, "user-1")
 			So(errors.Is(err, coursedomain.ErrInvalidSlug), ShouldBeFalse)
 			So(err, ShouldNotBeNil)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
 			execErr = testutil.ErrDBUnexpected
-			err := repo.UpdateCourse(context.Background(), course)
+			err := repo.UpdateCourse(context.Background(), course, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "repository.UpdateCourse")
 		})

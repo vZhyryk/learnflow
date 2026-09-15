@@ -94,3 +94,47 @@ func (h *Handler) updateContentReview(w http.ResponseWriter, r *http.Request) {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
 }
+
+func (h *Handler) updateArticleReviewAdmin(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := appcontext.MustUserFromContext(ctx)
+
+	var req reviewdomain.UpdateArticleReviewRequest
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
+		return
+	}
+
+	err := h.svc.UpdateArticleReviewAdmin(ctx, req)
+	if err != nil {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
+
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "Article review updated successfully"}, nil)
+	if err != nil {
+		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
+	}
+}
+
+func (h *Handler) updateArticleReview(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := appcontext.MustUserFromContext(ctx)
+
+	var req reviewdomain.UpdateArticleReviewRequest
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, func() {
+		req.UserID = user.ID
+	}) {
+		return
+	}
+
+	err := h.svc.UpdateArticleReview(ctx, req)
+	if err != nil {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
+
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "Article review updated successfully"}, nil)
+	if err != nil {
+		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
+	}
+}

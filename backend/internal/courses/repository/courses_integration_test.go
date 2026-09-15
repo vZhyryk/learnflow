@@ -173,7 +173,7 @@ func TestGetCourseByID_Integration(t *testing.T) {
 				seed := draftCourse(t, tx)
 				created, err := repo.CreateCourse(ctx, seed)
 				So(err, ShouldBeNil)
-				So(repo.DeleteCourse(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteCourse(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				_, err = repo.GetCourseByID(ctx, created.ID)
 
@@ -223,7 +223,7 @@ func TestPublishCourse_Integration(t *testing.T) {
 				created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 				So(err, ShouldBeNil)
 
-				So(repo.PublishCourse(ctx, created.ID), ShouldBeNil)
+				So(repo.PublishCourse(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				got, err := repo.GetCourseByID(ctx, created.ID)
 				So(err, ShouldBeNil)
@@ -236,7 +236,7 @@ func TestPublishCourse_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 
-				err := repo.PublishCourse(ctx, "00000000-0000-0000-0000-000000000000")
+				err := repo.PublishCourse(ctx, "00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000000")
 
 				So(errors.Is(err, coursedomain.ErrCourseNotFound), ShouldBeTrue)
 			})
@@ -254,7 +254,7 @@ func TestArchiveCourse_Integration(t *testing.T) {
 				created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 				So(err, ShouldBeNil)
 
-				So(repo.ArchiveCourse(ctx, created.ID), ShouldBeNil)
+				So(repo.ArchiveCourse(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				got, err := repo.GetCourseByID(ctx, created.ID)
 				So(err, ShouldBeNil)
@@ -266,7 +266,7 @@ func TestArchiveCourse_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 
-				err := repo.ArchiveCourse(ctx, "00000000-0000-0000-0000-000000000000")
+				err := repo.ArchiveCourse(ctx, "00000000-0000-0000-0000-000000000000", "00000000-0000-0000-0000-000000000000")
 
 				So(errors.Is(err, coursedomain.ErrCourseNotFound), ShouldBeTrue)
 			})
@@ -284,7 +284,7 @@ func TestDeleteCourse_Integration(t *testing.T) {
 				created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 				So(err, ShouldBeNil)
 
-				So(repo.DeleteCourse(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteCourse(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
 				_, err = repo.GetCourseByID(ctx, created.ID)
 				So(errors.Is(err, coursedomain.ErrCourseNotFound), ShouldBeTrue)
@@ -296,9 +296,9 @@ func TestDeleteCourse_Integration(t *testing.T) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 				created, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 				So(err, ShouldBeNil)
-				So(repo.DeleteCourse(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteCourse(ctx, created.ID, created.CreatedByUserID), ShouldBeNil)
 
-				err = repo.DeleteCourse(ctx, created.ID)
+				err = repo.DeleteCourse(ctx, created.ID, created.CreatedByUserID)
 
 				So(errors.Is(err, coursedomain.ErrCourseNotFound), ShouldBeTrue)
 			})
@@ -321,7 +321,7 @@ func TestUpdateCourse_Integration(t *testing.T) {
 				created.Title = "Updated Title"
 				created.Description = &newDescription
 
-				err = repo.UpdateCourse(ctx, created)
+				err = repo.UpdateCourse(ctx, created, created.CreatedByUserID)
 				So(err, ShouldBeNil)
 
 				got, err := repo.GetCourseByID(ctx, created.ID)
@@ -342,7 +342,7 @@ func TestUpdateCourse_Integration(t *testing.T) {
 
 				created.Slug = other.Slug
 
-				err = repo.UpdateCourse(ctx, created)
+				err = repo.UpdateCourse(ctx, created, created.CreatedByUserID)
 
 				So(errors.Is(err, coursedomain.ErrInvalidSlug), ShouldBeTrue)
 			})
@@ -354,7 +354,7 @@ func TestUpdateCourse_Integration(t *testing.T) {
 				ghost := draftCourse(t, tx)
 				ghost.ID = "00000000-0000-0000-0000-000000000000"
 
-				err := repo.UpdateCourse(ctx, ghost)
+				err := repo.UpdateCourse(ctx, ghost, ghost.CreatedByUserID)
 
 				So(errors.Is(err, coursedomain.ErrCourseNotFound), ShouldBeTrue)
 			})
@@ -374,15 +374,15 @@ func TestGetAllCoursesByStatus_Integration(t *testing.T) {
 
 			published, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 			So(err, ShouldBeNil)
-			So(repo.PublishCourse(ctx, published.ID), ShouldBeNil)
+			So(repo.PublishCourse(ctx, published.ID, published.CreatedByUserID), ShouldBeNil)
 
 			archived, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 			So(err, ShouldBeNil)
-			So(repo.ArchiveCourse(ctx, archived.ID), ShouldBeNil)
+			So(repo.ArchiveCourse(ctx, archived.ID, archived.CreatedByUserID), ShouldBeNil)
 
 			deleted, err := repo.CreateCourse(ctx, draftCourse(t, tx))
 			So(err, ShouldBeNil)
-			So(repo.DeleteCourse(ctx, deleted.ID), ShouldBeNil)
+			So(repo.DeleteCourse(ctx, deleted.ID, deleted.CreatedByUserID), ShouldBeNil)
 
 			params := pagination.NewParams(1, 100)
 
@@ -406,7 +406,7 @@ func TestGetAllCoursesByStatus_Integration(t *testing.T) {
 			Convey("GetAllArchivedCourses includes the soft-deleted archived course too", func() {
 				// GetAllArchivedCourses intentionally omits `deleted_at IS NULL` — it's an
 				// admin "including soft-deleted ones" query per db-conventions.md.
-				So(repo.DeleteCourse(ctx, archived.ID), ShouldBeNil)
+				So(repo.DeleteCourse(ctx, archived.ID, archived.CreatedByUserID), ShouldBeNil)
 
 				got, err := repo.GetAllArchivedCourses(ctx, params)
 				So(err, ShouldBeNil)

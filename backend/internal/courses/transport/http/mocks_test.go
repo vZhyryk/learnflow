@@ -57,20 +57,20 @@ func newHTTPFixture(svc *mockService, method, path string) *httpFixture {
 }
 
 type mockService struct {
-	archiveCourse   func(ctx context.Context, courseID string) error
+	archiveCourse   func(ctx context.Context, courseID, userID string) error
 	createCourse    func(ctx context.Context, req coursedomain.CreateCourseRequest) (string, error)
-	deleteCourse    func(ctx context.Context, courseID string) error
+	deleteCourse    func(ctx context.Context, courseID, userID string) error
 	getCourseBySlug func(ctx context.Context, slug string) (*coursedomain.Course, error)
-	publishCourse   func(ctx context.Context, courseID string) error
-	updateCourse    func(ctx context.Context, req coursedomain.UpdateCourseRequest) error
+	publishCourse   func(ctx context.Context, courseID, userID string) error
+	updateCourse    func(ctx context.Context, req coursedomain.UpdateCourseRequest, userID string) error
 	getAllCourses   func(ctx context.Context, getType coursedomain.CourseStatus, params pagination.Params) (courseList []*coursedomain.Course, err error)
 }
 
-func (m *mockService) ArchiveCourse(ctx context.Context, courseID string) error {
+func (m *mockService) ArchiveCourse(ctx context.Context, courseID, userID string) error {
 	if m.archiveCourse == nil {
 		panic("mockService.archiveCourse not set")
 	}
-	return m.archiveCourse(ctx, courseID)
+	return m.archiveCourse(ctx, courseID, userID)
 }
 func (m *mockService) CreateCourse(ctx context.Context, req coursedomain.CreateCourseRequest) (string, error) {
 	if m.createCourse == nil {
@@ -79,11 +79,11 @@ func (m *mockService) CreateCourse(ctx context.Context, req coursedomain.CreateC
 	return m.createCourse(ctx, req)
 }
 
-func (m *mockService) DeleteCourse(ctx context.Context, courseID string) error {
+func (m *mockService) DeleteCourse(ctx context.Context, courseID, userID string) error {
 	if m.deleteCourse == nil {
 		panic("mockService.deleteCourse not set")
 	}
-	return m.deleteCourse(ctx, courseID)
+	return m.deleteCourse(ctx, courseID, userID)
 }
 
 func (m *mockService) GetCourseBySlug(ctx context.Context, slug string) (*coursedomain.Course, error) {
@@ -92,17 +92,17 @@ func (m *mockService) GetCourseBySlug(ctx context.Context, slug string) (*course
 	}
 	return m.getCourseBySlug(ctx, slug)
 }
-func (m *mockService) PublishCourse(ctx context.Context, courseID string) error {
+func (m *mockService) PublishCourse(ctx context.Context, courseID, userID string) error {
 	if m.publishCourse == nil {
 		panic("mockService.publishCourse not set")
 	}
-	return m.publishCourse(ctx, courseID)
+	return m.publishCourse(ctx, courseID, userID)
 }
-func (m *mockService) UpdateCourse(ctx context.Context, req coursedomain.UpdateCourseRequest) error {
+func (m *mockService) UpdateCourse(ctx context.Context, req coursedomain.UpdateCourseRequest, userID string) error {
 	if m.updateCourse == nil {
 		panic("mockService.updateCourse not set")
 	}
-	return m.updateCourse(ctx, req)
+	return m.updateCourse(ctx, req, userID)
 }
 func (m *mockService) GetAllCourses(ctx context.Context, getType coursedomain.CourseStatus, params pagination.Params) (courseList []*coursedomain.Course, err error) {
 	if m.getAllCourses == nil {

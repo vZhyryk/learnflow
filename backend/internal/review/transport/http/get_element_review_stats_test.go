@@ -106,3 +106,52 @@ func TestContentReviewStats(t *testing.T) {
 		})
 	})
 }
+
+func TestArticleReviewStats(t *testing.T) {
+	Convey("GET /api/v1/articles/{id}/reviews/stats", t, func() {
+		var svcErr error
+		var svcRating float64
+		var svcCount int
+		svc := &mockService{
+			getArticleReviewStats: func(_ context.Context, _ string) (float64, int, error) {
+				return svcRating, svcCount, svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/articles/"+validArticleID+"/reviews/stats")
+		mux, newReq := f.mux, f.newReq
+
+		Convey("No user in context → still succeeds (public route)", func() {
+			w := testutil.ServeHTTP(mux, newReq("", nil))
+			So(w.Code, ShouldEqual, http.StatusOK)
+		})
+
+		Convey("invalid article id → 422", func() {
+			f := newHTTPFixture(svc, http.MethodGet, "/api/v1/articles/---/reviews/stats")
+			mux, newReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(mux, newReq("", nil))
+			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
+		})
+
+		Convey("unexpected service error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, newReq("", nil))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 200 with rating and count", func() {
+			svcRating, svcCount = 4.1, 7
+			w := testutil.ServeHTTP(mux, newReq("", nil))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["rating"], ShouldEqual, 4.1)
+			So(body["count"], ShouldEqual, float64(7))
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, newReq("", nil))
+			}, ShouldNotPanic)
+		})
+	})
+}

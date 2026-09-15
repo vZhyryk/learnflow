@@ -71,9 +71,14 @@ type ContentItem struct {
 	Status                ContentItemStatus `json:"status"`
 	CreatedByUserID       string            `json:"created_by_user_id"`
 	CreatedAt             time.Time         `json:"created_at"`
-	UpdatedAt             time.Time         `json:"updated_at"`
+	UpdatedAt             *time.Time        `json:"updated_at"`
+	UpdatedByUserID       *string           `json:"updated_by_user_id"`
 	PublishedAt           *time.Time        `json:"published_at"`
+	PublishedByUserID     *string           `json:"published_by_user_id"`
 	DeletedAt             *time.Time        `json:"deleted_at"`
+	DeletedByUserID       *string           `json:"deleted_by_user_id"`
+	ArchivedAt            *time.Time        `json:"archived_at"`
+	ArchivedByUserID      *string           `json:"archived_by_user_id"`
 	Announcement          *string           `json:"announcement"`
 	AnnouncementExpiresAt *time.Time        `json:"announcement_expires_at"`
 }

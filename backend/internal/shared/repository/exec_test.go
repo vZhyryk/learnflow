@@ -25,19 +25,19 @@ func TestExecUpdateByID(t *testing.T) {
 
 		Convey("When it succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := ExecUpdateByID(context.Background(), rep, "UPDATE items SET x = $1 WHERE id = $2", "MyMethod", "item-123", notFoundErr)
+			err := ExecUpdateByID(context.Background(), rep, "UPDATE items SET x = $1 WHERE id = $2", "MyMethod", "item-123", "user-1", notFoundErr)
 			So(err, ShouldBeNil)
 		})
 
 		Convey("When no row is matched", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 0")
-			err := ExecUpdateByID(context.Background(), rep, "UPDATE items SET x = $1 WHERE id = $2", "MyMethod", "unknown", notFoundErr)
+			err := ExecUpdateByID(context.Background(), rep, "UPDATE items SET x = $1 WHERE id = $2", "MyMethod", "unknown", "user-1", notFoundErr)
 			So(errors.Is(err, notFoundErr), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
 			execErr = testutil.ErrDBUnexpected
-			err := ExecUpdateByID(context.Background(), rep, "UPDATE items SET x = $1 WHERE id = $2", "MyMethod", "item-123", notFoundErr)
+			err := ExecUpdateByID(context.Background(), rep, "UPDATE items SET x = $1 WHERE id = $2", "MyMethod", "item-123", "user-1", notFoundErr)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "repository.MyMethod")
 		})

@@ -32,7 +32,7 @@ func TestPublishArticle(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishArticle(context.Background(), "article_ID")
+			err := srv.PublishArticle(context.Background(), "article_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
@@ -45,7 +45,7 @@ func TestPublishArticle(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishArticle(context.Background(), "article_ID")
+			err := srv.PublishArticle(context.Background(), "article_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, articledomain.ErrInvalidArticleStatus), ShouldBeTrue)
 		})
@@ -58,7 +58,7 @@ func TestPublishArticle(t *testing.T) {
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishArticle(context.Background(), "article_ID")
+			err := srv.PublishArticle(context.Background(), "article_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "service.PublishArticle")
 		})
@@ -66,11 +66,11 @@ func TestPublishArticle(t *testing.T) {
 		Convey("PublishArticle - publish error", func() {
 			cRepo := &mockArticleRepo{
 				getArticleByID: validGetArticleByID,
-				publishArticle: testutil.AlwaysFailsDB,
+				publishArticle: testutil.AlwaysFailsDB2,
 			}
 
 			srv := newTestService(cRepo, nil)
-			err := srv.PublishArticle(context.Background(), "article_ID")
+			err := srv.PublishArticle(context.Background(), "article_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "service.PublishArticle")
 		})
@@ -78,11 +78,11 @@ func TestPublishArticle(t *testing.T) {
 		Convey("PublishArticle - outbox emit error", func() {
 			cRepo := &mockArticleRepo{
 				getArticleByID: validGetArticleByID,
-				publishArticle: testutil.AlwaysNil,
+				publishArticle: testutil.AlwaysNil2,
 			}
 
 			srv := newTestService(cRepo, testutil.NewFailingOutbox(testutil.ErrDBUnexpected))
-			err := srv.PublishArticle(context.Background(), "article_ID")
+			err := srv.PublishArticle(context.Background(), "article_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -90,12 +90,12 @@ func TestPublishArticle(t *testing.T) {
 		Convey("Successful", func() {
 			cRepo := &mockArticleRepo{
 				getArticleByID: validGetArticleByID,
-				publishArticle: testutil.AlwaysNil,
+				publishArticle: testutil.AlwaysNil2,
 			}
 			var captured []any
 
 			srv := newTestService(cRepo, testutil.NewCapturingOutbox(&captured))
-			err := srv.PublishArticle(context.Background(), "article_ID")
+			err := srv.PublishArticle(context.Background(), "article_ID", "user-1")
 			So(err, ShouldBeNil)
 		})
 	})

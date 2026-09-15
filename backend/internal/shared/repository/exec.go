@@ -7,8 +7,8 @@ import (
 
 // ExecUpdateByID runs a single-row status-change UPDATE, wrapping errors and mapping 0 rows
 // affected to notFoundErr.
-func ExecUpdateByID(ctx context.Context, rep *BaseRepository, sql, methodName, itemID string, notFoundErr error) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, sql, itemID)
+func ExecUpdateByID(ctx context.Context, rep *BaseRepository, sql, methodName, itemID, userID string, notFoundErr error) error {
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, sql, itemID, userID)
 	if err != nil {
 		return fmt.Errorf("repository.%s: %w", methodName, err)
 	}
