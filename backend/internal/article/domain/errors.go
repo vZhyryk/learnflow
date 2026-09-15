@@ -7,13 +7,15 @@ import "errors"
 var (
 	ErrArticleNotFound = errors.New("Article not found")
 
-	ErrInvalidSlug           = errors.New("invalid slug")
-	ErrInvalidTitle          = errors.New("invalid title")
-	ErrInvalidSeoTitle       = errors.New("invalid seo title")
-	ErrInvalidSeoDescription = errors.New("invalid seo description")
-	ErrInvalidOgImageURL     = errors.New("invalid og image url")
-	ErrInvalidBody           = errors.New("invalid body")
-	ErrInvalidExcerpt        = errors.New("invalid Excerpt")
+	ErrInvalidSlug               = errors.New("invalid slug")
+	ErrInvalidTitle              = errors.New("invalid title")
+	ErrInvalidSeoTitle           = errors.New("invalid seo title")
+	ErrInvalidSeoDescription     = errors.New("invalid seo description")
+	ErrInvalidOgImageURL         = errors.New("invalid og image url")
+	ErrInvalidBody               = errors.New("invalid body")
+	ErrInvalidDescription        = errors.New("invalid description")
+	ErrInvalidAnnouncement       = errors.New("invalid announcement")
+	ErrInvalidAnnouncedExpiredAt = errors.New("invalid announced_expired_at")
 
 	ErrInvalidArticleID = errors.New("invalid Article ID")
 

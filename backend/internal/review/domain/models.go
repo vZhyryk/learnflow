@@ -9,14 +9,15 @@ import (
 
 // CourseReview is a user's rating and comment on a course.
 type CourseReview struct {
-	ID        string     `json:"id"`
-	CourseID  string     `json:"course_id"`
-	UserID    string     `json:"user_id"`
-	Rating    int        `json:"rating"`
-	Comment   *string    `json:"comment"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	DeletedAt *time.Time `json:"deleted_at"`
+	ID              string     `json:"id"`
+	CourseID        string     `json:"course_id"`
+	UserID          string     `json:"user_id"`
+	Rating          int        `json:"rating"`
+	Comment         *string    `json:"comment"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	DeletedAt       *time.Time `json:"deleted_at"`
+	DeletedByUserID *string    `json:"deleted_by_user_id"`
 }
 
 // CreateCourseReviewRequest is the input for creating a CourseReview.
@@ -152,14 +153,15 @@ func (r UpdateCourseReviewRequest) applyComment(p *CourseReview) {
 
 // ContentReview is a user's rating and comment on a content item.
 type ContentReview struct {
-	ID        string     `json:"id"`
-	ContentID string     `json:"content_id"`
-	UserID    string     `json:"user_id"`
-	Rating    int        `json:"rating"`
-	Comment   *string    `json:"comment"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	DeletedAt *time.Time `json:"deleted_at"`
+	ID              string     `json:"id"`
+	ContentID       string     `json:"content_id"`
+	UserID          string     `json:"user_id"`
+	Rating          int        `json:"rating"`
+	Comment         *string    `json:"comment"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	DeletedAt       *time.Time `json:"deleted_at"`
+	DeletedByUserID *string    `json:"deleted_by_user_id"`
 }
 
 // CreateContentReviewRequest is the input for creating a ContentReview.

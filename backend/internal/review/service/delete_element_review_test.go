@@ -16,7 +16,7 @@ func TestDeleteCourseReview(t *testing.T) {
 			getCourseReviewByID: func(_ context.Context, _ string) (*reviewdomain.CourseReview, error) {
 				return &reviewdomain.CourseReview{ID: "review-1", UserID: "user-1"}, nil
 			},
-			deleteCourseReview: func(_ context.Context, _ string) error {
+			deleteCourseReview: func(_ context.Context, _, _ string) error {
 				return nil
 			},
 		}
@@ -43,7 +43,7 @@ func TestDeleteCourseReview(t *testing.T) {
 		})
 
 		Convey("repository delete error", func() {
-			cRepo.deleteCourseReview = func(_ context.Context, _ string) error {
+			cRepo.deleteCourseReview = func(_ context.Context, _, _ string) error {
 				return testutil.ErrDBUnexpected
 			}
 
@@ -65,7 +65,7 @@ func TestDeleteContentReview(t *testing.T) {
 			getContentReviewByID: func(_ context.Context, _ string) (*reviewdomain.ContentReview, error) {
 				return &reviewdomain.ContentReview{ID: "review-1", UserID: "user-1"}, nil
 			},
-			deleteContentReview: func(_ context.Context, _ string) error {
+			deleteContentReview: func(_ context.Context, _, _ string) error {
 				return nil
 			},
 		}
@@ -92,7 +92,7 @@ func TestDeleteContentReview(t *testing.T) {
 		})
 
 		Convey("repository delete error", func() {
-			cRepo.deleteContentReview = func(_ context.Context, _ string) error {
+			cRepo.deleteContentReview = func(_ context.Context, _, _ string) error {
 				return testutil.ErrDBUnexpected
 			}
 
@@ -114,21 +114,21 @@ func TestDeleteCourseReviewAdmin(t *testing.T) {
 		srv := newTestService(cRepo, nil, nil)
 
 		Convey("repository delete error", func() {
-			cRepo.deleteCourseReview = func(_ context.Context, _ string) error {
+			cRepo.deleteCourseReview = func(_ context.Context, _, _ string) error {
 				return testutil.ErrDBUnexpected
 			}
 
-			err := srv.DeleteCourseReviewAdmin(context.Background(), "review-1")
+			err := srv.DeleteCourseReviewAdmin(context.Background(), "review-1", "admin-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
 
 		Convey("success", func() {
-			cRepo.deleteCourseReview = func(_ context.Context, _ string) error {
+			cRepo.deleteCourseReview = func(_ context.Context, _, _ string) error {
 				return nil
 			}
 
-			err := srv.DeleteCourseReviewAdmin(context.Background(), "review-1")
+			err := srv.DeleteCourseReviewAdmin(context.Background(), "review-1", "admin-1")
 			So(err, ShouldBeNil)
 		})
 	})
@@ -140,21 +140,21 @@ func TestDeleteContentReviewAdmin(t *testing.T) {
 		srv := newTestService(nil, cRepo, nil)
 
 		Convey("repository delete error", func() {
-			cRepo.deleteContentReview = func(_ context.Context, _ string) error {
+			cRepo.deleteContentReview = func(_ context.Context, _, _ string) error {
 				return testutil.ErrDBUnexpected
 			}
 
-			err := srv.DeleteContentReviewAdmin(context.Background(), "review-1")
+			err := srv.DeleteContentReviewAdmin(context.Background(), "review-1", "admin-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
 
 		Convey("success", func() {
-			cRepo.deleteContentReview = func(_ context.Context, _ string) error {
+			cRepo.deleteContentReview = func(_ context.Context, _, _ string) error {
 				return nil
 			}
 
-			err := srv.DeleteContentReviewAdmin(context.Background(), "review-1")
+			err := srv.DeleteContentReviewAdmin(context.Background(), "review-1", "admin-1")
 			So(err, ShouldBeNil)
 		})
 	})

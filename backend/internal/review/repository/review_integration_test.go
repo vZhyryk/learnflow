@@ -124,7 +124,7 @@ func TestCreateCourseReview_Integration(t *testing.T) {
 
 				first, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
-				So(repo.DeleteCourseReview(ctx, first.ID), ShouldBeNil)
+				So(repo.DeleteCourseReview(ctx, first.ID, userID), ShouldBeNil)
 
 				second, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 5})
 
@@ -238,7 +238,7 @@ func TestUpdateCourseReview_Integration(t *testing.T) {
 				userID := insertTestUser(t, tx)
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 2})
 				So(err, ShouldBeNil)
-				So(repo.DeleteCourseReview(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteCourseReview(ctx, created.ID, userID), ShouldBeNil)
 
 				err = repo.UpdateCourseReview(ctx, &reviewdomain.CourseReview{ID: created.ID, Rating: 5})
 
@@ -297,7 +297,7 @@ func TestDeleteCourseReview_Integration(t *testing.T) {
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
 
-				So(repo.DeleteCourseReview(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteCourseReview(ctx, created.ID, userID), ShouldBeNil)
 
 				_, err = repo.GetCourseReviewByID(ctx, created.ID)
 				So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
@@ -311,9 +311,9 @@ func TestDeleteCourseReview_Integration(t *testing.T) {
 				userID := insertTestUser(t, tx)
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
-				So(repo.DeleteCourseReview(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteCourseReview(ctx, created.ID, userID), ShouldBeNil)
 
-				err = repo.DeleteCourseReview(ctx, created.ID)
+				err = repo.DeleteCourseReview(ctx, created.ID, userID)
 
 				So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
 			})
@@ -323,7 +323,7 @@ func TestDeleteCourseReview_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
 
-				err := repo.DeleteCourseReview(ctx, "00000000-0000-0000-0000-000000000000")
+				err := repo.DeleteCourseReview(ctx, "00000000-0000-0000-0000-000000000000", insertTestUser(t, tx))
 
 				So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
 			})
@@ -343,7 +343,7 @@ func TestDeleteContentReview_Integration(t *testing.T) {
 				created, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
 
-				So(repo.DeleteContentReview(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteContentReview(ctx, created.ID, userID), ShouldBeNil)
 
 				_, err = repo.GetContentReviewByID(ctx, created.ID)
 				So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
@@ -354,7 +354,7 @@ func TestDeleteContentReview_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
 
-				err := repo.DeleteContentReview(ctx, "00000000-0000-0000-0000-000000000000")
+				err := repo.DeleteContentReview(ctx, "00000000-0000-0000-0000-000000000000", insertTestUser(t, tx))
 
 				So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
 			})
@@ -466,7 +466,7 @@ func TestGetCourseReviewByUserAndCourseID_Integration(t *testing.T) {
 				userID := insertTestUser(t, tx)
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
-				So(repo.DeleteCourseReview(ctx, created.ID), ShouldBeNil)
+				So(repo.DeleteCourseReview(ctx, created.ID, userID), ShouldBeNil)
 
 				_, err = repo.GetCourseReviewByUserAndCourseID(ctx, userID, courseID)
 
@@ -525,7 +525,7 @@ func TestGetCourseReviewList_Integration(t *testing.T) {
 			So(err, ShouldBeNil)
 			deleted, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: insertTestUser(t, tx), Rating: 1})
 			So(err, ShouldBeNil)
-			So(repo.DeleteCourseReview(ctx, deleted.ID), ShouldBeNil)
+			So(repo.DeleteCourseReview(ctx, deleted.ID, insertTestUser(t, tx)), ShouldBeNil)
 
 			Convey("Listing returns only active reviews for that course", func() {
 				got, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), courseID, reviewdomain.ReviewFilter{})
@@ -587,7 +587,7 @@ func TestGetContentReviewList_Integration(t *testing.T) {
 			So(err, ShouldBeNil)
 			deleted, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: insertTestUser(t, tx), Rating: 1})
 			So(err, ShouldBeNil)
-			So(repo.DeleteContentReview(ctx, deleted.ID), ShouldBeNil)
+			So(repo.DeleteContentReview(ctx, deleted.ID, insertTestUser(t, tx)), ShouldBeNil)
 
 			Convey("Listing returns only active reviews for that content item", func() {
 				got, err := repo.GetContentReviewList(ctx, pagination.NewParams(1, 100), contentID, reviewdomain.ReviewFilter{})
@@ -640,7 +640,7 @@ func TestGetCourseReviewStats_Integration(t *testing.T) {
 				So(err, ShouldBeNil)
 				excluded, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: insertTestUser(t, tx), Rating: 1})
 				So(err, ShouldBeNil)
-				So(repo.DeleteCourseReview(ctx, excluded.ID), ShouldBeNil)
+				So(repo.DeleteCourseReview(ctx, excluded.ID, insertTestUser(t, tx)), ShouldBeNil)
 
 				rating, count, err := repo.GetCourseReviewStats(ctx, courseID)
 

@@ -20,7 +20,7 @@ type AccessChecker interface {
 type CourseReviewRepository interface {
 	CreateCourseReview(ctx context.Context, courseReview *CourseReview) (*CourseReview, error)
 	UpdateCourseReview(ctx context.Context, courseReview *CourseReview) error
-	DeleteCourseReview(ctx context.Context, reviewID string) error
+	DeleteCourseReview(ctx context.Context, reviewID, userID string) error
 	GetCourseReviewList(ctx context.Context, params pagination.Params, courseID string, filter ReviewFilter) ([]*CourseReview, error)
 	GetCourseReviewByID(ctx context.Context, reviewID string) (*CourseReview, error)
 	GetCourseReviewByUserAndCourseID(ctx context.Context, userID, courseID string) (*CourseReview, error)
@@ -31,7 +31,7 @@ type CourseReviewRepository interface {
 type ContentReviewRepository interface {
 	CreateContentReview(ctx context.Context, contentReview *ContentReview) (*ContentReview, error)
 	UpdateContentReview(ctx context.Context, contentReview *ContentReview) error
-	DeleteContentReview(ctx context.Context, reviewID string) error
+	DeleteContentReview(ctx context.Context, reviewID, userID string) error
 	GetContentReviewList(ctx context.Context, params pagination.Params, contentID string, filter ReviewFilter) ([]*ContentReview, error)
 	GetContentReviewByID(ctx context.Context, reviewID string) (*ContentReview, error)
 	GetContentReviewByUserAndContentID(ctx context.Context, userID, contentID string) (*ContentReview, error)
@@ -56,6 +56,6 @@ type Service interface {
 	GetContentReviewStats(ctx context.Context, contentID string) (rating float64, count int, err error)
 	DeleteCourseReview(ctx context.Context, reviewID, userID string) error
 	DeleteContentReview(ctx context.Context, reviewID, userID string) error
-	DeleteCourseReviewAdmin(ctx context.Context, reviewID string) error
-	DeleteContentReviewAdmin(ctx context.Context, reviewID string) error
+	DeleteCourseReviewAdmin(ctx context.Context, reviewID, userID string) error
+	DeleteContentReviewAdmin(ctx context.Context, reviewID, userID string) error
 }

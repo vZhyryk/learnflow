@@ -27,7 +27,7 @@ func (s *Service) CreateArticle(ctx context.Context, req articledomain.CreateArt
 		article := articledomain.Article{
 			Slug:            req.Slug,
 			Title:           req.Title,
-			Excerpt:         req.Excerpt,
+			Description:     req.Description,
 			SeoTitle:        req.SeoTitle,
 			SeoDescription:  req.SeoDescription,
 			OgImageURL:      req.OgImageURL,

@@ -52,28 +52,30 @@ func (r ContentType) Valid() bool {
 
 // ContentItem represents a ContentItem in draft, published, or archived state.
 type ContentItem struct {
-	ID               string            `json:"id"`
-	Slug             string            `json:"slug"`
-	Title            string            `json:"title"`
-	ContentType      ContentType       `json:"content_type"`
-	Description      *string           `json:"description"`
-	Body             *string           `json:"body"`
-	VideoURL         *string           `json:"video_url"`
-	FileURL          *string           `json:"file_url"`
-	EstimatedMinutes *int              `json:"estimated_minutes"`
-	EstimatedPages   *int              `json:"estimated_pages"`
-	ThumbnailURL     *string           `json:"thumbnail_url"`
-	SeoTitle         *string           `json:"seo_title"`
-	SeoDescription   *string           `json:"seo_description"`
-	OgImageURL       *string           `json:"og_image_url"`
-	CanonicalURL     *string           `json:"canonical_url"`
-	IsIndexable      bool              `json:"is_indexable"`
-	Status           ContentItemStatus `json:"status"`
-	CreatedByUserID  string            `json:"created_by_user_id"`
-	CreatedAt        time.Time         `json:"created_at"`
-	UpdatedAt        time.Time         `json:"updated_at"`
-	PublishedAt      *time.Time        `json:"published_at"`
-	DeletedAt        *time.Time        `json:"deleted_at"`
+	ID                    string            `json:"id"`
+	Slug                  string            `json:"slug"`
+	Title                 string            `json:"title"`
+	ContentType           ContentType       `json:"content_type"`
+	Description           *string           `json:"description"`
+	Body                  *string           `json:"body"`
+	VideoURL              *string           `json:"video_url"`
+	FileURL               *string           `json:"file_url"`
+	EstimatedMinutes      *int              `json:"estimated_minutes"`
+	EstimatedPages        *int              `json:"estimated_pages"`
+	ThumbnailURL          *string           `json:"thumbnail_url"`
+	SeoTitle              *string           `json:"seo_title"`
+	SeoDescription        *string           `json:"seo_description"`
+	OgImageURL            *string           `json:"og_image_url"`
+	CanonicalURL          *string           `json:"canonical_url"`
+	IsIndexable           bool              `json:"is_indexable"`
+	Status                ContentItemStatus `json:"status"`
+	CreatedByUserID       string            `json:"created_by_user_id"`
+	CreatedAt             time.Time         `json:"created_at"`
+	UpdatedAt             time.Time         `json:"updated_at"`
+	PublishedAt           *time.Time        `json:"published_at"`
+	DeletedAt             *time.Time        `json:"deleted_at"`
+	Announcement          *string           `json:"announcement"`
+	AnnouncementExpiresAt *time.Time        `json:"announcement_expires_at"`
 }
 
 // ReadyToPublish reports whether the ContentItem has all fields required to go public.

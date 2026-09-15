@@ -1,6 +1,6 @@
 -- LearnFlow database initialization — annotated version
 -- PostgreSQL 17+; run once on empty volume via /docker-entrypoint-initdb.d/
--- Synced through: migration 000010
+-- Synced through: migration 000011
 --
 -- GLOBAL DESIGN DECISIONS
 -- ───────────────────────
@@ -327,7 +327,22 @@ CREATE TABLE courses (
     -- to be "removed" without breaking FK references from payments, access records,
     -- and progress rows that depend on it. WHERE deleted_at IS NULL in all listing queries.
     deleted_at          timestamptz,
-    CONSTRAINT courses_slug_unique UNIQUE (slug)
+
+    -- [description/announcement nonempty CHECKs, announcement_expires_at]: added in
+    -- migration 000011 — description already existed (nullable), the CHECK just
+    -- forbids empty-string-but-set. announcement/announcement_expires_at are new,
+    -- both nullable, meant to be set via a future dedicated /announce endpoint (not
+    -- wired into publish — publish and announce are separate actions by design, see
+    -- REQUIREMENTS.md NOTI-11). announcement_expires_at only gets an "after created_at"
+    -- sanity CHECK (immutable column, safe) — no "after published_at" CHECK, since
+    -- published_at/status change on archive/republish and would make the CHECK
+    -- spuriously fail on unrelated writes.
+    announcement        text,
+    announcement_expires_at timestamptz,
+    CONSTRAINT courses_slug_unique UNIQUE (slug),
+    CONSTRAINT courses_description_nonempty CHECK (description IS NULL OR btrim(description) <> ''),
+    CONSTRAINT courses_announcement_nonempty CHECK (announcement IS NULL OR btrim(announcement) <> ''),
+    CONSTRAINT courses_announcement_expires_at_after_created CHECK (announcement_expires_at IS NULL OR announcement_expires_at > created_at)
 );
 
 -- [status index]: Most common listing query: WHERE status = 'published'.
@@ -393,7 +408,16 @@ CREATE TABLE content_items (
     -- referenced by user_content_progress, user_video_engagement, course_content_items,
     -- and user_content_access. Physical delete would violate all these FKs.
     deleted_at          timestamptz,
-    CONSTRAINT content_items_slug_unique UNIQUE (slug)
+
+    -- [announcement/announcement_expires_at]: added in migration 000011, same rationale
+    -- as courses above (see that comment) — nullable, not wired into publish, meant for
+    -- a future dedicated /announce endpoint.
+    announcement        text,
+    announcement_expires_at timestamptz,
+    CONSTRAINT content_items_slug_unique UNIQUE (slug),
+    CONSTRAINT content_items_description_nonempty CHECK (description IS NULL OR btrim(description) <> ''),
+    CONSTRAINT content_items_announcement_nonempty CHECK (announcement IS NULL OR btrim(announcement) <> ''),
+    CONSTRAINT content_items_announcement_expires_at_after_created CHECK (announcement_expires_at IS NULL OR announcement_expires_at > created_at)
 );
 
 -- [Composite (content_type, status)]: Covers two query patterns with one index:
@@ -464,6 +488,14 @@ CREATE TABLE course_reviews (
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now(),
     deleted_at  timestamptz,
+
+    -- [deleted_by_user_id]: added in migration 000011 — records WHO deleted a review,
+    -- distinct from deleted_at (WHEN). Needed because delete can be self (owner deletes
+    -- own review, REVW-03) or admin (moderation, any review) — deleted_by_user_id is the
+    -- only way to tell them apart, since admin-delete-review isn't currently covered by
+    -- ADMN-10's admin_actions audit trail. Nullable, not backfilled for pre-migration
+    -- deletes (unknown). Not yet read back via any API — DB-only audit trail for now.
+    deleted_by_user_id uuid REFERENCES users(id),
     CONSTRAINT course_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
     -- [comment_length CHECK]: added in migration 000010 — prevents comment spam.
     -- Limits review comments to 2000 characters. NULL is allowed (rating-only reviews).
@@ -501,6 +533,10 @@ CREATE TABLE content_reviews (
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now(),
     deleted_at      timestamptz,
+
+    -- [deleted_by_user_id]: added in migration 000011 — same rationale as
+    -- course_reviews.deleted_by_user_id above (see that comment).
+    deleted_by_user_id uuid REFERENCES users(id),
     CONSTRAINT content_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
     -- [comment_length CHECK]: added in migration 000010 — prevents comment spam.
     -- Limits review comments to 2000 characters. NULL is allowed (rating-only reviews).
@@ -1634,9 +1670,13 @@ CREATE TABLE articles (
     slug                text        NOT NULL,
     title               text        NOT NULL,
 
-    -- [excerpt nullable]: Optional short summary shown in article listings and OG tags.
-    -- If NULL, the frontend falls back to the first N characters of body.
-    excerpt             text,
+    -- [description, not excerpt]: renamed from `excerpt` in migration 000011 — unified
+    -- naming with courses/content_items, which both use `description` for the same
+    -- "short editorial intro" concept. Existing excerpt values were backfilled into
+    -- description before the excerpt column was dropped (data-preserving rename, not
+    -- a plain drop+recreate). Optional short summary shown in article listings and OG
+    -- tags; if NULL, the frontend falls back to the first N characters of body.
+    description         text,
 
     body                text        NOT NULL,
     seo_title           text,
@@ -1653,6 +1693,12 @@ CREATE TABLE articles (
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now(),
 
+    -- [announcement/announcement_expires_at]: added in migration 000011 — nullable,
+    -- not wired into publish, meant for a future dedicated /announce endpoint (see
+    -- REQUIREMENTS.md NOTI-11 and the same comment on courses above).
+    announcement        text,
+    announcement_expires_at timestamptz,
+
     CONSTRAINT articles_slug_unique                     UNIQUE (slug),
 
     -- [CHECK: draft | published | archived]: 'archived' added in migration
@@ -1664,12 +1710,14 @@ CREATE TABLE articles (
     CONSTRAINT articles_title_nonempty                  CHECK (btrim(title) <> ''),
     CONSTRAINT articles_slug_nonempty                   CHECK (btrim(slug) <> ''),
     CONSTRAINT articles_body_nonempty                   CHECK (btrim(body) <> ''),
-    CONSTRAINT articles_excerpt_nonempty                CHECK (excerpt IS NULL OR btrim(excerpt) <> ''),
+    CONSTRAINT articles_description_nonempty            CHECK (description IS NULL OR btrim(description) <> ''),
+    CONSTRAINT articles_announcement_nonempty            CHECK (announcement IS NULL OR btrim(announcement) <> ''),
 
     -- [Chronological ordering constraints]: Prevents impossible timestamp combinations
     -- caused by clock bugs or incorrect field assignments.
     CONSTRAINT articles_published_at_after_created      CHECK (published_at IS NULL OR published_at >= created_at),
     CONSTRAINT articles_deleted_at_after_created        CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    CONSTRAINT articles_announcement_expires_at_after_created CHECK (announcement_expires_at IS NULL OR announcement_expires_at > created_at),
 
     -- [published_requires_published_at]: A published article without published_at would
     -- break sitemap lastmod and SEO tooling. This constraint closes the gap.

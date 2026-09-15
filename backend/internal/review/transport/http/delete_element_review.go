@@ -18,7 +18,7 @@ func (h *Handler) deleteCourseReviewAdmin(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err := h.svc.DeleteCourseReviewAdmin(ctx, reviewID)
+	err := h.svc.DeleteCourseReviewAdmin(ctx, reviewID, user.ID)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
@@ -39,7 +39,7 @@ func (h *Handler) deleteContentReviewAdmin(w http.ResponseWriter, r *http.Reques
 		h.handleErrorResponse(w, r, reviewdomain.ErrInvalidReviewID)
 		return
 	}
-	err := h.svc.DeleteContentReviewAdmin(ctx, reviewID)
+	err := h.svc.DeleteContentReviewAdmin(ctx, reviewID, user.ID)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return

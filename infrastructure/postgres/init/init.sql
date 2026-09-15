@@ -11,7 +11,7 @@
 --         notifications, announcements, activity_log, event_outbox, failed_jobs,
 --         admin_actions, support_chats, support_messages,
 --         account_recovery_tokens, articles, gift_coupons, user_sessions
--- Synced through: migration 000010
+-- Synced through: migration 000011
 
 -- Index naming convention: idx_{table}_{col1}_{col2}[_{qualifier}]
 --   qualifier = domain condition key: active, available, booked, pending, open, unread, unresolved, unused
@@ -169,12 +169,17 @@ CREATE TABLE courses (
     updated_at          timestamptz NOT NULL DEFAULT now(),
     published_at        timestamptz,
     deleted_at          timestamptz,
+    announcement        text,
+    announcement_expires_at timestamptz,
     CONSTRAINT courses_slug_unique                     UNIQUE (slug),
     CONSTRAINT courses_title_nonempty                  CHECK (btrim(title) <> ''),
     CONSTRAINT courses_slug_nonempty                   CHECK (btrim(slug) <> ''),
     CONSTRAINT courses_published_at_after_created      CHECK (published_at IS NULL OR published_at >= created_at),
     CONSTRAINT courses_deleted_at_after_created        CHECK (deleted_at IS NULL OR deleted_at >= created_at),
-    CONSTRAINT courses_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL)
+    CONSTRAINT courses_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL),
+    CONSTRAINT courses_description_nonempty             CHECK (description IS NULL OR btrim(description) <> ''),
+    CONSTRAINT courses_announcement_nonempty            CHECK (announcement IS NULL OR btrim(announcement) <> ''),
+    CONSTRAINT courses_announcement_expires_at_after_created CHECK (announcement_expires_at IS NULL OR announcement_expires_at > created_at)
 );
 
 CREATE INDEX idx_courses_status ON courses(status) WHERE deleted_at IS NULL;
@@ -206,12 +211,17 @@ CREATE TABLE content_items (
     updated_at          timestamptz NOT NULL DEFAULT now(),
     published_at        timestamptz,
     deleted_at          timestamptz,
+    announcement        text,
+    announcement_expires_at timestamptz,
     CONSTRAINT content_items_slug_unique                     UNIQUE (slug),
     CONSTRAINT content_items_title_nonempty                  CHECK (btrim(title) <> ''),
     CONSTRAINT content_items_slug_nonempty                   CHECK (btrim(slug) <> ''),
     CONSTRAINT content_items_published_at_after_created      CHECK (published_at IS NULL OR published_at >= created_at),
     CONSTRAINT content_items_deleted_at_after_created        CHECK (deleted_at IS NULL OR deleted_at >= created_at),
-    CONSTRAINT content_items_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL)
+    CONSTRAINT content_items_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL),
+    CONSTRAINT content_items_description_nonempty             CHECK (description IS NULL OR btrim(description) <> ''),
+    CONSTRAINT content_items_announcement_nonempty            CHECK (announcement IS NULL OR btrim(announcement) <> ''),
+    CONSTRAINT content_items_announcement_expires_at_after_created CHECK (announcement_expires_at IS NULL OR announcement_expires_at > created_at)
 );
 
 CREATE INDEX idx_content_items_content_type_status ON content_items(content_type, status) WHERE deleted_at IS NULL;
@@ -246,6 +256,7 @@ CREATE TABLE course_reviews (
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now(),
     deleted_at  timestamptz,
+    deleted_by_user_id uuid REFERENCES users(id),
     CONSTRAINT course_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
     CONSTRAINT course_reviews_comment_length_check CHECK (comment IS NULL OR char_length(comment) <= 2000)
 );
@@ -268,6 +279,7 @@ CREATE TABLE content_reviews (
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now(),
     deleted_at      timestamptz,
+    deleted_by_user_id uuid REFERENCES users(id),
     CONSTRAINT content_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
     CONSTRAINT content_reviews_comment_length_check CHECK (comment IS NULL OR char_length(comment) <= 2000)
 );
@@ -867,7 +879,7 @@ CREATE TABLE articles (
     id                  uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     slug                text        NOT NULL,
     title               text        NOT NULL,
-    excerpt             text,
+    description         text,
     body                text        NOT NULL,
     seo_title           text,
     seo_description     text,
@@ -879,15 +891,19 @@ CREATE TABLE articles (
     deleted_at          timestamptz,
     created_at          timestamptz NOT NULL DEFAULT now(),
     updated_at          timestamptz NOT NULL DEFAULT now(),
+    announcement        text,
+    announcement_expires_at timestamptz,
     CONSTRAINT articles_slug_unique                     UNIQUE (slug),
     CONSTRAINT articles_status_check                    CHECK (status IN ('draft', 'published', 'archived')),
     CONSTRAINT articles_title_nonempty                  CHECK (btrim(title) <> ''),
     CONSTRAINT articles_slug_nonempty                   CHECK (btrim(slug) <> ''),
     CONSTRAINT articles_body_nonempty                   CHECK (btrim(body) <> ''),
-    CONSTRAINT articles_excerpt_nonempty                CHECK (excerpt IS NULL OR btrim(excerpt) <> ''),
+    CONSTRAINT articles_description_nonempty            CHECK (description IS NULL OR btrim(description) <> ''),
     CONSTRAINT articles_published_at_after_created      CHECK (published_at IS NULL OR published_at >= created_at),
     CONSTRAINT articles_deleted_at_after_created        CHECK (deleted_at IS NULL OR deleted_at >= created_at),
-    CONSTRAINT articles_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL)
+    CONSTRAINT articles_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL),
+    CONSTRAINT articles_announcement_nonempty            CHECK (announcement IS NULL OR btrim(announcement) <> ''),
+    CONSTRAINT articles_announcement_expires_at_after_created CHECK (announcement_expires_at IS NULL OR announcement_expires_at > created_at)
 );
 
 CREATE INDEX idx_articles_created_at ON articles(created_at DESC);

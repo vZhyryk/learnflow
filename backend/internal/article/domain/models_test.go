@@ -106,23 +106,23 @@ func TestArticleCheckBody(t *testing.T) {
 	})
 }
 
-func TestArticleCheckExcerpt(t *testing.T) {
-	Convey("checkExcerpt", t, func() {
-		Convey("missing Excerpt is invalid", func() {
+func TestArticleCheckDescription(t *testing.T) {
+	Convey("checkDescription", t, func() {
+		Convey("missing Description is invalid", func() {
 			item := Article{Title: "title"}
-			So(errors.Is(item.checkExcerpt(), ErrInvalidExcerpt), ShouldBeTrue)
+			So(errors.Is(item.checkDescription(), ErrInvalidDescription), ShouldBeTrue)
 		})
 
-		Convey("empty Excerpt is invalid", func() {
+		Convey("empty Description is invalid", func() {
 			empty := ""
-			item := Article{Title: "title", Excerpt: &empty}
-			So(errors.Is(item.checkExcerpt(), ErrInvalidExcerpt), ShouldBeTrue)
+			item := Article{Title: "title", Description: &empty}
+			So(errors.Is(item.checkDescription(), ErrInvalidDescription), ShouldBeTrue)
 		})
 
-		Convey("non-empty Excerpt is valid", func() {
-			excerpt := "article excerpt"
-			item := Article{Title: "title", Excerpt: &excerpt}
-			So(item.checkExcerpt(), ShouldBeNil)
+		Convey("non-empty Description is valid", func() {
+			description := "article description"
+			item := Article{Title: "title", Description: &description}
+			So(item.checkDescription(), ShouldBeNil)
 		})
 	})
 }
@@ -134,7 +134,7 @@ func TestArticleReadyToPublish(t *testing.T) {
 		Convey("all fields valid", func() {
 			item := Article{
 				Title:          "title",
-				Excerpt:        &notEmpty,
+				Description:    &notEmpty,
 				Body:           notEmpty,
 				SeoTitle:       &notEmpty,
 				SeoDescription: &notEmpty,
@@ -145,32 +145,32 @@ func TestArticleReadyToPublish(t *testing.T) {
 		Convey("missing body fails", func() {
 			item := Article{
 				Title:          "title",
-				Excerpt:        &notEmpty,
+				Description:    &notEmpty,
 				SeoTitle:       &notEmpty,
 				SeoDescription: &notEmpty,
 			}
 			So(errors.Is(item.ReadyToPublish(), ErrInvalidBody), ShouldBeTrue)
 		})
 
-		Convey("missing excerpt fails", func() {
+		Convey("missing description fails", func() {
 			item := Article{
 				Title:          "title",
 				Body:           notEmpty,
 				SeoTitle:       &notEmpty,
 				SeoDescription: &notEmpty,
 			}
-			So(errors.Is(item.ReadyToPublish(), ErrInvalidExcerpt), ShouldBeTrue)
+			So(errors.Is(item.ReadyToPublish(), ErrInvalidDescription), ShouldBeTrue)
 		})
 	})
 }
 
 func validCreateArticleRequest() CreateArticleRequest {
-	excerpt := "article excerpt"
+	description := "article description"
 	return CreateArticleRequest{
-		Slug:    "valid-slug",
-		Title:   "Title",
-		Body:    "article body",
-		Excerpt: &excerpt,
+		Slug:        "valid-slug",
+		Title:       "Title",
+		Body:        "article body",
+		Description: &description,
 	}
 }
 
@@ -322,23 +322,23 @@ func TestCreateArticleRequestValidateBody(t *testing.T) {
 	})
 }
 
-func TestCreateArticleRequestValidateExcerpt(t *testing.T) {
-	Convey("CreateArticleRequest.validateExcerpt", t, func() {
+func TestCreateArticleRequestValidateDescription(t *testing.T) {
+	Convey("CreateArticleRequest.validateDescription", t, func() {
 		Convey("nil is valid", func() {
-			req := CreateArticleRequest{Excerpt: nil}
-			So(req.validateExcerpt(), ShouldBeNil)
+			req := CreateArticleRequest{Description: nil}
+			So(req.validateDescription(), ShouldBeNil)
 		})
 
 		Convey("empty is invalid", func() {
 			empty := ""
-			req := CreateArticleRequest{Excerpt: &empty}
-			So(errors.Is(req.validateExcerpt(), ErrInvalidExcerpt), ShouldBeTrue)
+			req := CreateArticleRequest{Description: &empty}
+			So(errors.Is(req.validateDescription(), ErrInvalidDescription), ShouldBeTrue)
 		})
 
 		Convey("non-empty is valid", func() {
-			val := "excerpt"
-			req := CreateArticleRequest{Excerpt: &val}
-			So(req.validateExcerpt(), ShouldBeNil)
+			val := "description"
+			req := CreateArticleRequest{Description: &val}
+			So(req.validateDescription(), ShouldBeNil)
 		})
 	})
 }
@@ -375,11 +375,11 @@ func TestCreateArticleRequestValidate(t *testing.T) {
 			So(errors.Is(req.Validate(), ErrInvalidBody), ShouldBeTrue)
 		})
 
-		Convey("invalid excerpt fails", func() {
+		Convey("invalid description fails", func() {
 			req := validCreateArticleRequest()
 			empty := ""
-			req.Excerpt = &empty
-			So(errors.Is(req.Validate(), ErrInvalidExcerpt), ShouldBeTrue)
+			req.Description = &empty
+			So(errors.Is(req.Validate(), ErrInvalidDescription), ShouldBeTrue)
 		})
 	})
 }
@@ -583,23 +583,23 @@ func TestUpdateArticleRequestValidateBody(t *testing.T) {
 	})
 }
 
-func TestUpdateArticleRequestValidateExcerpt(t *testing.T) {
-	Convey("UpdateArticleRequest.validateExcerpt", t, func() {
+func TestUpdateArticleRequestValidateDescription(t *testing.T) {
+	Convey("UpdateArticleRequest.validateDescription", t, func() {
 		Convey("nil is valid", func() {
-			req := UpdateArticleRequest{Excerpt: nil}
-			So(req.validateExcerpt(), ShouldBeNil)
+			req := UpdateArticleRequest{Description: nil}
+			So(req.validateDescription(), ShouldBeNil)
 		})
 
 		Convey("empty is invalid", func() {
 			empty := ""
-			req := UpdateArticleRequest{Excerpt: &empty}
-			So(errors.Is(req.validateExcerpt(), ErrInvalidExcerpt), ShouldBeTrue)
+			req := UpdateArticleRequest{Description: &empty}
+			So(errors.Is(req.validateDescription(), ErrInvalidDescription), ShouldBeTrue)
 		})
 
-		Convey("valid excerpt", func() {
-			val := "excerpt"
-			req := UpdateArticleRequest{Excerpt: &val}
-			So(req.validateExcerpt(), ShouldBeNil)
+		Convey("valid description", func() {
+			val := "description"
+			req := UpdateArticleRequest{Description: &val}
+			So(req.validateDescription(), ShouldBeNil)
 		})
 	})
 }
@@ -659,10 +659,10 @@ func TestUpdateArticleRequestValidate(t *testing.T) {
 			So(errors.Is(req.Validate(), ErrInvalidBody), ShouldBeTrue)
 		})
 
-		Convey("invalid excerpt fails", func() {
+		Convey("invalid description fails", func() {
 			empty := ""
-			req := UpdateArticleRequest{ID: validID, Excerpt: &empty}
-			So(errors.Is(req.Validate(), ErrInvalidExcerpt), ShouldBeTrue)
+			req := UpdateArticleRequest{ID: validID, Description: &empty}
+			So(errors.Is(req.Validate(), ErrInvalidDescription), ShouldBeTrue)
 		})
 	})
 }
@@ -690,7 +690,7 @@ func TestUpdateArticleRequestApplyNonNilFields(t *testing.T) {
 			ID:             "article-id",
 			Slug:           "old-slug",
 			Title:          "Old Title",
-			Excerpt:        nil,
+			Description:    nil,
 			Body:           "",
 			SeoTitle:       nil,
 			SeoDescription: nil,
@@ -700,7 +700,7 @@ func TestUpdateArticleRequestApplyNonNilFields(t *testing.T) {
 
 		newSlug := "new-slug"
 		newTitle := "New Title"
-		newExcerpt := "New Excerpt"
+		newDescription := "New Description"
 		newBody := "New body"
 		newSeoTitle := "New SEO Title"
 		newSeoDescription := "New SEO Description"
@@ -711,7 +711,7 @@ func TestUpdateArticleRequestApplyNonNilFields(t *testing.T) {
 			ID:             "article-id",
 			Slug:           &newSlug,
 			Title:          &newTitle,
-			Excerpt:        &newExcerpt,
+			Description:    &newDescription,
 			Body:           &newBody,
 			SeoTitle:       &newSeoTitle,
 			SeoDescription: &newSeoDescription,
@@ -722,7 +722,7 @@ func TestUpdateArticleRequestApplyNonNilFields(t *testing.T) {
 
 		So(item.Slug, ShouldEqual, newSlug)
 		So(item.Title, ShouldEqual, newTitle)
-		So(item.Excerpt, ShouldEqual, &newExcerpt)
+		So(item.Description, ShouldEqual, &newDescription)
 		So(item.Body, ShouldEqual, newBody)
 		So(item.SeoTitle, ShouldEqual, &newSeoTitle)
 		So(item.SeoDescription, ShouldEqual, &newSeoDescription)

@@ -33,14 +33,14 @@ func (s *Service) PublishArticle(ctx context.Context, articleID string) error {
 		// TODO(notifications module, Phase 3+): recipient unset — nothing to wire to yet;
 		// NotificationWorker must build "articleUrl" from Data["slug"] + base URL (same
 		// pattern as internal/worker/email_verification.go's verificationUrl) before Send.
-		// *article.Excerpt is safe to dereference only because ReadyToPublish above
-		// already guarantees it is non-nil/non-empty (checkExcerpt).
+		// *article.Description is safe to dereference only because ReadyToPublish above
+		// already guarantees it is non-nil/non-empty (checkDescription).
 		payload := events.NotificationSendPayload{
 			Template: "article_published.html",
 			Data: map[string]string{
-				"title":   article.Title,
-				"excerpt": *article.Excerpt,
-				"slug":    article.Slug,
+				"title":       article.Title,
+				"description": *article.Description,
+				"slug":        article.Slug,
 			},
 		}
 

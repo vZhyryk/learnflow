@@ -102,18 +102,18 @@ func TestDeleteCourseReview(t *testing.T) {
 		})
 		Convey("When delete succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			So(repo.DeleteCourseReview(context.Background(), "content-123"), ShouldBeNil)
+			So(repo.DeleteCourseReview(context.Background(), "content-123", "user-123"), ShouldBeNil)
 		})
 
 		Convey("When no row is matched (content item not found)", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 0")
-			err := repo.DeleteCourseReview(context.Background(), "content-123")
+			err := repo.DeleteCourseReview(context.Background(), "content-123", "user-123")
 			So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
 			execErr = testutil.ErrDBUnexpected
-			err := repo.DeleteCourseReview(context.Background(), "content-123")
+			err := repo.DeleteCourseReview(context.Background(), "content-123", "user-123")
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
 	})

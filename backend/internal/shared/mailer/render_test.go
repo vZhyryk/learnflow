@@ -56,7 +56,7 @@ func TestRenderEmail(t *testing.T) {
 		Convey("article_published template renders subject, plain and html bodies", func() {
 			data := map[string]any{
 				"title":      "Why We Chose pgx",
-				"excerpt":    "A look at our PostgreSQL driver choice.",
+				"description":    "A look at our PostgreSQL driver choice.",
 				"articleUrl": "https://learnflow.dev/articles/why-we-chose-pgx",
 			}
 			subject, plainBody, htmlBody, err := renderEmail("article_published.html", data)

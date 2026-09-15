@@ -36,13 +36,15 @@ const (
 
 	deleteCourseReviewSQL = `
 		UPDATE course_reviews
-		SET deleted_at = now()
+		SET deleted_at = now(),
+		deleted_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
 	deleteContentReviewSQL = `
 		UPDATE content_reviews
-		SET deleted_at = now()
+		SET deleted_at = now(),
+		deleted_by_user_id = $2
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 

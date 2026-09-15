@@ -15,14 +15,14 @@ func fakeArticle(now time.Time) *articledomain.Article {
 	seoTitle := "seo title"
 	seoDescription := "seo description"
 	ogImageURL := "https://example.com/og.png"
-	excerpt := "Excerpt"
+	description := "Description"
 	publishedAt := now
 
 	return &articledomain.Article{
 		ID:              "article-123",
 		Slug:            "some-slug",
 		Title:           "Some Title",
-		Excerpt:         &excerpt,
+		Description:     &description,
 		SeoTitle:        &seoTitle,
 		SeoDescription:  &seoDescription,
 		OgImageURL:      &ogImageURL,
@@ -41,7 +41,7 @@ func fakeArticleScan(item *articledomain.Article) func(dest ...any) error {
 		*testutil.CastStr(dest[0], 0) = item.ID
 		*testutil.CastStr(dest[1], 1) = item.Slug
 		*testutil.CastStr(dest[2], 2) = item.Title
-		*testutil.CastPtrStr(dest[3], 3) = item.Excerpt
+		*testutil.CastPtrStr(dest[3], 3) = item.Description
 		*testutil.CastStr(dest[4], 4) = item.Body
 		*testutil.CastPtrStr(dest[5], 5) = item.SeoTitle
 		*testutil.CastPtrStr(dest[6], 6) = item.SeoDescription

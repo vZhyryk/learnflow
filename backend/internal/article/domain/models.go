@@ -30,21 +30,23 @@ func (r ArticleStatus) Valid() bool {
 
 // Article represents a Article in draft, published, or archived state.
 type Article struct {
-	ID              string        `json:"id"`
-	Slug            string        `json:"slug"`
-	Title           string        `json:"title"`
-	Excerpt         *string       `json:"excerpt"`
-	Body            string        `json:"body"`
-	SeoTitle        *string       `json:"seo_title"`
-	SeoDescription  *string       `json:"seo_description"`
-	OgImageURL      *string       `json:"og_image_url"`
-	IsIndexable     bool          `json:"is_indexable"`
-	Status          ArticleStatus `json:"status"`
-	CreatedByUserID string        `json:"created_by_user_id"`
-	CreatedAt       time.Time     `json:"created_at"`
-	UpdatedAt       time.Time     `json:"updated_at"`
-	PublishedAt     *time.Time    `json:"published_at"`
-	DeletedAt       *time.Time    `json:"deleted_at"`
+	ID                    string        `json:"id"`
+	Slug                  string        `json:"slug"`
+	Title                 string        `json:"title"`
+	Description           *string       `json:"description"`
+	Body                  string        `json:"body"`
+	SeoTitle              *string       `json:"seo_title"`
+	SeoDescription        *string       `json:"seo_description"`
+	OgImageURL            *string       `json:"og_image_url"`
+	IsIndexable           bool          `json:"is_indexable"`
+	Status                ArticleStatus `json:"status"`
+	Announcement          *string       `json:"announcement"`
+	CreatedByUserID       string        `json:"created_by_user_id"`
+	CreatedAt             time.Time     `json:"created_at"`
+	UpdatedAt             time.Time     `json:"updated_at"`
+	PublishedAt           *time.Time    `json:"published_at"`
+	DeletedAt             *time.Time    `json:"deleted_at"`
+	AnnouncementExpiresAt *time.Time    `json:"announcement_expires_at"`
 }
 
 // ReadyToPublish reports whether the Article has all fields required to go public.
@@ -52,7 +54,7 @@ func (c *Article) ReadyToPublish() error {
 	checks := []func() error{
 		c.checkTitleReady,
 		c.checkBody,
-		c.checkExcerpt,
+		c.checkDescription,
 		c.checkSeoTitleReady,
 		c.checkSeoDescriptionReady,
 	}
@@ -93,9 +95,9 @@ func (c *Article) checkBody() error {
 	return nil
 }
 
-func (c *Article) checkExcerpt() error {
-	if c.Excerpt == nil || *c.Excerpt == "" {
-		return ErrInvalidExcerpt
+func (c *Article) checkDescription() error {
+	if c.Description == nil || *c.Description == "" {
+		return ErrInvalidDescription
 	}
 
 	return nil
@@ -105,7 +107,7 @@ func (c *Article) checkExcerpt() error {
 type CreateArticleRequest struct {
 	Slug            string  `json:"slug"`
 	Title           string  `json:"title"`
-	Excerpt         *string `json:"excerpt"`
+	Description     *string `json:"description"`
 	Body            string  `json:"body"`
 	SeoTitle        *string `json:"seo_title"`
 	SeoDescription  *string `json:"seo_description"`
@@ -123,7 +125,7 @@ func (req *CreateArticleRequest) Validate() error {
 		req.validateSeoDescription,
 		req.validateOgImageURL,
 		req.validateBody,
-		req.validateExcerpt,
+		req.validateDescription,
 	}
 	for _, check := range checks {
 		if err := check(); err != nil {
@@ -134,9 +136,9 @@ func (req *CreateArticleRequest) Validate() error {
 	return nil
 }
 
-func (req *CreateArticleRequest) validateExcerpt() error {
-	if req.Excerpt != nil && *req.Excerpt == "" {
-		return ErrInvalidExcerpt
+func (req *CreateArticleRequest) validateDescription() error {
+	if req.Description != nil && *req.Description == "" {
+		return ErrInvalidDescription
 	}
 	return nil
 }
@@ -185,7 +187,7 @@ type UpdateArticleRequest struct {
 	OgImageURL     *string `json:"og_image_url"`
 	IsIndexable    *bool   `json:"is_indexable"`
 	Body           *string `json:"body"`
-	Excerpt        *string `json:"excerpt"`
+	Description    *string `json:"description"`
 }
 
 // Validate checks that the update Article request fields meet format requirements.
@@ -198,7 +200,7 @@ func (req *UpdateArticleRequest) Validate() error {
 		req.validateSeoDescription,
 		req.validateOgImageURL,
 		req.validateBody,
-		req.validateExcerpt,
+		req.validateDescription,
 	}
 	for _, check := range checks {
 		if err := check(); err != nil {
@@ -223,9 +225,9 @@ func (req *UpdateArticleRequest) validateSlug() error {
 	return nil
 }
 
-func (req *UpdateArticleRequest) validateExcerpt() error {
-	if req.Excerpt != nil && *req.Excerpt == "" {
-		return ErrInvalidExcerpt
+func (req *UpdateArticleRequest) validateDescription() error {
+	if req.Description != nil && *req.Description == "" {
+		return ErrInvalidDescription
 	}
 	return nil
 }
@@ -263,7 +265,7 @@ func (r UpdateArticleRequest) Apply(p *Article) {
 		r.applyOgImageURL,
 		r.applyIsIndexable,
 		r.applyBody,
-		r.applyExcerpt,
+		r.applyDescription,
 	}
 	for _, apply := range appliers {
 		apply(p)
@@ -312,8 +314,8 @@ func (r UpdateArticleRequest) applyBody(p *Article) {
 	}
 }
 
-func (r UpdateArticleRequest) applyExcerpt(p *Article) {
-	if r.Excerpt != nil {
-		p.Excerpt = r.Excerpt
+func (r UpdateArticleRequest) applyDescription(p *Article) {
+	if r.Description != nil {
+		p.Description = r.Description
 	}
 }

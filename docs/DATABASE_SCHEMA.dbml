@@ -1,6 +1,6 @@
 Project LearnFlowDatabase {
   database_type: "PostgreSQL"
-  Note: 'Synchronized with backend/migrations through migration 000010. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
+  Note: 'Synchronized with backend/migrations through migration 000011. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
 }
 
 Table users {
@@ -119,7 +119,7 @@ Table courses {
   id uuid [pk]
   slug text [not null, unique]
   title text [not null]
-  description text
+  description text [note: 'CHECK (added in 000011): NULL or nonempty']
   thumbnail_url text
   preview_video_url text
   status text [not null, default: 'draft', note: 'CHECK: draft | published | archived; DEFAULT since migration 000007']
@@ -134,6 +134,8 @@ Table courses {
   updated_at timestamptz [not null, default: `now()`]
   published_at timestamptz
   deleted_at timestamptz
+  announcement text [note: 'added in 000011; nullable; not wired into publish — reserved for a future /announce endpoint (NOTI-11)']
+  announcement_expires_at timestamptz [note: 'added in 000011; CHECK: NULL or > created_at']
 
   indexes {
     status [name: 'courses_status_idx']
@@ -145,7 +147,7 @@ Table content_items {
   slug text [not null, unique]
   title text [not null]
   content_type text [not null, note: 'CHECK: video | book | presentation']
-  description text
+  description text [note: 'CHECK (added in 000011): NULL or nonempty']
   body text
   video_url text
   file_url text
@@ -163,6 +165,8 @@ Table content_items {
   updated_at timestamptz [not null, default: `now()`]
   published_at timestamptz
   deleted_at timestamptz
+  announcement text [note: 'added in 000011; nullable; not wired into publish — reserved for a future /announce endpoint (NOTI-11)']
+  announcement_expires_at timestamptz [note: 'added in 000011; CHECK: NULL or > created_at']
 
   indexes {
     (content_type, status) [name: 'content_items_type_status_idx']
@@ -193,6 +197,7 @@ Table course_reviews {
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   deleted_at timestamptz
+  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000011; who deleted — self or admin (REVW-03); not covered by admin_actions today']
 
   indexes {
     (user_id, course_id) [name: 'course_reviews_user_course_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL — allows re-review after soft-delete']
@@ -209,6 +214,7 @@ Table content_reviews {
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   deleted_at timestamptz
+  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000011; who deleted — self or admin (REVW-03); not covered by admin_actions today']
 
   indexes {
     (user_id, content_item_id) [name: 'content_reviews_user_content_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL']
@@ -691,7 +697,7 @@ Table articles {
   id uuid [pk]
   slug text [not null, unique]
   title text [not null]
-  excerpt text [note: 'Optional short preview; if provided must be non-empty']
+  description text [note: 'renamed from excerpt in 000011 (data preserved), unified with courses/content_items naming; CHECK: NULL or nonempty']
   body text [not null, note: 'CHECK: btrim(body) <> empty string']
   seo_title text
   seo_description text
@@ -703,6 +709,8 @@ Table articles {
   deleted_at timestamptz [note: 'Soft delete']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
+  announcement text [note: 'added in 000011; nullable; not wired into publish — reserved for a future /announce endpoint (NOTI-11)']
+  announcement_expires_at timestamptz [note: 'added in 000011; CHECK: NULL or > created_at']
 
   indexes {
     created_at [name: 'idx_articles_created_at', note: 'DESC — admin panel list']

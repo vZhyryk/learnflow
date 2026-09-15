@@ -18,7 +18,7 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 
 	case errors.Is(err, articledomain.ErrInvalidSlug),
 		errors.Is(err, articledomain.ErrInvalidTitle),
-		errors.Is(err, articledomain.ErrInvalidExcerpt),
+		errors.Is(err, articledomain.ErrInvalidDescription),
 		errors.Is(err, articledomain.ErrInvalidSeoTitle),
 		errors.Is(err, articledomain.ErrInvalidSeoDescription),
 		errors.Is(err, articledomain.ErrInvalidOgImageURL),

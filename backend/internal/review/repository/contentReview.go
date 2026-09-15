@@ -41,8 +41,8 @@ func (rep *Repository) UpdateContentReview(ctx context.Context, contentItem *rev
 }
 
 // DeleteContentReview soft-deletes a content review.
-func (rep *Repository) DeleteContentReview(ctx context.Context, reviewID string) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, deleteContentReviewSQL, reviewID)
+func (rep *Repository) DeleteContentReview(ctx context.Context, reviewID, userID string) error {
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, deleteContentReviewSQL, reviewID, userID)
 	if err != nil {
 		return fmt.Errorf("repository.DeleteContentReview: %w", err)
 	}
@@ -58,7 +58,7 @@ func (rep *Repository) DeleteContentReview(ctx context.Context, reviewID string)
 func (rep *Repository) GetContentReviewList(ctx context.Context, params pagination.Params, contentID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error) {
 	args := make([]any, 1)
 	args[0] = contentID
-	var query string = getCourseReviewByCourseIDSQL
+	var query string = getContentReviewByContentIDSQL
 	if filter.IsUsed() {
 		query = query[:strings.Index(query, filterPlace)] + rep.GenerateFilterQuery(filter.Op)
 		args = append(args, filter.Rating)

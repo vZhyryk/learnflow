@@ -18,24 +18,26 @@ const (
 
 // Course represents a course in draft, published, or archived state.
 type Course struct {
-	ID               string       `json:"id"`
-	Slug             string       `json:"slug"`
-	Title            string       `json:"title"`
-	Description      *string      `json:"description"`
-	ThumbnailURL     *string      `json:"thumbnail_url"`
-	PreviewVideoURL  *string      `json:"preview_video_url"`
-	Status           CourseStatus `json:"status"`
-	EstimatedMinutes *int         `json:"estimated_minutes"`
-	SeoTitle         *string      `json:"seo_title"`
-	SeoDescription   *string      `json:"seo_description"`
-	OgImageURL       *string      `json:"og_image_url"`
-	CanonicalURL     *string      `json:"canonical_url"`
-	IsIndexable      bool         `json:"is_indexable"`
-	CreatedByUserID  string       `json:"created_by_user_id"`
-	CreatedAt        time.Time    `json:"created_at"`
-	UpdatedAt        time.Time    `json:"updated_at"`
-	PublishedAt      *time.Time   `json:"published_at"`
-	DeletedAt        *time.Time   `json:"deleted_at"`
+	ID                    string       `json:"id"`
+	Slug                  string       `json:"slug"`
+	Title                 string       `json:"title"`
+	Description           *string      `json:"description"`
+	ThumbnailURL          *string      `json:"thumbnail_url"`
+	PreviewVideoURL       *string      `json:"preview_video_url"`
+	Status                CourseStatus `json:"status"`
+	EstimatedMinutes      *int         `json:"estimated_minutes"`
+	SeoTitle              *string      `json:"seo_title"`
+	SeoDescription        *string      `json:"seo_description"`
+	OgImageURL            *string      `json:"og_image_url"`
+	CanonicalURL          *string      `json:"canonical_url"`
+	IsIndexable           bool         `json:"is_indexable"`
+	CreatedByUserID       string       `json:"created_by_user_id"`
+	CreatedAt             time.Time    `json:"created_at"`
+	UpdatedAt             time.Time    `json:"updated_at"`
+	PublishedAt           *time.Time   `json:"published_at"`
+	DeletedAt             *time.Time   `json:"deleted_at"`
+	Announcement          *string      `json:"announcement"`
+	AnnouncementExpiresAt *time.Time   `json:"announcement_expires_at"`
 }
 
 // Valid reports whether r is one of the known CourseStatus values.

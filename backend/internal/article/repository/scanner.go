@@ -11,7 +11,7 @@ func scanArticle(row repository.RowScanner) (*articledomain.Article, error) {
 		&article.ID,
 		&article.Slug,
 		&article.Title,
-		&article.Excerpt,
+		&article.Description,
 		&article.Body,
 		&article.SeoTitle,
 		&article.SeoDescription,

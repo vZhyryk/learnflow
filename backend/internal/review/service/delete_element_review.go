@@ -16,7 +16,7 @@ func (s *Service) DeleteCourseReview(ctx context.Context, reviewID, userID strin
 			return reviewdomain.ErrReviewNotFound
 		}
 
-		if err = s.courseRepo.DeleteCourseReview(ctx, reviewID); err != nil {
+		if err = s.courseRepo.DeleteCourseReview(ctx, reviewID, userID); err != nil {
 			return fmt.Errorf("service.DeleteCourseReview: %w", err)
 		}
 		return nil
@@ -33,7 +33,7 @@ func (s *Service) DeleteContentReview(ctx context.Context, reviewID, userID stri
 			return reviewdomain.ErrReviewNotFound
 		}
 
-		if err := s.contentRepo.DeleteContentReview(ctx, reviewID); err != nil {
+		if err := s.contentRepo.DeleteContentReview(ctx, reviewID, userID); err != nil {
 			return fmt.Errorf("service.DeleteContentReview: %w", err)
 		}
 		return nil
@@ -41,15 +41,15 @@ func (s *Service) DeleteContentReview(ctx context.Context, reviewID, userID stri
 
 }
 
-func (s *Service) DeleteCourseReviewAdmin(ctx context.Context, reviewID string) error {
-	if err := s.courseRepo.DeleteCourseReview(ctx, reviewID); err != nil {
+func (s *Service) DeleteCourseReviewAdmin(ctx context.Context, reviewID, userID string) error {
+	if err := s.courseRepo.DeleteCourseReview(ctx, reviewID, userID); err != nil {
 		return fmt.Errorf("service.DeleteCourseReviewAdmin: %w", err)
 	}
 	return nil
 }
 
-func (s *Service) DeleteContentReviewAdmin(ctx context.Context, reviewID string) error {
-	if err := s.contentRepo.DeleteContentReview(ctx, reviewID); err != nil {
+func (s *Service) DeleteContentReviewAdmin(ctx context.Context, reviewID, userID string) error {
+	if err := s.contentRepo.DeleteContentReview(ctx, reviewID, userID); err != nil {
 		return fmt.Errorf("service.DeleteContentReviewAdmin: %w", err)
 	}
 	return nil

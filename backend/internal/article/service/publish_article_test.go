@@ -13,14 +13,14 @@ import (
 func validGetArticleByID(_ context.Context, _ string) (*articledomain.Article, error) {
 	seoTitle := "SeoTitle"
 	seoDescription := "SeoDescription"
-	excerpt := "excerpt"
+	description := "description"
 	return &articledomain.Article{
 		Status:         articledomain.DraftStatus,
 		Title:          "title",
 		SeoTitle:       &seoTitle,
 		SeoDescription: &seoDescription,
 		Body:           "body",
-		Excerpt:        &excerpt,
+		Description:    &description,
 	}, nil
 }
 

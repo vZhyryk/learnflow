@@ -17,7 +17,7 @@ const articleSlugUniqueConstraint = "articles_slug_unique"
 
 // CreateArticle inserts a new draft Article.
 func (rep *Repository) CreateArticle(ctx context.Context, article *articledomain.Article) (*articledomain.Article, error) {
-	article, err := scanArticle(rep.QueryRunner(ctx).QueryRow(ctx, createDraftArticleSQL, article.Slug, article.Title, article.Excerpt, article.Body, article.SeoTitle, article.SeoDescription, article.OgImageURL, article.IsIndexable, article.CreatedByUserID))
+	article, err := scanArticle(rep.QueryRunner(ctx).QueryRow(ctx, createDraftArticleSQL, article.Slug, article.Title, article.Description, article.Body, article.SeoTitle, article.SeoDescription, article.OgImageURL, article.IsIndexable, article.CreatedByUserID))
 	if db.IsUniqueViolation(err, articleSlugUniqueConstraint) {
 		return nil, articledomain.ErrInvalidSlug
 	}
@@ -45,7 +45,7 @@ func (rep *Repository) DeleteArticle(ctx context.Context, articleID string) erro
 
 // UpdateArticle persists changes to an existing Article.
 func (rep *Repository) UpdateArticle(ctx context.Context, article *articledomain.Article) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateArticleSQL, article.ID, article.Slug, article.Title, article.Excerpt, article.Body, article.SeoTitle, article.SeoDescription, article.OgImageURL, article.IsIndexable)
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateArticleSQL, article.ID, article.Slug, article.Title, article.Description, article.Body, article.SeoTitle, article.SeoDescription, article.OgImageURL, article.IsIndexable)
 	if db.IsUniqueViolation(err, articleSlugUniqueConstraint) {
 		return articledomain.ErrInvalidSlug
 	}

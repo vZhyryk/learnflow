@@ -41,8 +41,8 @@ func (rep *Repository) UpdateCourseReview(ctx context.Context, contentItem *revi
 }
 
 // DeleteCourseReview soft-deletes a course review.
-func (rep *Repository) DeleteCourseReview(ctx context.Context, reviewID string) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, deleteCourseReviewSQL, reviewID)
+func (rep *Repository) DeleteCourseReview(ctx context.Context, reviewID, userID string) error {
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, deleteCourseReviewSQL, reviewID, userID)
 	if err != nil {
 		return fmt.Errorf("repository.DeleteCourseReview: %w", err)
 	}

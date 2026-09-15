@@ -130,7 +130,7 @@ func TestDeleteCourseReviewAdmin(t *testing.T) {
 	Convey("DELETE /api/v1/admin/courses/reviews/{id}", t, func() {
 		var svcErr error
 		svc := &mockService{
-			deleteCourseReviewAdmin: func(_ context.Context, _ string) error {
+			deleteCourseReviewAdmin: func(_ context.Context, _, _ string) error {
 				return svcErr
 			},
 		}
@@ -182,7 +182,7 @@ func TestDeleteContentReviewAdmin(t *testing.T) {
 	Convey("DELETE /api/v1/admin/content/reviews/{id}", t, func() {
 		var svcErr error
 		svc := &mockService{
-			deleteContentReviewAdmin: func(_ context.Context, _ string) error {
+			deleteContentReviewAdmin: func(_ context.Context, _, _ string) error {
 				return svcErr
 			},
 		}

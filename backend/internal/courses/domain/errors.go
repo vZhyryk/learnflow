@@ -7,16 +7,18 @@ import "errors"
 var (
 	ErrCourseNotFound = errors.New("course not found")
 
-	ErrInvalidSlug             = errors.New("invalid slug")
-	ErrInvalidTitle            = errors.New("invalid title")
-	ErrInvalidDescription      = errors.New("invalid description")
-	ErrInvalidThumbnailURL     = errors.New("invalid Thumbnail URL")
-	ErrInvalidPreviewVideoURL  = errors.New("invalid Preview Video URL")
-	ErrInvalidEstimatedMinutes = errors.New("invalid Estimated Minutes")
-	ErrInvalidSeoTitle         = errors.New("invalid seo title")
-	ErrInvalidSeoDescription   = errors.New("invalid seo description")
-	ErrInvalidOgImageURL       = errors.New("invalid og image url")
-	ErrInvalidCanonicalURL     = errors.New("invalid canonical url")
+	ErrInvalidSlug               = errors.New("invalid slug")
+	ErrInvalidTitle              = errors.New("invalid title")
+	ErrInvalidDescription        = errors.New("invalid description")
+	ErrInvalidThumbnailURL       = errors.New("invalid Thumbnail URL")
+	ErrInvalidPreviewVideoURL    = errors.New("invalid Preview Video URL")
+	ErrInvalidEstimatedMinutes   = errors.New("invalid Estimated Minutes")
+	ErrInvalidSeoTitle           = errors.New("invalid seo title")
+	ErrInvalidSeoDescription     = errors.New("invalid seo description")
+	ErrInvalidOgImageURL         = errors.New("invalid og image url")
+	ErrInvalidCanonicalURL       = errors.New("invalid canonical url")
+	ErrInvalidAnnouncement       = errors.New("invalid announcement")
+	ErrInvalidAnnouncedExpiredAt = errors.New("invalid announced_expired_at")
 
 	ErrInvalidCourseID = errors.New("invalid course ID")
 

@@ -2,12 +2,12 @@ package articlerepository
 
 const (
 	articleColumns = `
-    id, slug, title, excerpt, body, seo_title, seo_description, og_image_url, is_indexable,
+    id, slug, title, description, body, seo_title, seo_description, og_image_url, is_indexable,
 	status, created_by_user_id, created_at, updated_at, published_at, deleted_at
 	`
 
 	createDraftArticleSQL = `
-		INSERT INTO articles (slug, title, excerpt, body, seo_title, seo_description, og_image_url, is_indexable, created_by_user_id)
+		INSERT INTO articles (slug, title, description, body, seo_title, seo_description, og_image_url, is_indexable, created_by_user_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING` + articleColumns
 
@@ -35,7 +35,7 @@ const (
 		SET
 			slug = $2,
 			title = $3,
-			excerpt = $4,
+			description = $4,
 			body = $5,
 			seo_title = $6,
 			seo_description = $7,

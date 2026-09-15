@@ -85,8 +85,8 @@ type mockService struct {
 	getContentReviewStats    func(ctx context.Context, contentID string) (rating float64, count int, err error)
 	deleteCourseReview       func(ctx context.Context, reviewID, userID string) error
 	deleteContentReview      func(ctx context.Context, reviewID, userID string) error
-	deleteCourseReviewAdmin  func(ctx context.Context, reviewID string) error
-	deleteContentReviewAdmin func(ctx context.Context, reviewID string) error
+	deleteCourseReviewAdmin  func(ctx context.Context, reviewID, userID string) error
+	deleteContentReviewAdmin func(ctx context.Context, reviewID, userID string) error
 }
 
 func (m *mockService) CreateCourseReview(ctx context.Context, req reviewdomain.CreateCourseReviewRequest) error {
@@ -187,16 +187,16 @@ func (m *mockService) DeleteContentReview(ctx context.Context, reviewID, userID 
 	return m.deleteContentReview(ctx, reviewID, userID)
 }
 
-func (m *mockService) DeleteCourseReviewAdmin(ctx context.Context, reviewID string) error {
+func (m *mockService) DeleteCourseReviewAdmin(ctx context.Context, reviewID, userID string) error {
 	if m.deleteCourseReviewAdmin == nil {
 		panic("mockService.deleteCourseReviewAdmin not set")
 	}
-	return m.deleteCourseReviewAdmin(ctx, reviewID)
+	return m.deleteCourseReviewAdmin(ctx, reviewID, userID)
 }
 
-func (m *mockService) DeleteContentReviewAdmin(ctx context.Context, reviewID string) error {
+func (m *mockService) DeleteContentReviewAdmin(ctx context.Context, reviewID, userID string) error {
 	if m.deleteContentReviewAdmin == nil {
 		panic("mockService.deleteContentReviewAdmin not set")
 	}
-	return m.deleteContentReviewAdmin(ctx, reviewID)
+	return m.deleteContentReviewAdmin(ctx, reviewID, userID)
 }
