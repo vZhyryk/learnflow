@@ -59,8 +59,8 @@ func (rep *Repository) GetArticleReviewList(ctx context.Context, params paginati
 	args := make([]any, 1)
 	args[0] = articleID
 	query := getArticleReviewByArticleIDSQL
-	if filter.IsUsed() {
-		query = query[:strings.Index(query, filterPlace)] + rep.GenerateFilterQuery(filter.Op)
+	if idx := strings.Index(query, filterPlace); filter.IsUsed() && idx >= 0 {
+		query = query[:idx] + rep.GenerateFilterQuery(filter.Op)
 		args = append(args, filter.Rating)
 	} else {
 		query = strings.Replace(query, filterPlace, "", 1)

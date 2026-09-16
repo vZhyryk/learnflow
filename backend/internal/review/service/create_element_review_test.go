@@ -10,8 +10,8 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestCreateCourseReview(t *testing.T) {
-	Convey("Create CourseReview", t, func() {
+func TestCreateCourseReviewAccess(t *testing.T) {
+	Convey("Create CourseReview access checks", t, func() {
 		cRepo := &mockReviewRepo{}
 		accessChecker := &mockAccessChecker{
 			hasAccessCourse: func(_ context.Context, _ string, _ string) (bool, error) {
@@ -39,6 +39,18 @@ func TestCreateCourseReview(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
+	})
+}
+
+func TestCreateCourseReviewLookup(t *testing.T) {
+	Convey("Create CourseReview — existing-review lookup", t, func() {
+		cRepo := &mockReviewRepo{}
+		accessChecker := &mockAccessChecker{
+			hasAccessCourse: func(_ context.Context, _ string, _ string) (bool, error) {
+				return true, nil
+			},
+		}
+		srv := newTestService(cRepo, nil, accessChecker)
 
 		Convey("GetCourseReviewByUserAndCourseID error", func() {
 			cRepo.getCourseReviewByUserAndCourseID = func(_ context.Context, _ string, _ string) (*reviewdomain.CourseReview, error) {
@@ -59,12 +71,24 @@ func TestCreateCourseReview(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
+	})
+}
+
+func TestCreateCourseReviewPersistence(t *testing.T) {
+	Convey("Create CourseReview persistence", t, func() {
+		cRepo := &mockReviewRepo{
+			getCourseReviewByUserAndCourseID: func(_ context.Context, _ string, _ string) (*reviewdomain.CourseReview, error) {
+				return nil, reviewdomain.ErrReviewNotFound
+			},
+		}
+		accessChecker := &mockAccessChecker{
+			hasAccessCourse: func(_ context.Context, _ string, _ string) (bool, error) {
+				return true, nil
+			},
+		}
+		srv := newTestService(cRepo, nil, accessChecker)
 
 		Convey("CreateCourseReview error", func() {
-			cRepo.getCourseReviewByUserAndCourseID = func(_ context.Context, _ string, _ string) (*reviewdomain.CourseReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			cRepo.createCourseReview = func(_ context.Context, _ *reviewdomain.CourseReview) (*reviewdomain.CourseReview, error) {
 				return nil, testutil.ErrDBUnexpected
 			}
@@ -75,10 +99,6 @@ func TestCreateCourseReview(t *testing.T) {
 		})
 
 		Convey("success", func() {
-			cRepo.getCourseReviewByUserAndCourseID = func(_ context.Context, _ string, _ string) (*reviewdomain.CourseReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			cRepo.createCourseReview = func(_ context.Context, _ *reviewdomain.CourseReview) (*reviewdomain.CourseReview, error) {
 				return &reviewdomain.CourseReview{}, nil
 			}
@@ -89,8 +109,8 @@ func TestCreateCourseReview(t *testing.T) {
 	})
 }
 
-func TestCreateContentReview(t *testing.T) {
-	Convey("Create ContentReview", t, func() {
+func TestCreateContentReviewAccess(t *testing.T) {
+	Convey("Create ContentReview access checks", t, func() {
 		cRepo := &mockReviewRepo{}
 		accessChecker := &mockAccessChecker{
 			hasAccessContent: func(_ context.Context, _ string, _ string) (bool, error) {
@@ -118,6 +138,18 @@ func TestCreateContentReview(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
+	})
+}
+
+func TestCreateContentReviewLookup(t *testing.T) {
+	Convey("Create ContentReview — existing-review lookup", t, func() {
+		cRepo := &mockReviewRepo{}
+		accessChecker := &mockAccessChecker{
+			hasAccessContent: func(_ context.Context, _ string, _ string) (bool, error) {
+				return true, nil
+			},
+		}
+		srv := newTestService(nil, cRepo, accessChecker)
 
 		Convey("GetContentReviewByUserAndContentID error", func() {
 			cRepo.getContentReviewByUserAndContentID = func(_ context.Context, _ string, _ string) (*reviewdomain.ContentReview, error) {
@@ -138,12 +170,24 @@ func TestCreateContentReview(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
+	})
+}
+
+func TestCreateContentReviewPersistence(t *testing.T) {
+	Convey("Create ContentReview persistence", t, func() {
+		cRepo := &mockReviewRepo{
+			getContentReviewByUserAndContentID: func(_ context.Context, _ string, _ string) (*reviewdomain.ContentReview, error) {
+				return nil, reviewdomain.ErrReviewNotFound
+			},
+		}
+		accessChecker := &mockAccessChecker{
+			hasAccessContent: func(_ context.Context, _ string, _ string) (bool, error) {
+				return true, nil
+			},
+		}
+		srv := newTestService(nil, cRepo, accessChecker)
 
 		Convey("CreateContentReview error", func() {
-			cRepo.getContentReviewByUserAndContentID = func(_ context.Context, _ string, _ string) (*reviewdomain.ContentReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			cRepo.createContentReview = func(_ context.Context, _ *reviewdomain.ContentReview) (*reviewdomain.ContentReview, error) {
 				return nil, testutil.ErrDBUnexpected
 			}
@@ -154,10 +198,6 @@ func TestCreateContentReview(t *testing.T) {
 		})
 
 		Convey("success", func() {
-			cRepo.getContentReviewByUserAndContentID = func(_ context.Context, _ string, _ string) (*reviewdomain.ContentReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			cRepo.createContentReview = func(_ context.Context, _ *reviewdomain.ContentReview) (*reviewdomain.ContentReview, error) {
 				return &reviewdomain.ContentReview{}, nil
 			}
@@ -168,8 +208,8 @@ func TestCreateContentReview(t *testing.T) {
 	})
 }
 
-func TestCreateCourseReviewAdmin(t *testing.T) {
-	Convey("Create CourseReview as admin", t, func() {
+func TestCreateCourseReviewAdminLookup(t *testing.T) {
+	Convey("Create CourseReview as admin — existing-review lookup", t, func() {
 		cRepo := &mockReviewRepo{}
 		srv := newTestService(cRepo, nil, nil)
 
@@ -192,12 +232,19 @@ func TestCreateCourseReviewAdmin(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
+	})
+}
+
+func TestCreateCourseReviewAdminPersistence(t *testing.T) {
+	Convey("Create CourseReview as admin — persistence", t, func() {
+		cRepo := &mockReviewRepo{
+			getCourseReviewByUserAndCourseID: func(_ context.Context, _ string, _ string) (*reviewdomain.CourseReview, error) {
+				return nil, reviewdomain.ErrReviewNotFound
+			},
+		}
+		srv := newTestService(cRepo, nil, nil)
 
 		Convey("CreateCourseReview error", func() {
-			cRepo.getCourseReviewByUserAndCourseID = func(_ context.Context, _ string, _ string) (*reviewdomain.CourseReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			cRepo.createCourseReview = func(_ context.Context, _ *reviewdomain.CourseReview) (*reviewdomain.CourseReview, error) {
 				return nil, testutil.ErrDBUnexpected
 			}
@@ -208,10 +255,6 @@ func TestCreateCourseReviewAdmin(t *testing.T) {
 		})
 
 		Convey("success", func() {
-			cRepo.getCourseReviewByUserAndCourseID = func(_ context.Context, _ string, _ string) (*reviewdomain.CourseReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			cRepo.createCourseReview = func(_ context.Context, _ *reviewdomain.CourseReview) (*reviewdomain.CourseReview, error) {
 				return &reviewdomain.CourseReview{}, nil
 			}
@@ -222,8 +265,8 @@ func TestCreateCourseReviewAdmin(t *testing.T) {
 	})
 }
 
-func TestCreateContentReviewAdmin(t *testing.T) {
-	Convey("Create ContentReview as admin", t, func() {
+func TestCreateContentReviewAdminLookup(t *testing.T) {
+	Convey("Create ContentReview as admin — existing-review lookup", t, func() {
 		cRepo := &mockReviewRepo{}
 		srv := newTestService(nil, cRepo, nil)
 
@@ -246,12 +289,19 @@ func TestCreateContentReviewAdmin(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
+	})
+}
+
+func TestCreateContentReviewAdminPersistence(t *testing.T) {
+	Convey("Create ContentReview as admin — persistence", t, func() {
+		cRepo := &mockReviewRepo{
+			getContentReviewByUserAndContentID: func(_ context.Context, _ string, _ string) (*reviewdomain.ContentReview, error) {
+				return nil, reviewdomain.ErrReviewNotFound
+			},
+		}
+		srv := newTestService(nil, cRepo, nil)
 
 		Convey("CreateContentReview error", func() {
-			cRepo.getContentReviewByUserAndContentID = func(_ context.Context, _ string, _ string) (*reviewdomain.ContentReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			cRepo.createContentReview = func(_ context.Context, _ *reviewdomain.ContentReview) (*reviewdomain.ContentReview, error) {
 				return nil, testutil.ErrDBUnexpected
 			}
@@ -262,10 +312,6 @@ func TestCreateContentReviewAdmin(t *testing.T) {
 		})
 
 		Convey("success", func() {
-			cRepo.getContentReviewByUserAndContentID = func(_ context.Context, _ string, _ string) (*reviewdomain.ContentReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			cRepo.createContentReview = func(_ context.Context, _ *reviewdomain.ContentReview) (*reviewdomain.ContentReview, error) {
 				return &reviewdomain.ContentReview{}, nil
 			}
@@ -276,8 +322,8 @@ func TestCreateContentReviewAdmin(t *testing.T) {
 	})
 }
 
-func TestCreateArticleReview(t *testing.T) {
-	Convey("Create ArticleReview", t, func() {
+func TestCreateArticleReviewLookup(t *testing.T) {
+	Convey("Create ArticleReview — existing-review lookup", t, func() {
 		aRepo := &mockReviewRepo{}
 		srv := newTestServiceWithArticleRepo(aRepo)
 
@@ -300,12 +346,19 @@ func TestCreateArticleReview(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
+	})
+}
+
+func TestCreateArticleReviewPersistence(t *testing.T) {
+	Convey("Create ArticleReview — persistence", t, func() {
+		aRepo := &mockReviewRepo{
+			getArticleReviewByUserAndArticleID: func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, reviewdomain.ErrReviewNotFound
+			},
+		}
+		srv := newTestServiceWithArticleRepo(aRepo)
 
 		Convey("CreateArticleReview error", func() {
-			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			aRepo.createArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error) {
 				return nil, testutil.ErrDBUnexpected
 			}
@@ -316,10 +369,6 @@ func TestCreateArticleReview(t *testing.T) {
 		})
 
 		Convey("success", func() {
-			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			aRepo.createArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error) {
 				return &reviewdomain.ArticleReview{}, nil
 			}
@@ -330,8 +379,8 @@ func TestCreateArticleReview(t *testing.T) {
 	})
 }
 
-func TestCreateArticleReviewAdmin(t *testing.T) {
-	Convey("Create ArticleReview as admin", t, func() {
+func TestCreateArticleReviewAdminLookup(t *testing.T) {
+	Convey("Create ArticleReview as admin — existing-review lookup", t, func() {
 		aRepo := &mockReviewRepo{}
 		srv := newTestServiceWithArticleRepo(aRepo)
 
@@ -354,12 +403,19 @@ func TestCreateArticleReviewAdmin(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
+	})
+}
+
+func TestCreateArticleReviewAdminPersistence(t *testing.T) {
+	Convey("Create ArticleReview as admin — persistence", t, func() {
+		aRepo := &mockReviewRepo{
+			getArticleReviewByUserAndArticleID: func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
+				return nil, reviewdomain.ErrReviewNotFound
+			},
+		}
+		srv := newTestServiceWithArticleRepo(aRepo)
 
 		Convey("CreateArticleReview error", func() {
-			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			aRepo.createArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error) {
 				return nil, testutil.ErrDBUnexpected
 			}
@@ -370,10 +426,6 @@ func TestCreateArticleReviewAdmin(t *testing.T) {
 		})
 
 		Convey("success", func() {
-			aRepo.getArticleReviewByUserAndArticleID = func(_ context.Context, _ string, _ string) (*reviewdomain.ArticleReview, error) {
-				return nil, reviewdomain.ErrReviewNotFound
-			}
-
 			aRepo.createArticleReview = func(_ context.Context, _ *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error) {
 				return &reviewdomain.ArticleReview{}, nil
 			}

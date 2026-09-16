@@ -129,6 +129,7 @@ func (req *UpdateCourseReviewRequest) validateComment() error {
 	return nil
 }
 
+// Apply merges the request's non-nil fields onto p.
 func (r UpdateCourseReviewRequest) Apply(p *CourseReview) {
 	appliers := []func(*CourseReview){
 		r.applyRating,
@@ -273,6 +274,7 @@ func (req *UpdateContentReviewRequest) validateComment() error {
 	return nil
 }
 
+// Apply merges the request's non-nil fields onto p.
 func (r UpdateContentReviewRequest) Apply(p *ContentReview) {
 	appliers := []func(*ContentReview){
 		r.applyRating,
@@ -295,6 +297,7 @@ func (r UpdateContentReviewRequest) applyComment(p *ContentReview) {
 	}
 }
 
+// ArticleReview is a user's rating and comment on an article.
 type ArticleReview struct {
 	ID              string     `json:"id"`
 	ArticleID       string     `json:"article_id"`
@@ -416,6 +419,7 @@ func (req *UpdateArticleReviewRequest) validateComment() error {
 	return nil
 }
 
+// Apply merges the request's non-nil fields onto p.
 func (r UpdateArticleReviewRequest) Apply(p *ArticleReview) {
 	appliers := []func(*ArticleReview){
 		r.applyRating,
@@ -438,11 +442,13 @@ func (r UpdateArticleReviewRequest) applyComment(p *ArticleReview) {
 	}
 }
 
+// ReviewFilter filters a review list by rating comparison.
 type ReviewFilter struct {
 	Rating int
 	Op     string
 }
 
+// IsUsed reports whether the filter has a valid comparison operator set.
 func (f *ReviewFilter) IsUsed() bool {
 	validOps := map[string]bool{
 		"gt":  true,

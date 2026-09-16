@@ -6,6 +6,7 @@ import (
 	reviewdomain "learnflow_backend/internal/review/domain"
 )
 
+// UpdateCourseReview updates a course review owned by the requesting user.
 func (s *Service) UpdateCourseReview(ctx context.Context, req reviewdomain.UpdateCourseReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.courseRepo.GetCourseReviewByID(ctx, req.ReviewID)
@@ -35,6 +36,7 @@ func (s *Service) UpdateCourseReview(ctx context.Context, req reviewdomain.Updat
 	})
 }
 
+// UpdateContentReview updates a content review owned by the requesting user.
 func (s *Service) UpdateContentReview(ctx context.Context, req reviewdomain.UpdateContentReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.contentRepo.GetContentReviewByID(ctx, req.ReviewID)
@@ -64,6 +66,7 @@ func (s *Service) UpdateContentReview(ctx context.Context, req reviewdomain.Upda
 	})
 }
 
+// UpdateCourseReviewAdmin updates any course review, bypassing ownership/access checks.
 func (s *Service) UpdateCourseReviewAdmin(ctx context.Context, req reviewdomain.UpdateCourseReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.courseRepo.GetCourseReviewByID(ctx, req.ReviewID)
@@ -80,6 +83,7 @@ func (s *Service) UpdateCourseReviewAdmin(ctx context.Context, req reviewdomain.
 	})
 }
 
+// UpdateContentReviewAdmin updates any content review, bypassing ownership/access checks.
 func (s *Service) UpdateContentReviewAdmin(ctx context.Context, req reviewdomain.UpdateContentReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.contentRepo.GetContentReviewByID(ctx, req.ReviewID)
@@ -96,6 +100,7 @@ func (s *Service) UpdateContentReviewAdmin(ctx context.Context, req reviewdomain
 	})
 }
 
+// UpdateArticleReview updates an article review owned by the requesting user.
 func (s *Service) UpdateArticleReview(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.articleRepo.GetArticleReviewByID(ctx, req.ReviewID)
@@ -116,6 +121,7 @@ func (s *Service) UpdateArticleReview(ctx context.Context, req reviewdomain.Upda
 	})
 }
 
+// UpdateArticleReviewAdmin updates any article review, bypassing ownership checks.
 func (s *Service) UpdateArticleReviewAdmin(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.articleRepo.GetArticleReviewByID(ctx, req.ReviewID)

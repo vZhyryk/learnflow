@@ -30,8 +30,8 @@ func TestDeleteCourseReview(t *testing.T) {
 
 		Convey("invalid review id → 422", func() {
 			f := newHTTPFixture(svc, http.MethodDelete, "/api/v1/courses/reviews/---")
-			mux, newReq := f.mux, f.newReq
-			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			invalidMux, invalidNewReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(invalidMux, withUser(invalidNewReq("", nil)))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
@@ -88,8 +88,8 @@ func TestDeleteContentReview(t *testing.T) {
 
 		Convey("invalid review id → 422", func() {
 			f := newHTTPFixture(svc, http.MethodDelete, "/api/v1/content/reviews/---")
-			mux, newReq := f.mux, f.newReq
-			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			invalidMux, invalidNewReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(invalidMux, withUser(invalidNewReq("", nil)))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
@@ -146,8 +146,8 @@ func TestDeleteCourseReviewAdmin(t *testing.T) {
 
 		Convey("invalid review id → 422", func() {
 			f := newHTTPFixture(svc, http.MethodDelete, "/api/v1/admin/courses/reviews/---")
-			mux, newReq := f.mux, f.newReq
-			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			invalidMux, invalidNewReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(invalidMux, withUser(invalidNewReq("", nil)))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
@@ -198,8 +198,8 @@ func TestDeleteContentReviewAdmin(t *testing.T) {
 
 		Convey("invalid review id → 422", func() {
 			f := newHTTPFixture(svc, http.MethodDelete, "/api/v1/admin/content/reviews/---")
-			mux, newReq := f.mux, f.newReq
-			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			invalidMux, invalidNewReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(invalidMux, withUser(invalidNewReq("", nil)))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
@@ -250,8 +250,8 @@ func TestDeleteArticleReview(t *testing.T) {
 
 		Convey("invalid review id → 422", func() {
 			f := newHTTPFixture(svc, http.MethodDelete, "/api/v1/articles/reviews/---")
-			mux, newReq := f.mux, f.newReq
-			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			invalidMux, invalidNewReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(invalidMux, withUser(invalidNewReq("", nil)))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
@@ -302,8 +302,8 @@ func TestDeleteArticleReviewAdmin(t *testing.T) {
 
 		Convey("invalid review id → 422", func() {
 			f := newHTTPFixture(svc, http.MethodDelete, "/api/v1/admin/articles/reviews/---")
-			mux, newReq := f.mux, f.newReq
-			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			invalidMux, invalidNewReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(invalidMux, withUser(invalidNewReq("", nil)))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgconn"
+	//nolint:staticcheck // project convention — dot-import Convey, same as every *_test.go file
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -22,6 +23,8 @@ func TestExecMethod(
 	bind func(*MockQueryRunner) func(ctx context.Context, id, userID string) error,
 	notFoundErr error,
 ) {
+	const testUserID = "user-1"
+
 	Convey("Given a repository", t, func() {
 		var execTag pgconn.CommandTag
 		var execErr error
@@ -33,18 +36,18 @@ func TestExecMethod(
 
 		Convey("When it succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			So(call(context.Background(), "item-123", "user-1"), ShouldBeNil)
+			So(call(context.Background(), "item-123", testUserID), ShouldBeNil)
 		})
 
 		Convey("When no row is matched (not found)", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 0")
-			err := call(context.Background(), "unknown", "user-1")
+			err := call(context.Background(), "unknown", testUserID)
 			So(errors.Is(err, notFoundErr), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
 			execErr = ErrDBUnexpected
-			err := call(context.Background(), "item-123", "user-1")
+			err := call(context.Background(), "item-123", testUserID)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "repository."+methodName)
 		})

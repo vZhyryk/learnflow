@@ -10,20 +10,25 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestUpdateCourseReview(t *testing.T) {
-	Convey("Update CourseReview", t, func() {
-		cRepo := &mockReviewRepo{
-			getCourseReviewByID: func(_ context.Context, _ string) (*reviewdomain.CourseReview, error) {
-				return &reviewdomain.CourseReview{ID: "review-1", CourseID: "course-1", UserID: "user-1"}, nil
-			},
-		}
-		accessChecker := &mockAccessChecker{
-			hasAccessCourse: func(_ context.Context, _ string, _ string) (bool, error) {
-				return true, nil
-			},
-		}
-		srv := newTestService(cRepo, nil, accessChecker)
-		req := reviewdomain.UpdateCourseReviewRequest{ReviewID: "review-1", UserID: "user-1"}
+func newCourseReviewUpdateFixture() (*mockReviewRepo, *mockAccessChecker, *Service, reviewdomain.UpdateCourseReviewRequest) {
+	cRepo := &mockReviewRepo{
+		getCourseReviewByID: func(_ context.Context, _ string) (*reviewdomain.CourseReview, error) {
+			return &reviewdomain.CourseReview{ID: "review-1", CourseID: "course-1", UserID: "user-1"}, nil
+		},
+	}
+	accessChecker := &mockAccessChecker{
+		hasAccessCourse: func(_ context.Context, _ string, _ string) (bool, error) {
+			return true, nil
+		},
+	}
+	srv := newTestService(cRepo, nil, accessChecker)
+	req := reviewdomain.UpdateCourseReviewRequest{ReviewID: "review-1", UserID: "user-1"}
+	return cRepo, accessChecker, srv, req
+}
+
+func TestUpdateCourseReviewOwnershipAndAccess(t *testing.T) {
+	Convey("Update CourseReview ownership/access checks", t, func() {
+		cRepo, accessChecker, srv, req := newCourseReviewUpdateFixture()
 
 		Convey("fetch review error", func() {
 			cRepo.getCourseReviewByID = func(_ context.Context, _ string) (*reviewdomain.CourseReview, error) {
@@ -64,6 +69,12 @@ func TestUpdateCourseReview(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrNoPermission), ShouldBeTrue)
 		})
+	})
+}
+
+func TestUpdateCourseReviewPersistence(t *testing.T) {
+	Convey("Update CourseReview persistence", t, func() {
+		cRepo, _, srv, req := newCourseReviewUpdateFixture()
 
 		Convey("repository update error", func() {
 			cRepo.updateCourseReview = func(_ context.Context, _ *reviewdomain.CourseReview) error {
@@ -91,20 +102,25 @@ func TestUpdateCourseReview(t *testing.T) {
 	})
 }
 
-func TestUpdateContentReview(t *testing.T) {
-	Convey("Update ContentReview", t, func() {
-		cRepo := &mockReviewRepo{
-			getContentReviewByID: func(_ context.Context, _ string) (*reviewdomain.ContentReview, error) {
-				return &reviewdomain.ContentReview{ID: "review-1", ContentID: "content-1", UserID: "user-1"}, nil
-			},
-		}
-		accessChecker := &mockAccessChecker{
-			hasAccessContent: func(_ context.Context, _ string, _ string) (bool, error) {
-				return true, nil
-			},
-		}
-		srv := newTestService(nil, cRepo, accessChecker)
-		req := reviewdomain.UpdateContentReviewRequest{ReviewID: "review-1", UserID: "user-1"}
+func newContentReviewUpdateFixture() (*mockReviewRepo, *mockAccessChecker, *Service, reviewdomain.UpdateContentReviewRequest) {
+	cRepo := &mockReviewRepo{
+		getContentReviewByID: func(_ context.Context, _ string) (*reviewdomain.ContentReview, error) {
+			return &reviewdomain.ContentReview{ID: "review-1", ContentID: "content-1", UserID: "user-1"}, nil
+		},
+	}
+	accessChecker := &mockAccessChecker{
+		hasAccessContent: func(_ context.Context, _ string, _ string) (bool, error) {
+			return true, nil
+		},
+	}
+	srv := newTestService(nil, cRepo, accessChecker)
+	req := reviewdomain.UpdateContentReviewRequest{ReviewID: "review-1", UserID: "user-1"}
+	return cRepo, accessChecker, srv, req
+}
+
+func TestUpdateContentReviewOwnershipAndAccess(t *testing.T) {
+	Convey("Update ContentReview ownership/access checks", t, func() {
+		cRepo, accessChecker, srv, req := newContentReviewUpdateFixture()
 
 		Convey("fetch review error", func() {
 			cRepo.getContentReviewByID = func(_ context.Context, _ string) (*reviewdomain.ContentReview, error) {
@@ -145,6 +161,12 @@ func TestUpdateContentReview(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrNoPermission), ShouldBeTrue)
 		})
+	})
+}
+
+func TestUpdateContentReviewPersistence(t *testing.T) {
+	Convey("Update ContentReview persistence", t, func() {
+		cRepo, _, srv, req := newContentReviewUpdateFixture()
 
 		Convey("repository update error", func() {
 			cRepo.updateContentReview = func(_ context.Context, _ *reviewdomain.ContentReview) error {

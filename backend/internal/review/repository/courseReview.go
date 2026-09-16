@@ -58,9 +58,9 @@ func (rep *Repository) DeleteCourseReview(ctx context.Context, reviewID, userID 
 func (rep *Repository) GetCourseReviewList(ctx context.Context, params pagination.Params, courseID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error) {
 	args := make([]any, 1)
 	args[0] = courseID
-	var query string = getCourseReviewByCourseIDSQL
-	if filter.IsUsed() {
-		query = query[:strings.Index(query, filterPlace)] + rep.GenerateFilterQuery(filter.Op)
+	var query = getCourseReviewByCourseIDSQL
+	if idx := strings.Index(query, filterPlace); filter.IsUsed() && idx >= 0 {
+		query = query[:idx] + rep.GenerateFilterQuery(filter.Op)
 		args = append(args, filter.Rating)
 	} else {
 		query = strings.Replace(query, filterPlace, "", 1)

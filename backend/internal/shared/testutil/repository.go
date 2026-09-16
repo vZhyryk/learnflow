@@ -60,98 +60,49 @@ type MockRow struct {
 // Scan delegates to ScanFn.
 func (r *MockRow) Scan(dest ...any) error { return r.ScanFn(dest...) }
 
-// CastStr safely type-asserts a scan destination to *string, panicking with context on failure.
-func CastStr(v any, idx int) *string {
-	s, ok := v.(*string)
+// castAs safely type-asserts a scan destination to *T, panicking with context on failure.
+// It backs all the Cast*/CastEnum helpers below — they exist as named, non-generic entry
+// points so call sites read naturally (CastStr(v, idx)) without spelling out a type param.
+func castAs[T any](v any, idx int) *T {
+	t, ok := v.(*T)
 	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *string, got %T", idx, v))
-	}
-	return s
-}
-
-// CastPtrStr safely type-asserts a scan destination to **string.
-func CastPtrStr(v any, idx int) **string {
-	s, ok := v.(**string)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected **string, got %T", idx, v))
-	}
-	return s
-}
-
-// CastTime safely type-asserts a scan destination to *time.Time.
-func CastTime(v any, idx int) *time.Time {
-	s, ok := v.(*time.Time)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *time.Time, got %T", idx, v))
-	}
-	return s
-}
-
-// CastInt safely type-asserts a scan destination to *int.
-func CastInt(v any, idx int) *int {
-	s, ok := v.(*int)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *int, got %T", idx, v))
-	}
-	return s
-}
-
-// CastFloat64 safely type-asserts a scan destination to *float64.
-func CastFloat64(v any, idx int) *float64 {
-	s, ok := v.(*float64)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *float64, got %T", idx, v))
-	}
-	return s
-}
-
-// CastPgtypeDate safely type-asserts a scan destination to *pgtype.Date — used for
-// nullable `date` columns since pgx v5 can't scan `date` into *string.
-func CastPgtypeDate(v any, idx int) *pgtype.Date {
-	d, ok := v.(*pgtype.Date)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *pgtype.Date, got %T", idx, v))
-	}
-	return d
-}
-
-// CastBool safely type-asserts a scan destination to *bool.
-func CastBool(v any, idx int) *bool {
-	b, ok := v.(*bool)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *bool, got %T", idx, v))
-	}
-	return b
-}
-
-// CastPtrInt safely type-asserts a scan destination to **int, for nullable integer columns.
-func CastPtrInt(v any, idx int) **int {
-	i, ok := v.(**int)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected **int, got %T", idx, v))
-	}
-	return i
-}
-
-// CastPtrTime safely type-asserts a scan destination to **time.Time, for nullable
-// timestamptz columns.
-func CastPtrTime(v any, idx int) **time.Time {
-	t, ok := v.(**time.Time)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected **time.Time, got %T", idx, v))
+		panic(fmt.Sprintf("dest[%d]: expected *%T, got %T", idx, t, v))
 	}
 	return t
 }
 
+// CastStr safely type-asserts a scan destination to *string, panicking with context on failure.
+func CastStr(v any, idx int) *string { return castAs[string](v, idx) }
+
+// CastPtrStr safely type-asserts a scan destination to **string.
+func CastPtrStr(v any, idx int) **string { return castAs[*string](v, idx) }
+
+// CastTime safely type-asserts a scan destination to *time.Time.
+func CastTime(v any, idx int) *time.Time { return castAs[time.Time](v, idx) }
+
+// CastInt safely type-asserts a scan destination to *int.
+func CastInt(v any, idx int) *int { return castAs[int](v, idx) }
+
+// CastFloat64 safely type-asserts a scan destination to *float64.
+func CastFloat64(v any, idx int) *float64 { return castAs[float64](v, idx) }
+
+// CastPgtypeDate safely type-asserts a scan destination to *pgtype.Date — used for
+// nullable `date` columns since pgx v5 can't scan `date` into *string.
+func CastPgtypeDate(v any, idx int) *pgtype.Date { return castAs[pgtype.Date](v, idx) }
+
+// CastBool safely type-asserts a scan destination to *bool.
+func CastBool(v any, idx int) *bool { return castAs[bool](v, idx) }
+
+// CastPtrInt safely type-asserts a scan destination to **int, for nullable integer columns.
+func CastPtrInt(v any, idx int) **int { return castAs[*int](v, idx) }
+
+// CastPtrTime safely type-asserts a scan destination to **time.Time, for nullable
+// timestamptz columns.
+func CastPtrTime(v any, idx int) **time.Time { return castAs[*time.Time](v, idx) }
+
 // CastEnum safely type-asserts a scan destination to *T, for domain-specific string-enum
 // columns (e.g. CourseStatus, ContentType, UserRole) that can't live in a stdlib Cast* helper.
-func CastEnum[T any](v any, idx int) *T {
-	e, ok := v.(*T)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *%T, got %T", idx, e, v))
-	}
-	return e
-}
+func CastEnum[T any](v any, idx int) *T { return castAs[T](v, idx) }
 
 // MockRows implements pgx.Rows for controlled multi-row Scan injection in
 // repository/worker tests. Rows are consumed front-to-back by successive Scan calls.
@@ -174,6 +125,7 @@ func (r *MockRows) Scan(dest ...any) error {
 
 // Close is a no-op; MockRows has no underlying connection to release.
 func (r *MockRows) Close() {
+	// intentionally empty — see doc comment above
 }
 
 // Err returns RowsErr, the error to surface after iteration completes.

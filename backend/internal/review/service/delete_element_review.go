@@ -6,6 +6,7 @@ import (
 	reviewdomain "learnflow_backend/internal/review/domain"
 )
 
+// DeleteCourseReview soft-deletes a course review owned by the requesting user.
 func (s *Service) DeleteCourseReview(ctx context.Context, reviewID, userID string) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.courseRepo.GetCourseReviewByID(ctx, reviewID)
@@ -23,6 +24,7 @@ func (s *Service) DeleteCourseReview(ctx context.Context, reviewID, userID strin
 	})
 }
 
+// DeleteContentReview soft-deletes a content review owned by the requesting user.
 func (s *Service) DeleteContentReview(ctx context.Context, reviewID, userID string) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.contentRepo.GetContentReviewByID(ctx, reviewID)
@@ -38,9 +40,9 @@ func (s *Service) DeleteContentReview(ctx context.Context, reviewID, userID stri
 		}
 		return nil
 	})
-
 }
 
+// DeleteCourseReviewAdmin soft-deletes any course review, bypassing ownership checks.
 func (s *Service) DeleteCourseReviewAdmin(ctx context.Context, reviewID, userID string) error {
 	if err := s.courseRepo.DeleteCourseReview(ctx, reviewID, userID); err != nil {
 		return fmt.Errorf("service.DeleteCourseReviewAdmin: %w", err)
@@ -48,6 +50,7 @@ func (s *Service) DeleteCourseReviewAdmin(ctx context.Context, reviewID, userID 
 	return nil
 }
 
+// DeleteContentReviewAdmin soft-deletes any content review, bypassing ownership checks.
 func (s *Service) DeleteContentReviewAdmin(ctx context.Context, reviewID, userID string) error {
 	if err := s.contentRepo.DeleteContentReview(ctx, reviewID, userID); err != nil {
 		return fmt.Errorf("service.DeleteContentReviewAdmin: %w", err)
@@ -55,6 +58,7 @@ func (s *Service) DeleteContentReviewAdmin(ctx context.Context, reviewID, userID
 	return nil
 }
 
+// DeleteArticleReview soft-deletes an article review owned by the requesting user.
 func (s *Service) DeleteArticleReview(ctx context.Context, reviewID, userID string) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.articleRepo.GetArticleReviewByID(ctx, reviewID)
@@ -72,6 +76,7 @@ func (s *Service) DeleteArticleReview(ctx context.Context, reviewID, userID stri
 	})
 }
 
+// DeleteArticleReviewAdmin soft-deletes any article review, bypassing ownership checks.
 func (s *Service) DeleteArticleReviewAdmin(ctx context.Context, reviewID, userID string) error {
 	if err := s.articleRepo.DeleteArticleReview(ctx, reviewID, userID); err != nil {
 		return fmt.Errorf("service.DeleteArticleReviewAdmin: %w", err)

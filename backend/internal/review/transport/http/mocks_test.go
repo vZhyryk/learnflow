@@ -2,11 +2,7 @@ package reviewhttp_test
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"net/http/httptest"
-	"net/url"
-	"strings"
 
 	authdomain "learnflow_backend/internal/auth/domain"
 	reviewdomain "learnflow_backend/internal/review/domain"
@@ -50,22 +46,8 @@ type httpFixture struct {
 }
 
 func newHTTPFixture(svc *mockService, method, path string) *httpFixture {
-	return &httpFixture{
-		mux: newAuthMux(svc),
-		newReq: func(body string, urlParams map[string]string) *http.Request {
-			if len(urlParams) > 0 {
-				path += "?"
-			}
-
-			for key, value := range urlParams {
-				if value != "" && key != "" {
-					path += fmt.Sprintf("%s=%s", key, url.QueryEscape(value))
-				}
-			}
-
-			return httptest.NewRequestWithContext(context.Background(), method, path, strings.NewReader(body))
-		},
-	}
+	f := testutil.NewHTTPFixture(newAuthMux(svc), method, path)
+	return &httpFixture{mux: f.Mux, newReq: f.NewReq}
 }
 
 type mockService struct {

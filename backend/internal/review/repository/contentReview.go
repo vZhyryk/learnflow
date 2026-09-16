@@ -58,9 +58,9 @@ func (rep *Repository) DeleteContentReview(ctx context.Context, reviewID, userID
 func (rep *Repository) GetContentReviewList(ctx context.Context, params pagination.Params, contentID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error) {
 	args := make([]any, 1)
 	args[0] = contentID
-	var query string = getContentReviewByContentIDSQL
-	if filter.IsUsed() {
-		query = query[:strings.Index(query, filterPlace)] + rep.GenerateFilterQuery(filter.Op)
+	var query = getContentReviewByContentIDSQL
+	if idx := strings.Index(query, filterPlace); filter.IsUsed() && idx >= 0 {
+		query = query[:idx] + rep.GenerateFilterQuery(filter.Op)
 		args = append(args, filter.Rating)
 	} else {
 		query = strings.Replace(query, filterPlace, "", 1)
@@ -95,6 +95,7 @@ func (rep *Repository) GetContentReviewByUserAndContentID(ctx context.Context, u
 	return contentReview, nil
 }
 
+// GetContentReviewStats returns the average rating and review count for a content item.
 func (rep *Repository) GetContentReviewStats(ctx context.Context, contentID string) (rating float64, count int, err error) {
 	err = rep.QueryRunner(ctx).QueryRow(ctx, getContentReviewStats, contentID).Scan(&rating, &count)
 	if err != nil {

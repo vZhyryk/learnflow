@@ -38,6 +38,7 @@ type ContentReviewRepository interface {
 	GetContentReviewStats(ctx context.Context, contentID string) (rating float64, count int, err error)
 }
 
+// ArticleReviewRepository defines persistence operations for ArticleReview.
 type ArticleReviewRepository interface {
 	CreateArticleReview(ctx context.Context, articleReview *ArticleReview) (*ArticleReview, error)
 	UpdateArticleReview(ctx context.Context, articleReview *ArticleReview) error

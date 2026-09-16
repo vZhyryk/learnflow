@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	//nolint:staticcheck // project convention — dot-import Convey, same as every *_test.go file
 	. "github.com/smartystreets/goconvey/convey"
 )
 

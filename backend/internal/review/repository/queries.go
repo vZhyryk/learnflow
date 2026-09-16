@@ -157,6 +157,7 @@ const (
 	articleReviewsUserArticleUniqueConstraint = "idx_article_reviews_user_id_article_id_active_unique"
 )
 
+// GenerateFilterQuery returns the SQL comparison operator for a rating filter op.
 func (rep *Repository) GenerateFilterQuery(op string) string {
 	var val string
 	switch op {

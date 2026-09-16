@@ -9,13 +9,13 @@ import (
 	"github.com/justinas/alice"
 )
 
-// Handler wires HTTP routes for the courses module.
+// Handler wires HTTP routes for the review module.
 type Handler struct {
 	svc        reviewdomain.Service
 	jsonLogger *logger.Logger
 }
 
-// NewHTTPHandler returns a new Handler for the courses module.
+// NewHTTPHandler returns a new Handler for the review module.
 func NewHTTPHandler(svc reviewdomain.Service, jsonLogger *logger.Logger) *Handler {
 	return &Handler{
 		svc:        svc,
@@ -25,8 +25,7 @@ func NewHTTPHandler(svc reviewdomain.Service, jsonLogger *logger.Logger) *Handle
 
 // RegisterRoutes registers all course HTTP routes on the given mux.
 // chain applies to public routes, adminChain to admin-only routes.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, staticChain, StaticWithAuth, adminChain alice.Chain) {
-
+func (h *Handler) RegisterRoutes(mux *http.ServeMux, staticChain, staticWithAuth, adminChain alice.Chain) {
 	mux.Handle("PUT /api/v1/admin/courses/reviews", adminChain.ThenFunc(h.updateCourseReviewAdmin))
 	mux.Handle("PUT /api/v1/admin/content/reviews", adminChain.ThenFunc(h.updateContentReviewAdmin))
 	mux.Handle("PUT /api/v1/admin/articles/reviews", adminChain.ThenFunc(h.updateArticleReviewAdmin))
@@ -39,17 +38,17 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, staticChain, StaticWithAuth
 	mux.Handle("DELETE /api/v1/admin/content/reviews/{id}", adminChain.ThenFunc(h.deleteContentReviewAdmin))
 	mux.Handle("DELETE /api/v1/admin/articles/reviews/{id}", adminChain.ThenFunc(h.deleteArticleReviewAdmin))
 
-	mux.Handle("PUT /api/v1/courses/reviews", StaticWithAuth.ThenFunc(h.updateCourseReview))
-	mux.Handle("PUT /api/v1/content/reviews", StaticWithAuth.ThenFunc(h.updateContentReview))
-	mux.Handle("PUT /api/v1/articles/reviews", StaticWithAuth.ThenFunc(h.updateArticleReview))
+	mux.Handle("PUT /api/v1/courses/reviews", staticWithAuth.ThenFunc(h.updateCourseReview))
+	mux.Handle("PUT /api/v1/content/reviews", staticWithAuth.ThenFunc(h.updateContentReview))
+	mux.Handle("PUT /api/v1/articles/reviews", staticWithAuth.ThenFunc(h.updateArticleReview))
 
-	mux.Handle("POST /api/v1/courses/reviews", StaticWithAuth.ThenFunc(h.createCourseReview))
-	mux.Handle("POST /api/v1/content/reviews", StaticWithAuth.ThenFunc(h.createContentReview))
-	mux.Handle("POST /api/v1/articles/reviews", StaticWithAuth.ThenFunc(h.createArticleReview))
+	mux.Handle("POST /api/v1/courses/reviews", staticWithAuth.ThenFunc(h.createCourseReview))
+	mux.Handle("POST /api/v1/content/reviews", staticWithAuth.ThenFunc(h.createContentReview))
+	mux.Handle("POST /api/v1/articles/reviews", staticWithAuth.ThenFunc(h.createArticleReview))
 
-	mux.Handle("DELETE /api/v1/courses/reviews/{id}", StaticWithAuth.ThenFunc(h.deleteCourseReview))
-	mux.Handle("DELETE /api/v1/content/reviews/{id}", StaticWithAuth.ThenFunc(h.deleteContentReview))
-	mux.Handle("DELETE /api/v1/articles/reviews/{id}", StaticWithAuth.ThenFunc(h.deleteArticleReview))
+	mux.Handle("DELETE /api/v1/courses/reviews/{id}", staticWithAuth.ThenFunc(h.deleteCourseReview))
+	mux.Handle("DELETE /api/v1/content/reviews/{id}", staticWithAuth.ThenFunc(h.deleteContentReview))
+	mux.Handle("DELETE /api/v1/articles/reviews/{id}", staticWithAuth.ThenFunc(h.deleteArticleReview))
 
 	mux.Handle("GET /api/v1/courses/{id}/reviews", staticChain.ThenFunc(h.listCourseReviews))
 	mux.Handle("GET /api/v1/content/{id}/reviews", staticChain.ThenFunc(h.listContentReviews))

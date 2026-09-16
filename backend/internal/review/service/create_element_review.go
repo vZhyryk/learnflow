@@ -7,6 +7,7 @@ import (
 	reviewdomain "learnflow_backend/internal/review/domain"
 )
 
+// CreateCourseReview creates a course review by a user with access to the course.
 func (s *Service) CreateCourseReview(ctx context.Context, req reviewdomain.CreateCourseReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		hasAccess, err := s.accessChecker.HasAccessCourse(ctx, req.UserID, req.CourseID)
@@ -41,6 +42,7 @@ func (s *Service) CreateCourseReview(ctx context.Context, req reviewdomain.Creat
 	})
 }
 
+// CreateContentReview creates a content review by a user with access to the content item.
 func (s *Service) CreateContentReview(ctx context.Context, req reviewdomain.CreateContentReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		hasAccess, err := s.accessChecker.HasAccessContent(ctx, req.UserID, req.ContentID)
@@ -75,6 +77,7 @@ func (s *Service) CreateContentReview(ctx context.Context, req reviewdomain.Crea
 	})
 }
 
+// CreateCourseReviewAdmin creates a course review on behalf of a user, bypassing access checks.
 func (s *Service) CreateCourseReviewAdmin(ctx context.Context, req reviewdomain.CreateCourseReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		existingReview, err := s.courseRepo.GetCourseReviewByUserAndCourseID(ctx, req.UserID, req.CourseID)
@@ -98,6 +101,7 @@ func (s *Service) CreateCourseReviewAdmin(ctx context.Context, req reviewdomain.
 	})
 }
 
+// CreateContentReviewAdmin creates a content review on behalf of a user, bypassing access checks.
 func (s *Service) CreateContentReviewAdmin(ctx context.Context, req reviewdomain.CreateContentReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		existingReview, err := s.contentRepo.GetContentReviewByUserAndContentID(ctx, req.UserID, req.ContentID)
@@ -122,6 +126,7 @@ func (s *Service) CreateContentReviewAdmin(ctx context.Context, req reviewdomain
 	})
 }
 
+// CreateArticleReview creates an article review by a user.
 func (s *Service) CreateArticleReview(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		existingReview, err := s.articleRepo.GetArticleReviewByUserAndArticleID(ctx, req.UserID, req.ArticleID)
@@ -147,6 +152,7 @@ func (s *Service) CreateArticleReview(ctx context.Context, req reviewdomain.Crea
 	})
 }
 
+// CreateArticleReviewAdmin creates an article review on behalf of a user.
 func (s *Service) CreateArticleReviewAdmin(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		existingReview, err := s.articleRepo.GetArticleReviewByUserAndArticleID(ctx, req.UserID, req.ArticleID)

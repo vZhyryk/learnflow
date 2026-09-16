@@ -9,6 +9,9 @@ import (
 	"io"
 	"learnflow_backend/cmd/api/app"
 	"learnflow_backend/internal/access"
+	"learnflow_backend/internal/admin"
+	adminrepository "learnflow_backend/internal/admin/repository"
+	adminservice "learnflow_backend/internal/admin/service"
 	"learnflow_backend/internal/article"
 	articlerepository "learnflow_backend/internal/article/repository"
 	articleservice "learnflow_backend/internal/article/service"
@@ -115,6 +118,11 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	accessChecker := access.New(a.DB)
 	reviewSvc := reviewservice.New(reviewRepo, reviewRepo, reviewRepo, transactor, accessChecker)
 	review.RegisterReviewRoutes(router, reviewSvc, chains.Static, chains.StaticWithAuth, adminStaticWithAuth, a.Logger)
+
+	// Admin Routes
+	adminRepo := adminrepository.NewRepository(a.DB)
+	adminSvc := adminservice.New(adminRepo, transactor, outbox)
+	admin.RegisterAdminRoutes(router, adminSvc, adminStaticWithAuth, a.Logger)
 
 	// Helper routes
 	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

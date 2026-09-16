@@ -1,6 +1,8 @@
 package access
 
+// Access-check queries used by Checker.
 const (
+	// HasAccessContentQuery checks direct content access and course-derived access.
 	HasAccessContentQuery = `
 		SELECT EXISTS (
 			SELECT 1 FROM user_content_access

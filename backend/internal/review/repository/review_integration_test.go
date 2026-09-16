@@ -558,7 +558,7 @@ func TestGetCourseReviewList_Integration(t *testing.T) {
 
 				So(err, ShouldBeNil)
 				ids := courseReviewIDs(got)
-				So(ids, ShouldContain, active1.ID) // rating 5
+				So(ids, ShouldContain, active1.ID)    // rating 5
 				So(ids, ShouldNotContain, active2.ID) // rating 3
 				So(ids, ShouldNotContain, deleted.ID)
 			})

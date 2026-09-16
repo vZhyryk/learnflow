@@ -202,7 +202,7 @@ func (m *mockAccessChecker) HasAccessContent(ctx context.Context, userID, conten
 	return m.hasAccessContent(ctx, userID, contentID)
 }
 
-func newTestService(courseRepo *mockReviewRepo, contentRepo *mockReviewRepo, accessChecker *mockAccessChecker) *Service {
+func newTestService(courseRepo, contentRepo *mockReviewRepo, accessChecker *mockAccessChecker) *Service {
 	return New(courseRepo, contentRepo, &mockReviewRepo{}, &testutil.NoopTransactor{}, accessChecker)
 }
 

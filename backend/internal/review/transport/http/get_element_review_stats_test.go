@@ -30,8 +30,8 @@ func TestCourseReviewStats(t *testing.T) {
 
 		Convey("invalid course id → 422", func() {
 			f := newHTTPFixture(svc, http.MethodGet, "/api/v1/courses/---/reviews/stats")
-			mux, newReq := f.mux, f.newReq
-			w := testutil.ServeHTTP(mux, newReq("", nil))
+			invalidMux, invalidNewReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(invalidMux, invalidNewReq("", nil))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
@@ -79,8 +79,8 @@ func TestContentReviewStats(t *testing.T) {
 
 		Convey("invalid content id → 422", func() {
 			f := newHTTPFixture(svc, http.MethodGet, "/api/v1/content/---/reviews/stats")
-			mux, newReq := f.mux, f.newReq
-			w := testutil.ServeHTTP(mux, newReq("", nil))
+			invalidMux, invalidNewReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(invalidMux, invalidNewReq("", nil))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
@@ -128,8 +128,8 @@ func TestArticleReviewStats(t *testing.T) {
 
 		Convey("invalid article id → 422", func() {
 			f := newHTTPFixture(svc, http.MethodGet, "/api/v1/articles/---/reviews/stats")
-			mux, newReq := f.mux, f.newReq
-			w := testutil.ServeHTTP(mux, newReq("", nil))
+			invalidMux, invalidNewReq := f.mux, f.newReq
+			w := testutil.ServeHTTP(invalidMux, invalidNewReq("", nil))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 

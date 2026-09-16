@@ -84,31 +84,11 @@ func TestUpdateContentReview(t *testing.T) {
 }
 
 func TestDeleteContentReview(t *testing.T) {
-	Convey("Given a content repository", t, func() {
-		var execTag pgconn.CommandTag
-		var execErr error
-		repo := newTestRepo(&testutil.MockQueryRunner{
-			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-				return execTag, execErr
-			},
-		})
-		Convey("When delete succeeds", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 1")
-			So(repo.DeleteContentReview(context.Background(), "content-123", "user-123"), ShouldBeNil)
-		})
-
-		Convey("When no row is matched (content item not found)", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 0")
-			err := repo.DeleteContentReview(context.Background(), "content-123", "user-123")
-			So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
-		})
-
-		Convey("When the database returns an unexpected error", func() {
-			execErr = testutil.ErrDBUnexpected
-			err := repo.DeleteContentReview(context.Background(), "content-123", "user-123")
-			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-		})
-	})
+	testutil.TestExecMethod(t, "DeleteContentReview",
+		func(runner *testutil.MockQueryRunner) func(context.Context, string, string) error {
+			return newTestRepo(runner).DeleteContentReview
+		},
+		reviewdomain.ErrReviewNotFound)
 }
 
 func TestGetContentReviewByID(t *testing.T) {
