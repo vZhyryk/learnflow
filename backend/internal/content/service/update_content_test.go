@@ -23,7 +23,7 @@ func TestUpdateContentItem(t *testing.T) {
 				getContentItemByID: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.UpdateContentItem(context.Background(), contentdomain.UpdateContentItemRequest{ID: "content_item_id"}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -35,7 +35,7 @@ func TestUpdateContentItem(t *testing.T) {
 				getContentItemBySlug: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			slug := "New Slug"
 			err := srv.UpdateContentItem(context.Background(), contentdomain.UpdateContentItemRequest{ID: "content_item_id", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
@@ -50,7 +50,7 @@ func TestUpdateContentItem(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			slug := "New Slug"
 			err := srv.UpdateContentItem(context.Background(), contentdomain.UpdateContentItemRequest{ID: "content_item_id", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
@@ -64,7 +64,7 @@ func TestUpdateContentItem(t *testing.T) {
 				updateContentItem:    alwaysFailsErr,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			slug := "New Slug"
 			err := srv.UpdateContentItem(context.Background(), contentdomain.UpdateContentItemRequest{ID: "content_item_id", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
@@ -78,7 +78,7 @@ func TestUpdateContentItem(t *testing.T) {
 				updateContentItem:    alwaysFailsErr,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.UpdateContentItem(context.Background(), contentdomain.UpdateContentItemRequest{ID: "content_item_id", Slug: nil}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -91,7 +91,7 @@ func TestUpdateContentItem(t *testing.T) {
 				updateContentItem:    alwaysSucceedsUpdate,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.UpdateContentItem(context.Background(), contentdomain.UpdateContentItemRequest{ID: "content_item_id", Slug: nil}, "user-1")
 			So(err, ShouldBeNil)
 		})

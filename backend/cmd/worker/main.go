@@ -8,6 +8,10 @@ import (
 	"syscall"
 	"time"
 
+	adminrepository "learnflow_backend/internal/admin/repository"
+	articlerepository "learnflow_backend/internal/article/repository"
+	contentrepository "learnflow_backend/internal/content/repository"
+	courserepository "learnflow_backend/internal/courses/repository"
 	"learnflow_backend/internal/infrastructure/bootstrap"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/env"
@@ -38,17 +42,26 @@ func main() {
 		jsonLogger.Fatal(errors.New("BASE_URL env var is required and must not be empty"), nil)
 	}
 
+	adminRepo := adminrepository.NewRepository(dbInstance)
+	contentRepo := contentrepository.NewRepository(dbInstance)
+	articleRepo := articlerepository.NewRepository(dbInstance)
+	courseRepo := courserepository.NewRepository(dbInstance)
+
+	cleanUpPollInterval := 24 * time.Hour
+
 	workers := []worker.Worker{
 		worker.NewOutboxPoller(dbInstance, app.Publisher, app.Logger, transactor),
 		worker.NewDLQRetryWorker(dbInstance, app.Publisher, app.Logger, transactor),
+		worker.NewAnnouncementDeliveryPoller(dbInstance, app.Publisher, app.Logger, transactor),
 		worker.NewEmailVerificationWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
 		worker.NewEmailChangeWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
 		worker.NewPasswordResetWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
 		worker.NewRegistrationAttemptsWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
 		worker.NewAccountRecoveryWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
-		worker.NewOutboxCleanupWorker(dbInstance, app.Logger, 24*time.Hour),
-		// worker.NewBriefSubmittedWorker(dbInstance, app.Publisher, app.Logger, transactor),
-		// worker.NewNotificationWorker(dbInstance, app.Publisher, app.Logger, transactor),
+		worker.NewOutboxCleanupWorker(dbInstance, app.Logger, cleanUpPollInterval),
+		worker.NewAnnouncementCleanUpWorker(dbInstance, app.Logger, cleanUpPollInterval),
+		worker.NewAnnouncementFanOutWorker(dbInstance, redisClient, app.Logger, adminRepo, contentRepo, courseRepo, articleRepo),
+		worker.NewAnnouncementDeliveryWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
 	}
 
 	for _, w := range workers {

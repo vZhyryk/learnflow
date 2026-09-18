@@ -51,10 +51,9 @@ type BriefSubmittedPayload struct {
 	UserID  string `json:"user_id"`
 }
 
-// NotificationSendPayload is the event payload emitted when a notification should be delivered.
-type NotificationSendPayload struct {
-	Template string            `json:"template"`
-	Data     map[string]string `json:"data"`
+// AnnouncementPayload is the event payload emitted when an announcement is approved.
+type AnnouncementPayload struct {
+	AnnouncementID string `json:"announcement_id"`
 }
 
 // BookingCreatedPayload is the event payload emitted when a booking is created.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	admindomain "learnflow_backend/internal/admin/domain"
+	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/pagination"
 )
 
@@ -55,7 +56,11 @@ func (srv *Service) ApproveAnnouncement(ctx context.Context, announcementID, use
 		return fmt.Errorf("service.ApproveAnnouncement: %w", err)
 	}
 
-	return nil
+	payload := events.AnnouncementPayload{
+		AnnouncementID: announcementID,
+	}
+
+	return srv.outbox.Emit(ctx, events.AggregationTypeAnnouncement, announcementID, events.EventAnnouncementApprove, payload)
 }
 
 // GetAnnouncements returns a paginated list of all announcements.

@@ -704,6 +704,22 @@ CREATE TABLE announcements (
 CREATE INDEX idx_announcements_created_at ON announcements(created_at DESC);
 CREATE INDEX idx_announcements_expires_at ON announcements(expires_at) WHERE expires_at IS NOT NULL;
 
+CREATE TABLE announcement_email_deliveries (
+    id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    announcement_id uuid        NOT NULL REFERENCES announcements(id) ON DELETE RESTRICT,
+    status          text        NOT NULL DEFAULT 'pending' CONSTRAINT announcement_email_deliveries_status_check CHECK (status IN ('pending', 'sent', 'failed')),
+    last_error      text,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_announcement_email_deliveries_pending
+    ON announcement_email_deliveries(status) WHERE status = 'pending';
+
+CREATE UNIQUE INDEX idx_announcement_email_deliveries_user_id_announcement_id_unique
+    ON announcement_email_deliveries(user_id, announcement_id);
+
 -- ---------------------------------------------------------------------------
 -- 20. ACTIVITY LOG
 -- ---------------------------------------------------------------------------
@@ -734,7 +750,6 @@ CREATE TABLE event_outbox (
     status          text        NOT NULL DEFAULT 'pending' CONSTRAINT event_outbox_status_check CHECK (status IN ('pending', 'processing', 'published', 'failed', 'dead_letter')),
     attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT event_outbox_attempt_count_check CHECK (attempt_count >= 0),
     available_at    timestamptz NOT NULL DEFAULT now(),
-    locked_until    timestamptz,
     published_at    timestamptz,
     last_error      text,
     created_at      timestamptz NOT NULL DEFAULT now(),
@@ -743,8 +758,6 @@ CREATE TABLE event_outbox (
 
 CREATE INDEX idx_event_outbox_status_available_at_pending
     ON event_outbox(status, available_at) WHERE status = 'pending';
-CREATE INDEX idx_event_outbox_locked_until
-    ON event_outbox(locked_until) WHERE locked_until IS NOT NULL;
 CREATE INDEX idx_event_outbox_published_at_published
     ON event_outbox(published_at) WHERE status = 'published';
 

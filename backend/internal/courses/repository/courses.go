@@ -107,3 +107,13 @@ func (rep *Repository) GetCourseBySlug(ctx context.Context, slug string) (*cours
 
 	return course, nil
 }
+
+// CheckIfCourseExistsByID reports whether a course with the given ID exists.
+func (rep *Repository) CheckIfCourseExistsByID(ctx context.Context, courseID string) (bool, error) {
+	var exists bool
+	if err := rep.QueryRunner(ctx).QueryRow(ctx, checkIfCourseExistsByID, courseID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("repository.CheckIfCourseExistsByID: %w", err)
+	}
+
+	return exists, nil
+}

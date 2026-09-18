@@ -15,7 +15,7 @@ func TestDeleteContentItem(t *testing.T) {
 				deleteContentItem: testutil.AlwaysNil2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.DeleteContentItem(context.Background(), "contentItemID", "user-1")
 			So(err, ShouldBeNil)
 		})
@@ -25,7 +25,7 @@ func TestDeleteContentItem(t *testing.T) {
 				deleteContentItem: testutil.AlwaysFailsDB2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.DeleteContentItem(context.Background(), "contentItemID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")

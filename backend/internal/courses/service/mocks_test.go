@@ -3,24 +3,24 @@ package courseservice
 import (
 	"context"
 	coursedomain "learnflow_backend/internal/courses/domain"
-	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 )
 
 // mockCourseRepoRepo implements coursedomain.CourseRepository via function fields.
 type mockCourseRepoRepo struct {
-	createCourse           func(ctx context.Context, course *coursedomain.Course) (*coursedomain.Course, error)
-	publishCourse          func(ctx context.Context, courseID, userID string) error
-	archiveCourse          func(ctx context.Context, courseID, userID string) error
-	deleteCourse           func(ctx context.Context, courseID, userID string) error
-	updateCourse           func(ctx context.Context, course *coursedomain.Course, userID string) error
-	getAllPublishedCourses func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
-	getAllDraftCourses     func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
-	getAllArchivedCourses  func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
-	getAllCourses          func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
-	getCourseByID          func(ctx context.Context, courseID string) (*coursedomain.Course, error)
-	getCourseBySlug        func(ctx context.Context, slug string) (*coursedomain.Course, error)
+	createCourse            func(ctx context.Context, course *coursedomain.Course) (*coursedomain.Course, error)
+	publishCourse           func(ctx context.Context, courseID, userID string) error
+	archiveCourse           func(ctx context.Context, courseID, userID string) error
+	deleteCourse            func(ctx context.Context, courseID, userID string) error
+	updateCourse            func(ctx context.Context, course *coursedomain.Course, userID string) error
+	getAllPublishedCourses  func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
+	getAllDraftCourses      func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
+	getAllArchivedCourses   func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
+	getAllCourses           func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
+	getCourseByID           func(ctx context.Context, courseID string) (*coursedomain.Course, error)
+	getCourseBySlug         func(ctx context.Context, slug string) (*coursedomain.Course, error)
+	checkIfCourseExistsByID func(ctx context.Context, courseID string) (bool, error)
 }
 
 func (m *mockCourseRepoRepo) CreateCourse(ctx context.Context, course *coursedomain.Course) (*coursedomain.Course, error) {
@@ -101,8 +101,16 @@ func (m *mockCourseRepoRepo) GetCourseBySlug(ctx context.Context, slug string) (
 	return m.getCourseBySlug(ctx, slug)
 }
 
-func newTestService(repo *mockCourseRepoRepo, outbox *events.OutboxWriter) *Service {
-	return New(repo, &testutil.NoopTransactor{}, outbox)
+func (m *mockCourseRepoRepo) CheckIfCourseExistsByID(ctx context.Context, courseID string) (bool, error) {
+	if m.checkIfCourseExistsByID == nil {
+		panic("mockCourseRepo.checkIfCourseExistsByID not set")
+	}
+
+	return m.checkIfCourseExistsByID(ctx, courseID)
+}
+
+func newTestService(repo *mockCourseRepoRepo) *Service {
+	return New(repo, &testutil.NoopTransactor{})
 }
 
 // alwaysError is a getCourseByID/getCourseBySlug stub that always fails.

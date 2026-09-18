@@ -94,4 +94,8 @@ const (
 		SELECT` + courseColumns + `
 		FROM courses WHERE slug = $1 AND deleted_at IS NULL
 	`
+
+	checkIfCourseExistsByID = `
+		SELECT EXISTS(SELECT 1 FROM courses WHERE id = $1 AND deleted_at IS NULL)
+	`
 )

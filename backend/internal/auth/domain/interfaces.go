@@ -58,6 +58,7 @@ type TokenRepository interface {
 type UserRepository interface {
 	CreateUser(ctx context.Context, user *User) (string, error)
 	CreateUserProfile(ctx context.Context, user *UserProfile) error
+	CreateNotificationPreferences(ctx context.Context, userID string) error
 	GetUserByID(ctx context.Context, userID string) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
 	UpdateStatus(ctx context.Context, userID string, status UserStatus) error

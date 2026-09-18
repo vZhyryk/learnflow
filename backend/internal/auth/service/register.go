@@ -49,6 +49,10 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 			return fmt.Errorf("register: create user profile: %w", err)
 		}
 
+		if err = s.userRepo.CreateNotificationPreferences(ctx, id); err != nil {
+			return fmt.Errorf("register: create notification preferences: %w", err)
+		}
+
 		userID = id
 
 		return s.emitTokenEvent(ctx, id, emailVerificationTokenTTL, events.AggregationTypeUser, events.EventUserRegistered, func(ctx context.Context, rawToken, hashToken string, expiresAt time.Time) (any, error) {

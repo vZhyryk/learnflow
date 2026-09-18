@@ -17,7 +17,7 @@ func TestCreateArticle(t *testing.T) {
 				getArticleBySlug: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateArticle(context.Background(), articledomain.CreateArticleRequest{})
 			So(err, ShouldNotBeNil)
 			So(id, ShouldBeEmpty)
@@ -30,7 +30,7 @@ func TestCreateArticle(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateArticle(context.Background(), articledomain.CreateArticleRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, articledomain.ErrInvalidSlug), ShouldBeTrue)
@@ -47,7 +47,7 @@ func TestCreateArticle(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateArticle(context.Background(), articledomain.CreateArticleRequest{})
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -64,7 +64,7 @@ func TestCreateArticle(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateArticle(context.Background(), articledomain.CreateArticleRequest{})
 			So(err, ShouldBeNil)
 			So(id, ShouldEqual, "article_ID")
@@ -85,7 +85,7 @@ func TestCreateArticleIsIndexableOverride(t *testing.T) {
 			},
 		}
 
-		srv := newTestService(cRepo, nil)
+		srv := newTestService(cRepo)
 		isIndexable := false
 		id, err := srv.CreateArticle(context.Background(), articledomain.CreateArticleRequest{IsIndexable: &isIndexable})
 		So(err, ShouldBeNil)

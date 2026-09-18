@@ -11,23 +11,24 @@ import (
 // mockUserRepo implements authdomain.UserRepository via function fields.
 // Only set the fields needed for each test case — unset fields panic with a clear message.
 type mockUserRepo struct {
-	getUserByEmail         func(ctx context.Context, email string) (*authdomain.User, error)
-	createUser             func(ctx context.Context, user *authdomain.User) (string, error)
-	createUserProfile      func(ctx context.Context, profile *authdomain.UserProfile) error
-	getUserByID            func(ctx context.Context, userID string) (*authdomain.User, error)
-	updateStatus           func(ctx context.Context, userID string, status authdomain.UserStatus) error
-	updatePasswordHash     func(ctx context.Context, userID, hash string) error
-	updateEmail            func(ctx context.Context, userID, email string) error
-	updateEmailVerifiedAt  func(ctx context.Context, userID string) error
-	incrementFailedLogin   func(ctx context.Context, userID, lockInterval string, limit int) error
-	resetFailedLogin       func(ctx context.Context, userID string) error
-	updateLastLoginAt      func(ctx context.Context, userID string) error
-	getUserProfileByUserID func(ctx context.Context, userID string) (*authdomain.UserProfile, error)
-	getDeletedUserByEmail  func(ctx context.Context, email string) (*authdomain.User, error)
-	getDeletedUserByID     func(ctx context.Context, userID string) (*authdomain.User, error)
-	restoreUser            func(ctx context.Context, userID string) error
-	deleteUser             func(ctx context.Context, userID string) error
-	updateRole             func(ctx context.Context, userID string, role authdomain.UserRole) error
+	getUserByEmail                func(ctx context.Context, email string) (*authdomain.User, error)
+	createUser                    func(ctx context.Context, user *authdomain.User) (string, error)
+	createUserProfile             func(ctx context.Context, profile *authdomain.UserProfile) error
+	createNotificationPreferences func(ctx context.Context, userID string) error
+	getUserByID                   func(ctx context.Context, userID string) (*authdomain.User, error)
+	updateStatus                  func(ctx context.Context, userID string, status authdomain.UserStatus) error
+	updatePasswordHash            func(ctx context.Context, userID, hash string) error
+	updateEmail                   func(ctx context.Context, userID, email string) error
+	updateEmailVerifiedAt         func(ctx context.Context, userID string) error
+	incrementFailedLogin          func(ctx context.Context, userID, lockInterval string, limit int) error
+	resetFailedLogin              func(ctx context.Context, userID string) error
+	updateLastLoginAt             func(ctx context.Context, userID string) error
+	getUserProfileByUserID        func(ctx context.Context, userID string) (*authdomain.UserProfile, error)
+	getDeletedUserByEmail         func(ctx context.Context, email string) (*authdomain.User, error)
+	getDeletedUserByID            func(ctx context.Context, userID string) (*authdomain.User, error)
+	restoreUser                   func(ctx context.Context, userID string) error
+	deleteUser                    func(ctx context.Context, userID string) error
+	updateRole                    func(ctx context.Context, userID string, role authdomain.UserRole) error
 }
 
 func (m *mockUserRepo) CreateUser(ctx context.Context, user *authdomain.User) (string, error) {
@@ -42,6 +43,13 @@ func (m *mockUserRepo) CreateUserProfile(ctx context.Context, profile *authdomai
 		panic("mockUserRepo.createUserProfile not set")
 	}
 	return m.createUserProfile(ctx, profile)
+}
+
+func (m *mockUserRepo) CreateNotificationPreferences(ctx context.Context, userID string) error {
+	if m.createNotificationPreferences == nil {
+		panic("mockUserRepo.createNotificationPreferences not set")
+	}
+	return m.createNotificationPreferences(ctx, userID)
 }
 
 func (m *mockUserRepo) GetUserByID(ctx context.Context, userID string) (*authdomain.User, error) {

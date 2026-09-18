@@ -1,6 +1,6 @@
 Project LearnFlowDatabase {
   database_type: "PostgreSQL"
-  Note: 'Synchronized with backend/migrations through migration 000012. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
+  Note: 'Synchronized with backend/migrations through migration 000013. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
 }
 
 Table users {
@@ -573,6 +573,23 @@ Table announcements {
   }
 }
 
+Table announcement_email_deliveries {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  announcement_id uuid [not null, ref: > announcements.id]
+  status text [not null, default: 'pending', note: 'CHECK: pending | sent | failed']
+  last_error text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+
+  Note: 'added in 000013 — durable checkpoint between the announcement fan-out worker and the delivery worker, see NOTIFICATION_FLOW.md'
+
+  indexes {
+    status [name: 'idx_announcement_email_deliveries_pending', note: 'Partial index WHERE status = pending']
+    (user_id, announcement_id) [unique, name: 'idx_announcement_email_deliveries_user_id_announcement_id_unique', note: 'prevents duplicate delivery rows on fan-out retry']
+  }
+}
+
 Table activity_log {
   id uuid [pk]
   user_id uuid [ref: > users.id]
@@ -597,7 +614,6 @@ Table event_outbox {
   status text [not null, default: 'pending', note: 'CHECK: pending | processing | published | failed | dead_letter']
   attempt_count integer [not null, default: 0, note: 'CHECK: >= 0']
   available_at timestamptz [not null, default: `now()`]
-  locked_until timestamptz
   published_at timestamptz
   last_error text
   created_at timestamptz [not null, default: `now()`]
@@ -605,7 +621,6 @@ Table event_outbox {
 
   indexes {
     (status, available_at) [name: 'event_outbox_pending_idx', note: 'Partial index WHERE status = pending']
-    locked_until [name: 'event_outbox_locked_until_idx', note: 'Partial index WHERE locked_until IS NOT NULL']
     published_at [name: 'idx_event_outbox_published_at_published', note: 'Partial index WHERE status = published — backs OutboxCleanupWorker retention DELETE']
   }
 }

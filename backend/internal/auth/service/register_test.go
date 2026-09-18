@@ -130,6 +130,7 @@ func TestRegisterCreateUserFailures(t *testing.T) {
 			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error {
 				return testutil.ErrDBUnexpected
 			}
+			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error { return nil }
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
 			_, err := srv.Register(context.Background(), fakeRegisterRequest())
@@ -140,12 +141,32 @@ func TestRegisterCreateUserFailures(t *testing.T) {
 	})
 }
 
+func TestRegisterCreateNotificationPreferencesFails(t *testing.T) {
+	Convey("Given an auth service", t, func() {
+		Convey("When creating notification preferences fails", func() {
+			uRepo := newRegisterNewUserRepo()
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error { return nil }
+			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error {
+				return testutil.ErrDBUnexpected
+			}
+			srv := newTestService(uRepo, nil, nil, nil, nil)
+
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
+
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "create notification preferences")
+		})
+	})
+}
+
 func TestRegisterCreateVerificationTokenFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When creating the verification token fails", func() {
 			uRepo := newRegisterNewUserRepo()
 			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
 			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error { return nil }
+			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error { return nil }
 			tRepo := &mockTokenRepo{
 				createEmailVerificationToken: func(_ context.Context, _ *authdomain.EmailVerificationToken) (*authdomain.EmailVerificationToken, error) {
 					return nil, testutil.ErrDBUnexpected
@@ -172,6 +193,7 @@ func TestRegisterSuccess(t *testing.T) {
 				capturedProfile = p
 				return nil
 			}
+			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error { return nil }
 			tRepo := &mockTokenRepo{
 				createEmailVerificationToken: createEmailVerificationToken,
 			}
@@ -198,6 +220,7 @@ func TestRegisterMaxLengthPasswordHashing(t *testing.T) {
 			uRepo := newRegisterNewUserRepo()
 			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
 			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error { return nil }
+			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error { return nil }
 			tRepo := &mockTokenRepo{
 				createEmailVerificationToken: createEmailVerificationToken,
 			}

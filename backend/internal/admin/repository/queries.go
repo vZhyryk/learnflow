@@ -27,7 +27,7 @@ const (
 		UPDATE announcements
 		SET approved_at = now(),
 		approved_by_user_id = $2
-		WHERE id = $1 AND expires_at > now()
+		WHERE id = $1 AND expires_at > now() AND approved_at IS NULL
 	`
 
 	getAnnouncementsSQL = `

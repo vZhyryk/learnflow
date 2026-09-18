@@ -15,7 +15,7 @@ func TestArchiveCourse(t *testing.T) {
 				archiveCourse: testutil.AlwaysNil2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.ArchiveCourse(context.Background(), "courseID", "user-1")
 			So(err, ShouldBeNil)
 		})
@@ -25,7 +25,7 @@ func TestArchiveCourse(t *testing.T) {
 				archiveCourse: testutil.AlwaysFailsDB2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.ArchiveCourse(context.Background(), "courseID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")

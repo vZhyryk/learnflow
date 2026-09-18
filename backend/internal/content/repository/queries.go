@@ -95,4 +95,8 @@ const (
 		SELECT` + contentColumns + `
 		FROM content_items WHERE slug = $1 AND deleted_at IS NULL
 	`
+
+	checkIfContentExistsByID = `
+		SELECT EXISTS(SELECT 1 FROM content_items WHERE id = $1 AND deleted_at IS NULL)
+	`
 )

@@ -244,3 +244,40 @@ func TestGetAllArticles(t *testing.T) {
 	testutil.TestListMethod(t, "GetAllArticles",
 		bindArticleList((*Repository).GetAllArticles), fakeArticleN, fakeArticleScan)
 }
+
+func TestCheckIfArticleExistsByID(t *testing.T) {
+	Convey("Given a article repository", t, func() {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+				return row
+			},
+		})
+
+		Convey("When the article exists", func() {
+			row = &testutil.MockRow{ScanFn: func(dest ...any) error {
+				*testutil.CastBool(dest[0], 0) = true
+				return nil
+			}}
+			exists, err := repo.CheckIfArticleExistsByID(context.Background(), "article-123")
+			So(err, ShouldBeNil)
+			So(exists, ShouldBeTrue)
+		})
+
+		Convey("When the article does not exist", func() {
+			row = &testutil.MockRow{ScanFn: func(dest ...any) error {
+				*testutil.CastBool(dest[0], 0) = false
+				return nil
+			}}
+			exists, err := repo.CheckIfArticleExistsByID(context.Background(), "article-123")
+			So(err, ShouldBeNil)
+			So(exists, ShouldBeFalse)
+		})
+
+		Convey("When the database returns an unexpected error", func() {
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
+			_, err := repo.CheckIfArticleExistsByID(context.Background(), "article-123")
+			testutil.AssertUnexpectedDBError(err, "db error")
+		})
+	})
+}

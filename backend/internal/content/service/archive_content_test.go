@@ -15,7 +15,7 @@ func TestArchiveContentItem(t *testing.T) {
 				archiveContentItem: testutil.AlwaysNil2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.ArchiveContentItem(context.Background(), "contentItemID", "user-1")
 			So(err, ShouldBeNil)
 		})
@@ -25,7 +25,7 @@ func TestArchiveContentItem(t *testing.T) {
 				archiveContentItem: testutil.AlwaysFailsDB2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.ArchiveContentItem(context.Background(), "contentItemID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")

@@ -15,7 +15,7 @@ func TestDeleteCourse(t *testing.T) {
 				deleteCourse: testutil.AlwaysNil2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.DeleteCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldBeNil)
 		})
@@ -25,7 +25,7 @@ func TestDeleteCourse(t *testing.T) {
 				deleteCourse: testutil.AlwaysFailsDB2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.DeleteCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")

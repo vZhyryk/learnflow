@@ -88,4 +88,8 @@ const (
 		SELECT` + articleColumns + `
 		FROM articles WHERE slug = $1 AND deleted_at IS NULL
 	`
+
+	checkIfArticleExistsByID = `
+		SELECT EXISTS(SELECT 1 FROM articles WHERE id = $1 AND deleted_at IS NULL)
+	`
 )

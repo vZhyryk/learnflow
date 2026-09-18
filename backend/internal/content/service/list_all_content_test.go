@@ -24,7 +24,7 @@ func testGetAllContentItemsByType(t *testing.T, scenario string, status contentd
 			cRepo := &mockContentItemRepo{}
 			wireMock(cRepo, getContentItemError)
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			contentItem, err := srv.GetAllContentItems(context.Background(), status, pagination.Params{})
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 			So(contentItem, ShouldBeNil)
@@ -34,7 +34,7 @@ func testGetAllContentItemsByType(t *testing.T, scenario string, status contentd
 			cRepo := &mockContentItemRepo{}
 			wireMock(cRepo, getValidList)
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			ContentItem, err := srv.GetAllContentItems(context.Background(), status, pagination.Params{})
 			So(err, ShouldBeNil)
 			So(ContentItem, ShouldNotBeNil)

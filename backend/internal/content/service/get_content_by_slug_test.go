@@ -18,7 +18,7 @@ func TestGetContentItemBySlug(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			contentItem, err := srv.GetContentItemBySlug(context.Background(), "contentItem_slug")
 			So(err, ShouldBeNil)
 			So(contentItem, ShouldNotBeNil)
@@ -30,7 +30,7 @@ func TestGetContentItemBySlug(t *testing.T) {
 				getContentItemBySlug: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			contentItem, err := srv.GetContentItemBySlug(context.Background(), "contentItem_slug")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -44,7 +44,7 @@ func TestGetContentItemBySlug(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			contentItem, err := srv.GetContentItemBySlug(context.Background(), "contentItem_slug")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, contentdomain.ErrContentItemNotFound), ShouldBeTrue)

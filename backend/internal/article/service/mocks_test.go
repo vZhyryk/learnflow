@@ -3,23 +3,23 @@ package articleservice
 import (
 	"context"
 	articledomain "learnflow_backend/internal/article/domain"
-	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 )
 
 type mockArticleRepo struct {
-	createArticle           func(ctx context.Context, Article *articledomain.Article) (*articledomain.Article, error)
-	publishArticle          func(ctx context.Context, ArticleID, userID string) error
-	archiveArticle          func(ctx context.Context, ArticleID, userID string) error
-	deleteArticle           func(ctx context.Context, ArticleID, userID string) error
-	updateArticle           func(ctx context.Context, Article *articledomain.Article, userID string) error
-	getAllPublishedArticles func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
-	getAllDraftArticles     func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
-	getAllArchivedArticles  func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
-	getAllArticles          func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
-	getArticleByID          func(ctx context.Context, ArticleID string) (*articledomain.Article, error)
-	getArticleBySlug        func(ctx context.Context, slug string) (*articledomain.Article, error)
+	createArticle            func(ctx context.Context, Article *articledomain.Article) (*articledomain.Article, error)
+	publishArticle           func(ctx context.Context, ArticleID, userID string) error
+	archiveArticle           func(ctx context.Context, ArticleID, userID string) error
+	deleteArticle            func(ctx context.Context, ArticleID, userID string) error
+	updateArticle            func(ctx context.Context, Article *articledomain.Article, userID string) error
+	getAllPublishedArticles  func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
+	getAllDraftArticles      func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
+	getAllArchivedArticles   func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
+	getAllArticles           func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
+	getArticleByID           func(ctx context.Context, ArticleID string) (*articledomain.Article, error)
+	getArticleBySlug         func(ctx context.Context, slug string) (*articledomain.Article, error)
+	checkIfArticleExistsByID func(ctx context.Context, articleID string) (bool, error)
 }
 
 func (m *mockArticleRepo) CreateArticle(ctx context.Context, article *articledomain.Article) (*articledomain.Article, error) {
@@ -100,8 +100,16 @@ func (m *mockArticleRepo) GetArticleBySlug(ctx context.Context, slug string) (*a
 	return m.getArticleBySlug(ctx, slug)
 }
 
-func newTestService(repo *mockArticleRepo, outbox *events.OutboxWriter) *Service {
-	return New(repo, &testutil.NoopTransactor{}, outbox)
+func (m *mockArticleRepo) CheckIfArticleExistsByID(ctx context.Context, articleID string) (bool, error) {
+	if m.checkIfArticleExistsByID == nil {
+		panic("mockArticleRepo.checkIfArticleExistsByID not set")
+	}
+
+	return m.checkIfArticleExistsByID(ctx, articleID)
+}
+
+func newTestService(repo *mockArticleRepo) *Service {
+	return New(repo, &testutil.NoopTransactor{})
 }
 
 // alwaysError is a getArticleByID/getArticleBySlug stub that always fails.

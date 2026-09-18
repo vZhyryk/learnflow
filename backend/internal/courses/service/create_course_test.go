@@ -17,7 +17,7 @@ func TestCreateCourse(t *testing.T) {
 				getCourseBySlug: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateCourse(context.Background(), coursedomain.CreateCourseRequest{})
 			So(err, ShouldNotBeNil)
 			So(id, ShouldBeEmpty)
@@ -30,7 +30,7 @@ func TestCreateCourse(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateCourse(context.Background(), coursedomain.CreateCourseRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, coursedomain.ErrInvalidSlug), ShouldBeTrue)
@@ -47,7 +47,7 @@ func TestCreateCourse(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateCourse(context.Background(), coursedomain.CreateCourseRequest{})
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -64,7 +64,7 @@ func TestCreateCourse(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateCourse(context.Background(), coursedomain.CreateCourseRequest{})
 			So(err, ShouldBeNil)
 			So(id, ShouldEqual, "course_ID")
@@ -85,7 +85,7 @@ func TestCreateCourseIsIndexableOverride(t *testing.T) {
 			},
 		}
 
-		srv := newTestService(cRepo, nil)
+		srv := newTestService(cRepo)
 		isIndexable := false
 		id, err := srv.CreateCourse(context.Background(), coursedomain.CreateCourseRequest{IsIndexable: &isIndexable})
 		So(err, ShouldBeNil)

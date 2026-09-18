@@ -13,7 +13,9 @@ const (
 	EventBookingCreated                     EventType = "booking.created"
 	EventPaymentCompleted                   EventType = "payment.completed"
 	EventNotificationSend                   EventType = "notification.send"
+	EventAnnouncementApprove                EventType = "announcement.approved"
 	EventRegistrationAttemptOnExistingEmail EventType = "user.existed.register"
+	EventAnnouncementDeliver                EventType = "announcement.deliver"
 )
 
 // IsKnownEventType reports whether t is a registered event type.
@@ -28,7 +30,9 @@ func IsKnownEventType(t EventType) bool {
 		EventBookingCreated,
 		EventPaymentCompleted,
 		EventNotificationSend,
-		EventRegistrationAttemptOnExistingEmail:
+		EventAnnouncementApprove,
+		EventRegistrationAttemptOnExistingEmail,
+		EventAnnouncementDeliver:
 		return true
 	}
 	return false
@@ -46,7 +50,7 @@ const (
 	AggregationTypeBrief        AggregationType = "brief"
 	AggregationTypeBooking      AggregationType = "booking"
 	AggregationTypePayment      AggregationType = "payment"
-	AggregationTypeNotification AggregationType = "notification"
+	AggregationTypeAnnouncement AggregationType = "announcement"
 )
 
 // IsKnownAggregationType reports whether t is a registered aggregate type.
@@ -60,7 +64,7 @@ func IsKnownAggregationType(t AggregationType) bool {
 		AggregationTypeBrief,
 		AggregationTypeBooking,
 		AggregationTypePayment,
-		AggregationTypeNotification:
+		AggregationTypeAnnouncement:
 		return true
 	}
 	return false

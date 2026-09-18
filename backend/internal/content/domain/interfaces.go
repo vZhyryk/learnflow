@@ -23,6 +23,7 @@ type ContentRepository interface {
 	GetAllContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, error)
 	GetContentItemByID(ctx context.Context, contentItemID string) (*ContentItem, error)
 	GetContentItemBySlug(ctx context.Context, slug string) (*ContentItem, error)
+	CheckIfContentItemExistsByID(ctx context.Context, contentItemID string) (bool, error)
 }
 
 // Service defines the content module's business logic operations.

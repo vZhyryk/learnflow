@@ -107,3 +107,13 @@ func (rep *Repository) GetArticleBySlug(ctx context.Context, slug string) (*arti
 
 	return article, nil
 }
+
+// CheckIfArticleExistsByID reports whether an article with the given ID exists.
+func (rep *Repository) CheckIfArticleExistsByID(ctx context.Context, articleID string) (bool, error) {
+	var exists bool
+	if err := rep.QueryRunner(ctx).QueryRow(ctx, checkIfArticleExistsByID, articleID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("repository.CheckIfArticleExistsByID: %w", err)
+	}
+
+	return exists, nil
+}

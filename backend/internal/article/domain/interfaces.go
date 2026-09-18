@@ -23,6 +23,7 @@ type ArticleRepository interface {
 	GetAllArticles(ctx context.Context, params pagination.Params) ([]*Article, error)
 	GetArticleByID(ctx context.Context, articleID string) (*Article, error)
 	GetArticleBySlug(ctx context.Context, slug string) (*Article, error)
+	CheckIfArticleExistsByID(ctx context.Context, articleID string) (bool, error)
 }
 
 // Service defines the article module's business logic operations.

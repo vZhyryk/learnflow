@@ -75,6 +75,28 @@ func TestCreateUserProfile(t *testing.T) {
 	})
 }
 
+func TestCreateNotificationPreferences(t *testing.T) {
+	Convey("Given a users repository", t, func() {
+		var fakeErr error
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+				return pgconn.NewCommandTag("INSERT 1"), fakeErr
+			},
+		})
+
+		Convey("When creation succeeds", func() {
+			err := repo.CreateNotificationPreferences(context.Background(), "user-123")
+			So(err, ShouldBeNil)
+		})
+
+		Convey("When the database returns an unexpected error", func() {
+			fakeErr = testutil.ErrDB
+			err := repo.CreateNotificationPreferences(context.Background(), "user-123")
+			testutil.AssertUnexpectedDBError(err, "db error")
+		})
+	})
+}
+
 func TestGetUserByID(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 

@@ -18,7 +18,7 @@ func TestGetCourseBySlug(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			course, err := srv.GetCourseBySlug(context.Background(), "course_slug")
 			So(err, ShouldBeNil)
 			So(course, ShouldNotBeNil)
@@ -30,7 +30,7 @@ func TestGetCourseBySlug(t *testing.T) {
 				getCourseBySlug: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			course, err := srv.GetCourseBySlug(context.Background(), "course_slug")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -44,7 +44,7 @@ func TestGetCourseBySlug(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			course, err := srv.GetCourseBySlug(context.Background(), "course_slug")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, coursedomain.ErrCourseNotFound), ShouldBeTrue)

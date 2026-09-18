@@ -43,6 +43,16 @@ func (rep *Repository) CreateUserProfile(ctx context.Context, profile *authdomai
 	if err != nil {
 		return fmt.Errorf("repository.CreateUserProfile: %w", err)
 	}
+
+	return nil
+}
+
+// CreateNotificationPreferences inserts a default notification_preferences row (all
+// channels opted in, per the column DEFAULTs) linked to the given user ID.
+func (rep *Repository) CreateNotificationPreferences(ctx context.Context, userID string) error {
+	if _, err := rep.QueryRunner(ctx).Exec(ctx, createNotificationPreferencesSQL, userID); err != nil {
+		return fmt.Errorf("repository.CreateNotificationPreferences: %w", err)
+	}
 	return nil
 }
 

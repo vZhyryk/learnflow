@@ -18,7 +18,7 @@ func TestGetArticleBySlug(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			Article, err := srv.GetArticleBySlug(context.Background(), "Article_slug")
 			So(err, ShouldBeNil)
 			So(Article, ShouldNotBeNil)
@@ -30,7 +30,7 @@ func TestGetArticleBySlug(t *testing.T) {
 				getArticleBySlug: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			Article, err := srv.GetArticleBySlug(context.Background(), "Article_slug")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -44,7 +44,7 @@ func TestGetArticleBySlug(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			Article, err := srv.GetArticleBySlug(context.Background(), "Article_slug")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, articledomain.ErrArticleNotFound), ShouldBeTrue)

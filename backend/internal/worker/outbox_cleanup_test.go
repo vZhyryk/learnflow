@@ -11,7 +11,7 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func newTestOutboxCleanupWorker(runner *testutil.MockQueryRunner) *OutboxCleanupWorker {
+func newTestOutboxCleanupWorker(runner *testutil.MockQueryRunner) *CleanupWorker[OutboxCleanupWorker] {
 	return NewOutboxCleanupWorker(runner, testutil.NewTestLogger(), 24*time.Hour)
 }
 
@@ -61,7 +61,7 @@ func fullThenPartialBatchExecFn(calls *int) func(context.Context, string, ...any
 	return func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
 		*calls++
 		if *calls < 3 {
-			return pgconn.NewCommandTag(fmt.Sprintf("DELETE %d", outboxCleanupBatchSize)), nil
+			return pgconn.NewCommandTag(fmt.Sprintf("DELETE %d", cleanupBatchSize)), nil
 		}
 		return pgconn.NewCommandTag("DELETE 0"), nil
 	}

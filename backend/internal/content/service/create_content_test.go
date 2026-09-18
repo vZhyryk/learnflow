@@ -17,7 +17,7 @@ func TestCreateContentItem(t *testing.T) {
 				getContentItemBySlug: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateContentItem(context.Background(), contentdomain.CreateContentItemRequest{})
 			So(err, ShouldNotBeNil)
 			So(id, ShouldBeEmpty)
@@ -30,7 +30,7 @@ func TestCreateContentItem(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateContentItem(context.Background(), contentdomain.CreateContentItemRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, contentdomain.ErrInvalidSlug), ShouldBeTrue)
@@ -47,7 +47,7 @@ func TestCreateContentItem(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateContentItem(context.Background(), contentdomain.CreateContentItemRequest{})
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -64,7 +64,7 @@ func TestCreateContentItem(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			id, err := srv.CreateContentItem(context.Background(), contentdomain.CreateContentItemRequest{})
 			So(err, ShouldBeNil)
 			So(id, ShouldEqual, "content_item_ID")
@@ -85,7 +85,7 @@ func TestCreateContentItemIsIndexableOverride(t *testing.T) {
 			},
 		}
 
-		srv := newTestService(cRepo, nil)
+		srv := newTestService(cRepo)
 		isIndexable := false
 		id, err := srv.CreateContentItem(context.Background(), contentdomain.CreateContentItemRequest{IsIndexable: &isIndexable})
 		So(err, ShouldBeNil)

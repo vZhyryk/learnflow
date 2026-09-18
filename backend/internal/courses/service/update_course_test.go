@@ -24,7 +24,7 @@ func TestUpdateCourse(t *testing.T) {
 				getCourseByID: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID"}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -36,7 +36,7 @@ func TestUpdateCourse(t *testing.T) {
 				getCourseBySlug: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			slug := "New Slug"
 			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
@@ -51,7 +51,7 @@ func TestUpdateCourse(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			slug := "New Slug"
 			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
@@ -65,7 +65,7 @@ func TestUpdateCourse(t *testing.T) {
 				updateCourse:    alwaysFailsErr,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			slug := "New Slug"
 			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: &slug}, "user-1")
 			So(err, ShouldNotBeNil)
@@ -79,7 +79,7 @@ func TestUpdateCourse(t *testing.T) {
 				updateCourse:    alwaysFailsErr,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: nil}, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -92,7 +92,7 @@ func TestUpdateCourse(t *testing.T) {
 				updateCourse:    alwaysSucceedsUpdate,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.UpdateCourse(context.Background(), coursedomain.UpdateCourseRequest{ID: "course_ID", Slug: nil}, "user-1")
 			So(err, ShouldBeNil)
 		})

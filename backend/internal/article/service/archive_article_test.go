@@ -15,7 +15,7 @@ func TestArchiveArticle(t *testing.T) {
 				archiveArticle: testutil.AlwaysNil2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.ArchiveArticle(context.Background(), "ArticleID", "user-1")
 			So(err, ShouldBeNil)
 		})
@@ -25,7 +25,7 @@ func TestArchiveArticle(t *testing.T) {
 				archiveArticle: testutil.AlwaysFailsDB2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.ArchiveArticle(context.Background(), "ArticleID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")

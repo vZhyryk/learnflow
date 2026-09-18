@@ -16,7 +16,7 @@ const (
 	querySelectAndLockPending = `
     	SELECT id, event_type, payload_json
     	FROM event_outbox
-    	WHERE status = 'pending' AND (locked_until < now() OR locked_until IS NULL)
+    	WHERE status = 'pending'
     	ORDER BY created_at
     	LIMIT 100
     	FOR UPDATE SKIP LOCKED

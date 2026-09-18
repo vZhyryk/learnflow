@@ -26,7 +26,7 @@ func TestPublishCourse(t *testing.T) {
 				getCourseByID: alwaysError,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -39,7 +39,7 @@ func TestPublishCourse(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, coursedomain.ErrInvalidCourseStatus), ShouldBeTrue)
@@ -52,7 +52,7 @@ func TestPublishCourse(t *testing.T) {
 				},
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "service.ReadyToPublish")
@@ -64,22 +64,10 @@ func TestPublishCourse(t *testing.T) {
 				publishCourse: testutil.AlwaysFailsDB2,
 			}
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "service.PublishCourse")
-		})
-
-		Convey("PublishCourse - outbox emit error", func() {
-			cRepo := &mockCourseRepoRepo{
-				getCourseByID: validGetCourseByID,
-				publishCourse: testutil.AlwaysNil2,
-			}
-
-			srv := newTestService(cRepo, testutil.NewFailingOutbox(testutil.ErrDBUnexpected))
-			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
-			So(err, ShouldNotBeNil)
-			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
 
 		Convey("Successful", func() {
@@ -87,9 +75,8 @@ func TestPublishCourse(t *testing.T) {
 				getCourseByID: validGetCourseByID,
 				publishCourse: testutil.AlwaysNil2,
 			}
-			var captured []any
 
-			srv := newTestService(cRepo, testutil.NewCapturingOutbox(&captured))
+			srv := newTestService(cRepo)
 			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
 			So(err, ShouldBeNil)
 		})

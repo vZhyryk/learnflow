@@ -1355,6 +1355,34 @@ CREATE TABLE announcements (
 CREATE INDEX idx_announcements_created_at ON announcements(created_at DESC);
 CREATE INDEX idx_announcements_expires_at ON announcements(expires_at) WHERE expires_at IS NOT NULL;
 
+-- [migration 000013]: durable checkpoint between the fan-out worker (Worker A, which
+-- resolves the recipient list once and bulk-inserts one row per recipient here) and the
+-- delivery worker (Worker Б, which reads status='pending' rows, denormalizes them for
+-- Redis, and marks them sent/failed) — see NOTIFICATION_FLOW.md for the full pipeline.
+-- Kept as its own table rather than reusing event_outbox purely for schema hygiene: a
+-- single announcement can fan out to thousands of rows, which would dwarf the low-volume
+-- generic event_outbox table.
+CREATE TABLE announcement_email_deliveries (
+    id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    announcement_id uuid        NOT NULL REFERENCES announcements(id) ON DELETE RESTRICT,
+    status          text        NOT NULL DEFAULT 'pending' CONSTRAINT announcement_email_deliveries_status_check CHECK (status IN ('pending', 'sent', 'failed')),
+    last_error      text,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+-- [Partial index WHERE status='pending']: the delivery poller only ever queries pending
+-- rows — same rationale as idx_event_outbox_status_available_at_pending above.
+CREATE INDEX idx_announcement_email_deliveries_pending
+    ON announcement_email_deliveries(status) WHERE status = 'pending';
+
+-- [UNIQUE(user_id, announcement_id)]: the fan-out worker retries its whole bulk-insert
+-- (batches of 500) via retry.Do on transient failure — without this constraint, a batch
+-- that partially succeeded before the failure gets re-inserted on retry, duplicating rows.
+CREATE UNIQUE INDEX idx_announcement_email_deliveries_user_id_announcement_id_unique
+    ON announcement_email_deliveries(user_id, announcement_id);
+
 -- ---------------------------------------------------------------------------
 -- 20. ACTIVITY LOG
 -- ---------------------------------------------------------------------------
@@ -1417,11 +1445,6 @@ CREATE TABLE event_outbox (
     -- without a separate scheduler process.
     available_at    timestamptz NOT NULL DEFAULT now(),
 
-    -- [locked_until for distributed locking]: Multiple worker instances could pick
-    -- up the same event simultaneously without this. A worker claims an event by
-    -- setting locked_until = now() + 30s before processing. If the worker crashes,
-    -- the lock expires and another worker picks it up (at-least-once semantics).
-    locked_until    timestamptz,
     published_at    timestamptz,
     last_error      text,
     created_at      timestamptz NOT NULL DEFAULT now(),
@@ -1433,12 +1456,8 @@ CREATE TABLE event_outbox (
 CREATE INDEX idx_event_outbox_status_available_at_pending
     ON event_outbox(status, available_at) WHERE status = 'pending';
 
--- [locked_until index]: Cleanup job resets stale locks:
---   UPDATE event_outbox SET locked_until=NULL WHERE locked_until < now() AND status='pending'
--- Without this index, the cleanup job scans all events.
-CREATE INDEX idx_event_outbox_locked_until
-    ON event_outbox(locked_until) WHERE locked_until IS NOT NULL;
-
+-- [migration 000013]: locked_until dropped — dead column, never written by any
+-- query (FOR UPDATE SKIP LOCKED already handles concurrent-poller safety).
 -- [migration 000008]: OutboxCleanupWorker deletes published rows older than 7 days
 -- (internal/worker/outbox_cleanup.go) — without this index that DELETE is a full seq
 -- scan, growing more expensive the larger the table gets (i.e. exactly the scenario

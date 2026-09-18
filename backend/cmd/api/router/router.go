@@ -100,17 +100,17 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 
 	// Course Routes
 	courseRepo := courserepository.NewRepository(a.DB)
-	courseSvc := courseservice.New(courseRepo, transactor, outbox)
+	courseSvc := courseservice.New(courseRepo, transactor)
 	courses.RegisterCourseRoutes(router, courseSvc, chains.Static, adminStaticWithAuth, a.Logger)
 
 	// Content Routes
 	contentRepo := contentrepository.NewRepository(a.DB)
-	contentSvc := contentservice.New(contentRepo, transactor, outbox)
+	contentSvc := contentservice.New(contentRepo, transactor)
 	content.RegisterContentRoutes(router, contentSvc, chains.Static, adminStaticWithAuth, a.Logger)
 
 	// Article Routes
 	articleRepo := articlerepository.NewRepository(a.DB)
-	articleSvc := articleservice.New(articleRepo, transactor, outbox)
+	articleSvc := articleservice.New(articleRepo, transactor)
 	article.RegisterArticleRoutes(router, articleSvc, chains.Static, adminStaticWithAuth, a.Logger)
 
 	// Review Routes

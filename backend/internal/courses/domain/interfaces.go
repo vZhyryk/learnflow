@@ -23,6 +23,7 @@ type CourseRepository interface {
 	GetAllCourses(ctx context.Context, params pagination.Params) ([]*Course, error)
 	GetCourseByID(ctx context.Context, courseID string) (*Course, error)
 	GetCourseBySlug(ctx context.Context, slug string) (*Course, error)
+	CheckIfCourseExistsByID(ctx context.Context, courseID string) (bool, error)
 }
 
 // Service defines the courses module's business logic operations.

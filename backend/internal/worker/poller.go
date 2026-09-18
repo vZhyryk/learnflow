@@ -39,6 +39,9 @@ type SQLList[T any] struct {
 
 // Poller is a generic transactional-poll worker: on each tick it selects a batch of rows
 // under FOR UPDATE SKIP LOCKED, publishes each to Redis, and marks it success/failed.
+// Same pattern as EmailWorker[T] above — one generic engine, different table/queries per
+// instantiation via SQLList[T]: NewOutboxPoller (event_outbox -> Redis, every 5s) and
+// NewDLQRetryWorker (failed_jobs -> requeue to Redis, every 5m).
 type Poller[T any] struct {
 	db           db.QueryRunner
 	publisher    events.Publisher

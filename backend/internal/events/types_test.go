@@ -36,7 +36,7 @@ func TestIsKnownAggregationType(t *testing.T) {
 			So(IsKnownAggregationType(AggregationTypeBrief), ShouldBeTrue)
 			So(IsKnownAggregationType(AggregationTypeBooking), ShouldBeTrue)
 			So(IsKnownAggregationType(AggregationTypePayment), ShouldBeTrue)
-			So(IsKnownAggregationType(AggregationTypeNotification), ShouldBeTrue)
+			So(IsKnownAggregationType(AggregationTypeAnnouncement), ShouldBeTrue)
 		})
 
 		Convey("returns false for unknown event types", func() {

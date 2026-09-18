@@ -3,23 +3,23 @@ package contentservice
 import (
 	"context"
 	contentdomain "learnflow_backend/internal/content/domain"
-	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 )
 
 type mockContentItemRepo struct {
-	createContentItem           func(ctx context.Context, contentItem *contentdomain.ContentItem) (*contentdomain.ContentItem, error)
-	publishContentItem          func(ctx context.Context, contentItemID, userID string) error
-	archiveContentItem          func(ctx context.Context, contentItemID, userID string) error
-	deleteContentItem           func(ctx context.Context, contentItemID, userID string) error
-	updateContentItem           func(ctx context.Context, contentItem *contentdomain.ContentItem, userID string) error
-	getAllPublishedContentItems func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
-	getAllDraftContentItems     func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
-	getAllArchivedContentItems  func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
-	getAllContentItems          func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
-	getContentItemByID          func(ctx context.Context, contentItemID string) (*contentdomain.ContentItem, error)
-	getContentItemBySlug        func(ctx context.Context, slug string) (*contentdomain.ContentItem, error)
+	createContentItem            func(ctx context.Context, contentItem *contentdomain.ContentItem) (*contentdomain.ContentItem, error)
+	publishContentItem           func(ctx context.Context, contentItemID, userID string) error
+	archiveContentItem           func(ctx context.Context, contentItemID, userID string) error
+	deleteContentItem            func(ctx context.Context, contentItemID, userID string) error
+	updateContentItem            func(ctx context.Context, contentItem *contentdomain.ContentItem, userID string) error
+	getAllPublishedContentItems  func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
+	getAllDraftContentItems      func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
+	getAllArchivedContentItems   func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
+	getAllContentItems           func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
+	getContentItemByID           func(ctx context.Context, contentItemID string) (*contentdomain.ContentItem, error)
+	getContentItemBySlug         func(ctx context.Context, slug string) (*contentdomain.ContentItem, error)
+	checkIfContentItemExistsByID func(ctx context.Context, contentItemID string) (bool, error)
 }
 
 func (m *mockContentItemRepo) CreateContentItem(ctx context.Context, contentItem *contentdomain.ContentItem) (*contentdomain.ContentItem, error) {
@@ -100,8 +100,16 @@ func (m *mockContentItemRepo) GetContentItemBySlug(ctx context.Context, slug str
 	return m.getContentItemBySlug(ctx, slug)
 }
 
-func newTestService(repo *mockContentItemRepo, outbox *events.OutboxWriter) *Service {
-	return New(repo, &testutil.NoopTransactor{}, outbox)
+func (m *mockContentItemRepo) CheckIfContentItemExistsByID(ctx context.Context, contentItemID string) (bool, error) {
+	if m.checkIfContentItemExistsByID == nil {
+		panic("mockContentItemRepo.checkIfContentItemExistsByID not set")
+	}
+
+	return m.checkIfContentItemExistsByID(ctx, contentItemID)
+}
+
+func newTestService(repo *mockContentItemRepo) *Service {
+	return New(repo, &testutil.NoopTransactor{})
 }
 
 // alwaysError is a getContentItemByID/getContentItemBySlug stub that always fails.

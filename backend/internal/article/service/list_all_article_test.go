@@ -24,7 +24,7 @@ func testGetAllArticlesByType(t *testing.T, scenario string, status articledomai
 			cRepo := &mockArticleRepo{}
 			wireMock(cRepo, getArticleError)
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			Article, err := srv.GetAllArticles(context.Background(), status, pagination.Params{})
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 			So(Article, ShouldBeNil)
@@ -34,7 +34,7 @@ func testGetAllArticlesByType(t *testing.T, scenario string, status articledomai
 			cRepo := &mockArticleRepo{}
 			wireMock(cRepo, getValidList)
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			Article, err := srv.GetAllArticles(context.Background(), status, pagination.Params{})
 			So(err, ShouldBeNil)
 			So(Article, ShouldNotBeNil)

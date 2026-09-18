@@ -29,7 +29,7 @@ func testGetAllCoursesByType(t *testing.T, scenario string, status coursedomain.
 			cRepo := &mockCourseRepoRepo{}
 			wireMock(cRepo, getCoursesError)
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			course, err := srv.GetAllCourses(context.Background(), status, pagination.Params{})
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 			So(course, ShouldBeNil)
@@ -39,7 +39,7 @@ func testGetAllCoursesByType(t *testing.T, scenario string, status coursedomain.
 			cRepo := &mockCourseRepoRepo{}
 			wireMock(cRepo, getValidList)
 
-			srv := newTestService(cRepo, nil)
+			srv := newTestService(cRepo)
 			courses, err := srv.GetAllCourses(context.Background(), status, pagination.Params{})
 			So(err, ShouldBeNil)
 			So(courses, ShouldNotBeNil)

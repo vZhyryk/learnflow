@@ -107,3 +107,13 @@ func (rep *Repository) GetContentItemBySlug(ctx context.Context, slug string) (*
 
 	return contentItem, nil
 }
+
+// CheckIfContentItemExistsByID reports whether a content item with the given ID exists.
+func (rep *Repository) CheckIfContentItemExistsByID(ctx context.Context, contentItemID string) (bool, error) {
+	var exists bool
+	if err := rep.QueryRunner(ctx).QueryRow(ctx, checkIfContentExistsByID, contentItemID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("repository.CheckIfContentItemExistsByID: %w", err)
+	}
+
+	return exists, nil
+}
