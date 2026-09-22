@@ -85,8 +85,11 @@ func TestUpdateAnnouncement(t *testing.T) {
 	Convey("Given an admin repository", t, func() {
 		var execTag pgconn.CommandTag
 		var execErr error
+		var gotQuery string
+		var gotArgs []any
 		repo := newTestRepo(&testutil.MockQueryRunner{
-			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+			ExecFn: func(_ context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+				gotQuery, gotArgs = sql, args
 				return execTag, execErr
 			},
 		})
@@ -95,6 +98,18 @@ func TestUpdateAnnouncement(t *testing.T) {
 		Convey("When update succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
 			So(repo.UpdateAnnouncement(context.Background(), announcement), ShouldBeNil)
+		})
+
+		Convey("When update succeeds, expires_at is written as the 8th argument", func() {
+			execTag = pgconn.NewCommandTag("UPDATE 1")
+			expiresAt := time.Date(2030, 1, 2, 3, 4, 5, 0, time.UTC)
+			announcement.ExpiresAt = expiresAt
+
+			So(repo.UpdateAnnouncement(context.Background(), announcement), ShouldBeNil)
+
+			So(gotQuery, ShouldContainSubstring, "expires_at = $8")
+			So(gotArgs, ShouldHaveLength, 8)
+			So(gotArgs[7], ShouldResemble, expiresAt)
 		})
 
 		Convey("When no row is matched (announcement not found)", func() {
@@ -201,4 +216,34 @@ func TestGetApprovedAnnouncements(t *testing.T) {
 
 func TestGetExpiredAnnouncements(t *testing.T) {
 	testutil.TestListMethod(t, "GetExpiredAnnouncements", bindAnnouncementList((*Repository).GetExpiredAnnouncements), fakeAnnouncementN, fakeAnnouncementScan)
+}
+
+func TestGetPublicAnnouncements(t *testing.T) {
+	testutil.TestListMethodWithStringArg(t, "GetPublicAnnouncements",
+		func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*admindomain.AnnouncementPublic, error) {
+			return newTestRepo(runner).GetPublicAnnouncements
+		},
+		fakeAnnouncementPublic, fakeAnnouncementPublicScan)
+}
+
+func TestGetPublicAnnouncementsArgs(t *testing.T) {
+	Convey("Given an admin repository", t, func() {
+		var gotQuery string
+		var gotArgs []any
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryFn: func(_ context.Context, sql string, args ...any) (pgx.Rows, error) {
+				gotQuery, gotArgs = sql, args
+				return &testutil.MockRows{}, nil
+			},
+		})
+
+		Convey("When listing public announcements for a user", func() {
+			params := pagination.NewParams(2, 10)
+			_, err := repo.GetPublicAnnouncements(context.Background(), params, "user-1")
+
+			So(err, ShouldBeNil)
+			So(gotQuery, ShouldContainSubstring, "'banner' = ANY(a.channels)")
+			So(gotArgs, ShouldResemble, []any{"user-1", params.Limit(), params.Offset()})
+		})
+	})
 }

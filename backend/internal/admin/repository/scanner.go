@@ -27,3 +27,20 @@ func scanAnnouncement(row repository.RowScanner) (*admindomain.Announcement, err
 	}
 	return announcement, nil
 }
+
+func scanPublicAnnouncement(row repository.RowScanner) (*admindomain.AnnouncementPublic, error) {
+	announcement := &admindomain.AnnouncementPublic{}
+	err := row.Scan(
+		&announcement.ID,
+		&announcement.Title,
+		&announcement.Body,
+		&announcement.ApprovedAt,
+		&announcement.ExpiresAt,
+		&announcement.EntityID,
+		&announcement.EntityType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return announcement, nil
+}

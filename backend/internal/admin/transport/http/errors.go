@@ -24,7 +24,8 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 		errors.Is(err, admindomain.ErrInvalidChannel),
 		errors.Is(err, admindomain.ErrInvalidEntityType),
 		errors.Is(err, admindomain.ErrInvalidExpiresAt),
-		errors.Is(err, admindomain.ErrEntityDataMisMatch):
+		errors.Is(err, admindomain.ErrEntityDataMisMatch),
+		errors.Is(err, admindomain.ErrAnnouncementApproved):
 
 		h.handleErrorRespond(r, "validation_error", func() error {
 			return helpers.ErrorResponse(w, http.StatusUnprocessableEntity, err.Error())

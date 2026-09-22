@@ -35,6 +35,10 @@ func (srv *Service) UpdateAnnouncement(ctx context.Context, req admindomain.Upda
 			return fmt.Errorf("service.UpdateAnnouncement: %w", err)
 		}
 
+		if announcement.ApprovedAt != nil {
+			return admindomain.ErrAnnouncementApproved
+		}
+
 		req.Apply(announcement)
 
 		if (announcement.EntityType == nil) != (announcement.EntityID == nil) {
@@ -88,6 +92,16 @@ func (srv *Service) GetApprovedAnnouncements(ctx context.Context, params paginat
 	list, err := srv.announRepo.GetApprovedAnnouncements(ctx, params)
 	if err != nil {
 		return nil, fmt.Errorf("service.GetApprovedAnnouncements: %w", err)
+	}
+
+	return list, nil
+}
+
+// GetPublicAnnouncements returns a paginated list of approved banner announcements visible to userID.
+func (srv *Service) GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
+	list, err := srv.announRepo.GetPublicAnnouncements(ctx, params, userID)
+	if err != nil {
+		return nil, fmt.Errorf("service.GetPublicAnnouncements: %w", err)
 	}
 
 	return list, nil

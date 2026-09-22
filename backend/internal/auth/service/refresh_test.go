@@ -14,8 +14,8 @@ import (
 func newRefreshTestFixtures() (authdomain.RefreshRequest, *authdomain.User, *authdomain.UserSession) {
 	now := time.Now().UTC().Truncate(time.Second)
 	validReq := authdomain.RefreshRequest{RefreshToken: "raw-refresh-token", UserAgent: "test-agent", IPAddress: "127.0.0.1"}
-	activeUser := &authdomain.User{ID: "user-123", Role: authdomain.RoleUser, Status: authdomain.StatusActive}
-	activeSession := &authdomain.UserSession{ID: "session-123", UserID: "user-123", ExpiresAt: now.Add(7 * 24 * time.Hour)}
+	activeUser := &authdomain.User{ID: TestUserID, Role: authdomain.RoleUser, Status: authdomain.StatusActive}
+	activeSession := &authdomain.UserSession{ID: "session-123", UserID: TestUserID, ExpiresAt: now.Add(7 * 24 * time.Hour)}
 	return validReq, activeUser, activeSession
 }
 
@@ -219,7 +219,7 @@ func TestRefreshUserStatus(t *testing.T) {
 			sRepo := refreshActiveSessionRepo(activeSession)
 			uRepo := &mockUserRepo{
 				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Status: authdomain.StatusBlocked}, nil
+					return &authdomain.User{ID: TestUserID, Status: authdomain.StatusBlocked}, nil
 				},
 			}
 			srv := newTestService(uRepo, sRepo, nil, nil, nil)
@@ -233,7 +233,7 @@ func TestRefreshUserStatus(t *testing.T) {
 			sRepo := refreshActiveSessionRepo(activeSession)
 			uRepo := &mockUserRepo{
 				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Status: authdomain.StatusDeleted}, nil
+					return &authdomain.User{ID: TestUserID, Status: authdomain.StatusDeleted}, nil
 				},
 			}
 			srv := newTestService(uRepo, sRepo, nil, nil, nil)

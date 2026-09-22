@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -14,9 +16,15 @@ import (
 )
 
 // NewTestPool opens a pgxpool.Pool against the integration test database (DB_* env
-// vars, see docker-compose.tests.yml) and registers pool.Close via t.Cleanup.
+// vars, see docker-compose.tests.yml) and registers pool.Close via t.Cleanup. Fixtures
+// built on this pool commit real rows (unlike WithTestTx), so it refuses to run against
+// a DB_NAME that doesn't look like a test database.
 func NewTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
+
+	if !strings.Contains(strings.ToLower(os.Getenv("DB_NAME")), "test") {
+		t.Fatalf("testutil.NewTestPool: DB_NAME=%q doesn't look like a test database (must contain \"test\")", os.Getenv("DB_NAME"))
+	}
 
 	dsn, err := db.BuildDSNFromEnv()
 	if err != nil {
@@ -67,14 +75,22 @@ func RandomTestEmail(t *testing.T, prefix string) string {
 }
 
 // InsertTestUser inserts a minimal active user row to satisfy a users(id) foreign key.
-func InsertTestUser(t *testing.T, tx pgx.Tx, email string) string {
+// Accepts a pgx.Tx (rolled back) or a pool (committed — caller must clean up).
+func InsertTestUser(t *testing.T, q db.QueryRunner, email string) string {
 	t.Helper()
 
 	var id string
-	if err := tx.QueryRow(context.Background(), insertTestUserSQL, email, dummyUserPasswordHash).Scan(&id); err != nil {
+	if err := q.QueryRow(context.Background(), insertTestUserSQL, email, dummyUserPasswordHash).Scan(&id); err != nil {
 		t.Fatalf("testutil.InsertTestUser: %v", err)
 	}
 	return id
+}
+
+// InsertRandomTestUser inserts an active user with a unique random email.
+func InsertRandomTestUser(t *testing.T, q db.QueryRunner) string {
+	t.Helper()
+
+	return InsertTestUser(t, q, RandomTestEmail(t, "test-user"))
 }
 
 // RandomTestSlug generates a unique slug, prefixed by the caller's package/purpose
@@ -96,12 +112,12 @@ const insertTestCourseSQL = `
 
 // InsertTestCourse inserts a minimal draft course (and its owning user) to satisfy a
 // courses(id) foreign key.
-func InsertTestCourse(t *testing.T, tx pgx.Tx) string {
+func InsertTestCourse(t *testing.T, q db.QueryRunner) string {
 	t.Helper()
 
-	userID := InsertTestUser(t, tx, RandomTestEmail(t, "course-fixture"))
+	userID := InsertTestUser(t, q, RandomTestEmail(t, "course-fixture"))
 	var id string
-	if err := tx.QueryRow(context.Background(), insertTestCourseSQL, RandomTestSlug(t, "course-fixture"), userID).Scan(&id); err != nil {
+	if err := q.QueryRow(context.Background(), insertTestCourseSQL, RandomTestSlug(t, "course-fixture"), userID).Scan(&id); err != nil {
 		t.Fatalf("testutil.InsertTestCourse: %v", err)
 	}
 	return id
@@ -114,12 +130,12 @@ const insertTestContentItemSQL = `
 
 // InsertTestContentItem inserts a minimal draft content item (and its owning user) to
 // satisfy a content_items(id) foreign key.
-func InsertTestContentItem(t *testing.T, tx pgx.Tx) string {
+func InsertTestContentItem(t *testing.T, q db.QueryRunner) string {
 	t.Helper()
 
-	userID := InsertTestUser(t, tx, RandomTestEmail(t, "content-fixture"))
+	userID := InsertTestUser(t, q, RandomTestEmail(t, "content-fixture"))
 	var id string
-	if err := tx.QueryRow(context.Background(), insertTestContentItemSQL, RandomTestSlug(t, "content-fixture"), userID).Scan(&id); err != nil {
+	if err := q.QueryRow(context.Background(), insertTestContentItemSQL, RandomTestSlug(t, "content-fixture"), userID).Scan(&id); err != nil {
 		t.Fatalf("testutil.InsertTestContentItem: %v", err)
 	}
 	return id

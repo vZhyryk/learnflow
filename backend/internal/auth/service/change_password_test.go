@@ -34,7 +34,7 @@ func validChangePasswordSessionRepo() *mockSessionRepo {
 
 func validChangePasswordRequest() authdomain.ChangePasswordRequest {
 	return authdomain.ChangePasswordRequest{
-		UserID:      "user-123",
+		UserID:      TestUserID,
 		OldPassword: "correct-old-password",
 		NewPassword: "new-password",
 	}
@@ -45,7 +45,7 @@ func validChangePasswordRequest() authdomain.ChangePasswordRequest {
 // skip/apply branches in revokeUserSessions.
 func changePasswordLogoutRequest(accessTokenExpiresAt time.Time) authdomain.ChangePasswordRequest {
 	return authdomain.ChangePasswordRequest{
-		UserID:               "user-123",
+		UserID:               TestUserID,
 		OldPassword:          "correct-old-password",
 		NewPassword:          "new-password",
 		IsAllSessionsLogout:  true,
@@ -64,7 +64,7 @@ func TestChangePasswordUserLookupFails(t *testing.T) {
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			err := srv.ChangePassword(context.Background(), authdomain.ChangePasswordRequest{UserID: "user-123"})
+			err := srv.ChangePassword(context.Background(), authdomain.ChangePasswordRequest{UserID: TestUserID})
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "get user")
@@ -81,7 +81,7 @@ func TestChangePasswordWrongOldPassword(t *testing.T) {
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
 			err := srv.ChangePassword(context.Background(), authdomain.ChangePasswordRequest{
-				UserID:      "user-123",
+				UserID:      TestUserID,
 				OldPassword: "wrong-old-password",
 				NewPassword: "new-password",
 			})
@@ -146,7 +146,7 @@ func TestChangePasswordWithSessionLogout(t *testing.T) {
 			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest(time.Now().UTC().Add(15*time.Minute)))
 
 			So(err, ShouldBeNil)
-			So(gotUserID, ShouldEqual, "user-123")
+			So(gotUserID, ShouldEqual, TestUserID)
 			So(gotReason, ShouldEqual, authdomain.RevokeReasonPasswordChanged)
 		})
 
@@ -160,7 +160,7 @@ func TestChangePasswordWithSessionLogout(t *testing.T) {
 			srv := newTestService(uRepo, sRepo, nil, nil, newSuccessfulMockRedis())
 
 			err := srv.ChangePassword(context.Background(), authdomain.ChangePasswordRequest{
-				UserID:              "user-123",
+				UserID:              TestUserID,
 				OldPassword:         "correct-old-password",
 				NewPassword:         "new-password",
 				IsAllSessionsLogout: true,

@@ -14,7 +14,7 @@ import (
 const validAnnouncementID = "11111111-1111-1111-1111-111111111111"
 
 func TestCreateAnnouncement(t *testing.T) {
-	Convey("POST /api/v1/admin/announcement", t, func() {
+	Convey("POST /api/v1/admin/announcements", t, func() {
 		var svcErr error
 		svc := &mockService{
 			createAnnouncement: func(_ context.Context, _ admindomain.CreateAnnouncementRequest) (string, error) {
@@ -22,7 +22,7 @@ func TestCreateAnnouncement(t *testing.T) {
 			},
 		}
 
-		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/admin/announcement")
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/admin/announcements")
 		mux, newReq := f.mux, f.newReq
 		validBody := `{"title":"Test Announcement","body":"Body text","channels":["email"],"expires_at":"2099-01-01T00:00:00Z"}`
 
@@ -59,7 +59,7 @@ func TestCreateAnnouncement(t *testing.T) {
 }
 
 func TestUpdateAnnouncement(t *testing.T) {
-	Convey("PUT /api/v1/admin/announcement", t, func() {
+	Convey("PUT /api/v1/admin/announcements", t, func() {
 		var svcErr error
 		svc := &mockService{
 			updateAnnouncement: func(_ context.Context, _ admindomain.UpdateAnnouncementRequest) error {
@@ -67,7 +67,7 @@ func TestUpdateAnnouncement(t *testing.T) {
 			},
 		}
 
-		f := newHTTPFixture(svc, http.MethodPut, "/api/v1/admin/announcement")
+		f := newHTTPFixture(svc, http.MethodPut, "/api/v1/admin/announcements")
 		mux, newReq := f.mux, f.newReq
 		validBody := `{"id":"` + validAnnouncementID + `"}`
 
@@ -109,7 +109,7 @@ func TestUpdateAnnouncement(t *testing.T) {
 }
 
 func TestApproveAnnouncement(t *testing.T) {
-	Convey("PUT /api/v1/admin/announcement/{id}/approve", t, func() {
+	Convey("PUT /api/v1/admin/announcements/{id}/approve", t, func() {
 		var svcErr error
 		svc := &mockService{
 			approveAnnouncement: func(_ context.Context, _, _ string) error {
@@ -117,7 +117,7 @@ func TestApproveAnnouncement(t *testing.T) {
 			},
 		}
 
-		f := newHTTPFixture(svc, http.MethodPut, "/api/v1/admin/announcement/"+validAnnouncementID+"/approve")
+		f := newHTTPFixture(svc, http.MethodPut, "/api/v1/admin/announcements/"+validAnnouncementID+"/approve")
 		mux, newReq := f.mux, f.newReq
 
 		Convey("No user in context → panics (middleware invariant violated)", func() {
@@ -154,7 +154,7 @@ func TestApproveAnnouncement(t *testing.T) {
 }
 
 func TestGetAnnouncements(t *testing.T) {
-	Convey("GET /api/v1/admin/announcement/all", t, func() {
+	Convey("GET /api/v1/admin/announcements/all", t, func() {
 		var svcErr error
 		svc := &mockService{
 			getAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
@@ -162,7 +162,7 @@ func TestGetAnnouncements(t *testing.T) {
 			},
 		}
 
-		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/admin/announcement/all")
+		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/admin/announcements/all")
 		mux, newReq := f.mux, f.newReq
 
 		Convey("No user in context → still succeeds (handler does not require user)", func() {
@@ -192,7 +192,7 @@ func TestGetAnnouncements(t *testing.T) {
 }
 
 func TestGetUnApprovedAnnouncements(t *testing.T) {
-	Convey("GET /api/v1/admin/announcement/unapproved", t, func() {
+	Convey("GET /api/v1/admin/announcements/unapproved", t, func() {
 		var svcErr error
 		svc := &mockService{
 			getUnApprovedAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
@@ -200,7 +200,7 @@ func TestGetUnApprovedAnnouncements(t *testing.T) {
 			},
 		}
 
-		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/admin/announcement/unapproved")
+		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/admin/announcements/unapproved")
 		mux, newReq := f.mux, f.newReq
 
 		Convey("Service returns an error → 500", func() {
@@ -219,7 +219,7 @@ func TestGetUnApprovedAnnouncements(t *testing.T) {
 }
 
 func TestGetApprovedAnnouncements(t *testing.T) {
-	Convey("GET /api/v1/admin/announcement/approved", t, func() {
+	Convey("GET /api/v1/admin/announcements/approved", t, func() {
 		var svcErr error
 		svc := &mockService{
 			getApprovedAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
@@ -227,7 +227,7 @@ func TestGetApprovedAnnouncements(t *testing.T) {
 			},
 		}
 
-		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/admin/announcement/approved")
+		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/admin/announcements/approved")
 		mux, newReq := f.mux, f.newReq
 
 		Convey("Service returns an error → 500", func() {
@@ -245,8 +245,50 @@ func TestGetApprovedAnnouncements(t *testing.T) {
 	})
 }
 
+func TestGetPublicAnnouncements(t *testing.T) {
+	Convey("GET /api/v1/announcements", t, func() {
+		var svcErr error
+		var gotUserID string
+		svc := &mockService{
+			getPublicAnnouncements: func(_ context.Context, _ pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
+				gotUserID = userID
+				return []*admindomain.AnnouncementPublic{{ID: "announcement-1"}}, svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/announcements")
+		mux, newReq := f.mux, f.newReq
+
+		Convey("Service returns an error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 200, service gets the authenticated user's ID", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			So(gotUserID, ShouldEqual, "user-123")
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["announcements"], ShouldNotBeNil)
+		})
+
+		Convey("Response body carries no audit fields", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Body.String(), ShouldNotContainSubstring, "created_by_user_id")
+			So(w.Body.String(), ShouldNotContainSubstring, "approved_by_user_id")
+			So(w.Body.String(), ShouldNotContainSubstring, "channels")
+		})
+
+		Convey("Response write fails → does not panic", func() {
+			// Nothing to assert beyond "this does not panic" — the write error is only logged.
+			mux.ServeHTTP(&errWriter{}, withUser(newReq("", nil)))
+		})
+	})
+}
+
 func TestGetExpiredAnnouncements(t *testing.T) {
-	Convey("GET /api/v1/admin/announcement/expired", t, func() {
+	Convey("GET /api/v1/admin/announcements/expired", t, func() {
 		var svcErr error
 		svc := &mockService{
 			getExpiredAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
@@ -254,7 +296,7 @@ func TestGetExpiredAnnouncements(t *testing.T) {
 			},
 		}
 
-		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/admin/announcement/expired")
+		f := newHTTPFixture(svc, http.MethodGet, "/api/v1/admin/announcements/expired")
 		mux, newReq := f.mux, f.newReq
 
 		Convey("Service returns an error → 500", func() {

@@ -13,12 +13,14 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+var TestUserID string = "user-123"
+
 func newLogoutTestContext(user *authdomain.User) context.Context {
 	return appcontext.WithUser(context.Background(), user)
 }
 
 func validLogoutGetUserSessionByRefreshToken(_ context.Context, _ string) (*authdomain.UserSession, error) {
-	return &authdomain.UserSession{ID: "session-123", UserID: "user-123"}, nil
+	return &authdomain.UserSession{ID: "session-123", UserID: TestUserID}, nil
 }
 
 func TestLogoutNoUserInContext(t *testing.T) {
@@ -42,7 +44,7 @@ func TestLogoutSessionLookupFails(t *testing.T) {
 				},
 			}
 			srv := newTestService(nil, sRepo, nil, nil, nil)
-			ctx := newLogoutTestContext(&authdomain.User{ID: "user-123"})
+			ctx := newLogoutTestContext(&authdomain.User{ID: TestUserID})
 
 			_, err := srv.Logout(ctx, authdomain.LogoutRequest{RefreshToken: "ref"})
 
@@ -61,7 +63,7 @@ func TestLogoutSessionAlreadyGone(t *testing.T) {
 				},
 			}
 			srv := newTestService(nil, sRepo, nil, nil, nil)
-			ctx := newLogoutTestContext(&authdomain.User{ID: "user-123"})
+			ctx := newLogoutTestContext(&authdomain.User{ID: TestUserID})
 
 			userID, err := srv.Logout(ctx, authdomain.LogoutRequest{RefreshToken: "ref"})
 
@@ -80,7 +82,7 @@ func TestLogoutSessionBelongsToAnotherUser(t *testing.T) {
 				},
 			}
 			srv := newTestService(nil, sRepo, nil, nil, nil)
-			ctx := newLogoutTestContext(&authdomain.User{ID: "user-123"})
+			ctx := newLogoutTestContext(&authdomain.User{ID: TestUserID})
 
 			_, err := srv.Logout(ctx, authdomain.LogoutRequest{RefreshToken: "ref"})
 
@@ -95,16 +97,16 @@ func TestLogoutAlreadyRevoked(t *testing.T) {
 			revokedAt := time.Now().UTC()
 			sRepo := &mockSessionRepo{
 				getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
-					return &authdomain.UserSession{ID: "session-123", UserID: "user-123", RevokedAt: &revokedAt}, nil
+					return &authdomain.UserSession{ID: "session-123", UserID: TestUserID, RevokedAt: &revokedAt}, nil
 				},
 			}
 			srv := newTestService(nil, sRepo, nil, nil, nil)
-			ctx := newLogoutTestContext(&authdomain.User{ID: "user-123"})
+			ctx := newLogoutTestContext(&authdomain.User{ID: TestUserID})
 
 			userID, err := srv.Logout(ctx, authdomain.LogoutRequest{RefreshToken: "ref"})
 
 			So(err, ShouldBeNil)
-			So(userID, ShouldEqual, "user-123")
+			So(userID, ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -122,14 +124,14 @@ func TestLogoutRevokesActiveSession(t *testing.T) {
 				},
 			}
 			srv := newTestService(nil, sRepo, nil, nil, nil)
-			ctx := newLogoutTestContext(&authdomain.User{ID: "user-123"})
+			ctx := newLogoutTestContext(&authdomain.User{ID: TestUserID})
 
 			userID, err := srv.Logout(ctx, authdomain.LogoutRequest{RefreshToken: "ref"})
 
 			So(err, ShouldBeNil)
-			So(userID, ShouldEqual, "user-123")
+			So(userID, ShouldEqual, TestUserID)
 			So(gotSessionID, ShouldEqual, "session-123")
-			So(gotRevokedBy, ShouldEqual, "user-123")
+			So(gotRevokedBy, ShouldEqual, TestUserID)
 			So(gotReason, ShouldEqual, authdomain.RevokeReasonLogout)
 		})
 
@@ -141,7 +143,7 @@ func TestLogoutRevokesActiveSession(t *testing.T) {
 				},
 			}
 			srv := newTestService(nil, sRepo, nil, nil, nil)
-			ctx := newLogoutTestContext(&authdomain.User{ID: "user-123"})
+			ctx := newLogoutTestContext(&authdomain.User{ID: TestUserID})
 
 			_, err := srv.Logout(ctx, authdomain.LogoutRequest{RefreshToken: "ref"})
 
@@ -186,12 +188,12 @@ func TestLogoutBlocklistsAccessToken(t *testing.T) {
 			}
 			sRepo := activeLogoutSessionRepo()
 			srv := newTestService(nil, sRepo, nil, nil, redisClient)
-			ctx := newLogoutTestContext(&authdomain.User{ID: "user-123"})
+			ctx := newLogoutTestContext(&authdomain.User{ID: TestUserID})
 
 			userID, err := srv.Logout(ctx, logoutBlocklistRequest())
 
 			So(err, ShouldBeNil)
-			So(userID, ShouldEqual, "user-123")
+			So(userID, ShouldEqual, TestUserID)
 			So(redisCalled, ShouldBeTrue)
 			So(gotKey, ShouldEqual, "blocklist:jti-123")
 		})
@@ -204,7 +206,7 @@ func TestLogoutBlocklistFails(t *testing.T) {
 			redisClient := mockRedisSetNXError(testutil.ErrRedisUnavailable)
 			sRepo := activeLogoutSessionRepo()
 			srv := newTestService(nil, sRepo, nil, nil, redisClient)
-			ctx := newLogoutTestContext(&authdomain.User{ID: "user-123"})
+			ctx := newLogoutTestContext(&authdomain.User{ID: TestUserID})
 
 			_, err := srv.Logout(ctx, logoutBlocklistRequest())
 

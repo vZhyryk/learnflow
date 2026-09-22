@@ -4,10 +4,7 @@ package articlerepository
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"testing"
 
 	articledomain "learnflow_backend/internal/article/domain"
@@ -21,21 +18,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func randomTestSlug(t *testing.T) string {
-	t.Helper()
-
-	buf := make([]byte, 8)
-	if _, err := rand.Read(buf); err != nil {
-		t.Fatalf("randomTestSlug: %v", err)
-	}
-	return fmt.Sprintf("article-repo-integration-%s", hex.EncodeToString(buf))
-}
-
-func insertTestUser(t *testing.T, tx pgx.Tx) string {
-	t.Helper()
-	return testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "article-repo-integration"))
-}
-
 // draftArticle returns a Article seed with every field populated, ready for
 // CreateArticle — mirrors the shape a real CreateArticleRequest would produce after
 // Apply/validation.
@@ -47,13 +29,14 @@ func draftArticle(t *testing.T, tx pgx.Tx) *articledomain.Article {
 	ogImageURL := "https://example.com/og.png"
 
 	return &articledomain.Article{
-		Slug:            randomTestSlug(t),
+		Slug:            testutil.RandomTestSlug(t, "article-repo-integration"),
 		Title:           "Integration Test Article",
+		Body:            "Integration test article body.",
 		SeoTitle:        &seoTitle,
 		SeoDescription:  &seoDescription,
 		OgImageURL:      &ogImageURL,
 		IsIndexable:     true,
-		CreatedByUserID: insertTestUser(t, tx),
+		CreatedByUserID: testutil.InsertRandomTestUser(t, tx),
 	}
 }
 
@@ -307,7 +290,7 @@ func TestUpdateArticle_Integration(t *testing.T) {
 				created, err := repo.CreateArticle(ctx, draftArticle(t, tx))
 				So(err, ShouldBeNil)
 
-				created.Slug = randomTestSlug(t)
+				created.Slug = testutil.RandomTestSlug(t, "article-repo-integration")
 				created.Title = "Updated Title"
 
 				err = repo.UpdateArticle(ctx, created, created.CreatedByUserID)

@@ -10,7 +10,7 @@ import (
 )
 
 // RegisterAdminRoutes wires the admin module's HTTP handler onto mux.
-func RegisterAdminRoutes(mux *http.ServeMux, svc admindomain.Service, adminChain alice.Chain, jsonLogger *logger.Logger) {
+func RegisterAdminRoutes(mux *http.ServeMux, svc admindomain.Service, adminChain, staticChain alice.Chain, jsonLogger *logger.Logger) {
 	adminHandler := adminhttp.NewHTTPHandler(svc, jsonLogger)
-	adminHandler.RegisterRoutes(mux, adminChain)
+	adminHandler.RegisterRoutes(mux, adminChain, staticChain)
 }

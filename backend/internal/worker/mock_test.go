@@ -65,7 +65,7 @@ func runValidatePayloadTest[T any](t *testing.T, tokenType string, valid, invali
 	})
 }
 
-// runIdempotencyKeyTest is shared across the 5 email-worker Generate*IdempotencyKey tests.
+// runIdempotencyKeyTest is shared across the worker idempotency-key generator tests.
 func runIdempotencyKeyTest[T any](t *testing.T, tokenType string, payload T, generate func(T) string, want string) {
 	t.Helper()
 	Convey(fmt.Sprintf("Given an %s payload", tokenType), t, func() {

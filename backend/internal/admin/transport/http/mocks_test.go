@@ -20,7 +20,7 @@ var withUser = testutil.WithUser
 func newAuthMux(svc *mockService) *http.ServeMux {
 	h := adminhttp.NewHTTPHandler(svc, testutil.NewTestLogger())
 	mux := http.NewServeMux()
-	h.RegisterRoutes(mux, alice.Chain{})
+	h.RegisterRoutes(mux, alice.Chain{}, alice.Chain{})
 	return mux
 }
 
@@ -42,6 +42,7 @@ type mockService struct {
 	getAnnouncements           func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
 	getUnApprovedAnnouncements func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
 	getApprovedAnnouncements   func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
+	getPublicAnnouncements     func(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error)
 	getExpiredAnnouncements    func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
 }
 
@@ -78,6 +79,13 @@ func (m *mockService) GetUnApprovedAnnouncements(ctx context.Context, params pag
 		panic("mockService.getUnApprovedAnnouncements not set")
 	}
 	return m.getUnApprovedAnnouncements(ctx, params)
+}
+
+func (m *mockService) GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
+	if m.getPublicAnnouncements == nil {
+		panic("mockService.getPublicAnnouncements not set")
+	}
+	return m.getPublicAnnouncements(ctx, params, userID)
 }
 
 func (m *mockService) GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {

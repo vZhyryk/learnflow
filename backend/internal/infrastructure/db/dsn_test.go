@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"learnflow_backend/internal/infrastructure/db"
+	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -28,10 +29,7 @@ const (
 // this package for real-Postgres integration tests).
 func setRequiredEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv(envDBName, "testdb")
-	t.Setenv(envDBUser, "testuser")
-	t.Setenv(envDBHost, "localhost")
-	t.Setenv(envDBPassword, "testpass")
+	testutil.SetRequiredDBEnv(t)
 	unsetEnv(t, envDBPort)
 	unsetEnv(t, envDBSSLMode)
 }

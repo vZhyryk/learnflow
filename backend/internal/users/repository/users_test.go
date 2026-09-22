@@ -15,6 +15,8 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+var testUserID string = "user-123"
+
 func TestGetUserProfileByID(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
@@ -28,9 +30,9 @@ func TestGetUserProfileByID(t *testing.T) {
 
 		Convey("When the profile exists", func() {
 			row = &testutil.MockRow{ScanFn: fakeScanProfile(now)}
-			got, err := repo.GetUserProfileByID(context.Background(), "user-123")
+			got, err := repo.GetUserProfileByID(context.Background(), testUserID)
 			So(err, ShouldBeNil)
-			So(got.UserID, ShouldEqual, "user-123")
+			So(got.UserID, ShouldEqual, testUserID)
 			So(*got.FirstName, ShouldEqual, "John")
 			So(*got.LastName, ShouldEqual, "Doe")
 			So(*got.Country, ShouldEqual, "UA")
@@ -46,7 +48,7 @@ func TestGetUserProfileByID(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
-			_, err := repo.GetUserProfileByID(context.Background(), "user-123")
+			_, err := repo.GetUserProfileByID(context.Background(), testUserID)
 			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 	})
@@ -64,7 +66,7 @@ func TestUpdateUserProfile(t *testing.T) {
 
 		janeFirstName, janeLastName := "Jane", "Doe"
 		profile := &usersdomain.UserProfile{
-			UserID:    "user-123",
+			UserID:    testUserID,
 			FirstName: &janeFirstName,
 			LastName:  &janeLastName,
 		}

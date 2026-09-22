@@ -4,10 +4,7 @@ package courserepository
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"testing"
 
 	coursedomain "learnflow_backend/internal/courses/domain"
@@ -20,21 +17,6 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 )
-
-func randomTestSlug(t *testing.T) string {
-	t.Helper()
-
-	buf := make([]byte, 8)
-	if _, err := rand.Read(buf); err != nil {
-		t.Fatalf("randomTestSlug: %v", err)
-	}
-	return fmt.Sprintf("courses-repo-integration-%s", hex.EncodeToString(buf))
-}
-
-func insertTestUser(t *testing.T, tx pgx.Tx) string {
-	t.Helper()
-	return testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "courses-repo-integration"))
-}
 
 // draftCourse returns a Course seed with every field populated, ready for CreateCourse —
 // mirrors the shape a real CreateCourseRequest would produce after Apply/validation.
@@ -51,7 +33,7 @@ func draftCourse(t *testing.T, tx pgx.Tx) *coursedomain.Course {
 	canonicalURL := "https://example.com/courses/slug"
 
 	return &coursedomain.Course{
-		Slug:             randomTestSlug(t),
+		Slug:             testutil.RandomTestSlug(t, "courses-repo-integration"),
 		Title:            "Integration Test Course",
 		Description:      &description,
 		ThumbnailURL:     &thumbnailURL,
@@ -62,7 +44,7 @@ func draftCourse(t *testing.T, tx pgx.Tx) *coursedomain.Course {
 		OgImageURL:       &ogImageURL,
 		CanonicalURL:     &canonicalURL,
 		IsIndexable:      true,
-		CreatedByUserID:  insertTestUser(t, tx),
+		CreatedByUserID:  testutil.InsertRandomTestUser(t, tx),
 	}
 }
 
@@ -317,7 +299,7 @@ func TestUpdateCourse_Integration(t *testing.T) {
 				So(err, ShouldBeNil)
 
 				newDescription := "Updated description"
-				created.Slug = randomTestSlug(t)
+				created.Slug = testutil.RandomTestSlug(t, "courses-repo-integration")
 				created.Title = "Updated Title"
 				created.Description = &newDescription
 

@@ -122,7 +122,7 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	// Admin Routes
 	adminRepo := adminrepository.NewRepository(a.DB)
 	adminSvc := adminservice.New(adminRepo, transactor, outbox)
-	admin.RegisterAdminRoutes(router, adminSvc, adminStaticWithAuth, a.Logger)
+	admin.RegisterAdminRoutes(router, adminSvc, adminStaticWithAuth, chains.StaticWithAuth, a.Logger)
 
 	// Helper routes
 	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -30,7 +30,7 @@ func TestVerifyEmailTokenLookup(t *testing.T) {
 			tRepo := &mockTokenRepo{
 				getEmailVerificationToken: func(_ context.Context, _ string) (*authdomain.EmailVerificationToken, error) {
 					return &authdomain.EmailVerificationToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(-time.Hour)},
+						TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(-time.Hour)},
 					}, nil
 				},
 			}
@@ -45,7 +45,7 @@ func TestVerifyEmailTokenLookup(t *testing.T) {
 
 func fakeVerifyEmailToken(_ context.Context, _ string) (*authdomain.EmailVerificationToken, error) {
 	return &authdomain.EmailVerificationToken{
-		TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
+		TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(time.Hour)},
 	}, nil
 }
 
@@ -193,9 +193,9 @@ func TestVerifyEmailSuccess(t *testing.T) {
 			userID, err := srv.VerifyEmail(context.Background(), authdomain.VerifyEmailRequest{Token: "raw-token"})
 
 			So(err, ShouldBeNil)
-			So(userID, ShouldEqual, "user-123")
-			So(gotLookupUserID, ShouldEqual, "user-123")
-			So(gotUpdatedStatusUserID, ShouldEqual, "user-123")
+			So(userID, ShouldEqual, TestUserID)
+			So(gotLookupUserID, ShouldEqual, TestUserID)
+			So(gotUpdatedStatusUserID, ShouldEqual, TestUserID)
 			So(gotMarkedUsedHash, ShouldNotBeEmpty)
 		})
 	})

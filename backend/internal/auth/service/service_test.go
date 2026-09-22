@@ -75,5 +75,5 @@ func newChangePasswordTestUser() *authdomain.User {
 	if err != nil {
 		panic(err)
 	}
-	return &authdomain.User{ID: "user-123", PasswordHash: string(hash)}
+	return &authdomain.User{ID: TestUserID, PasswordHash: string(hash)}
 }

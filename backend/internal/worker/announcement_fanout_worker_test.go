@@ -40,7 +40,7 @@ func TestAnnouncementFanOutWorkerParseMessage(t *testing.T) {
 		Convey("When the idempotency check fails (redis unreachable)", func() {
 			annRep := &mockAnnouncementRepo{
 				getAnnouncementByID: func(_ context.Context, _ string) (*admindomain.Announcement, error) {
-					return &admindomain.Announcement{ID: "ann-1"}, nil
+					return &admindomain.Announcement{ID: "ann-1", Channels: []admindomain.Channel{admindomain.EmailChannel}}, nil
 				},
 			}
 			w := newTestAnnouncementFanOutWorker(&testutil.MockQueryRunner{}, testutil.UnreachableRedis(), annRep, defaultTestEntityConfigs())
@@ -49,6 +49,22 @@ func TestAnnouncementFanOutWorkerParseMessage(t *testing.T) {
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "idempotency check")
+			So(key, ShouldBeEmpty)
+		})
+
+		Convey("When the announcement has no email channel (redis is never reached)", func() {
+			annRep := &mockAnnouncementRepo{
+				getAnnouncementByID: func(_ context.Context, _ string) (*admindomain.Announcement, error) {
+					return &admindomain.Announcement{ID: "ann-1", Channels: []admindomain.Channel{admindomain.BannerChannel}}, nil
+				},
+			}
+			w := newTestAnnouncementFanOutWorker(&testutil.MockQueryRunner{}, testutil.UnreachableRedis(), annRep, defaultTestEntityConfigs())
+
+			payload, announcement, key, err := w.parseMessage(context.Background(), `{"announcement_id":"ann-1"}`)
+
+			So(err, ShouldEqual, errIsNotEmailAnnouncement)
+			So(payload, ShouldBeNil)
+			So(announcement, ShouldBeNil)
 			So(key, ShouldBeEmpty)
 		})
 	})
@@ -137,7 +153,7 @@ func TestAnnouncementFanOutWorkerFetchAnnouncement(t *testing.T) {
 			_, err := w.fetchAnnouncement(context.Background(), "ann-1")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "doesn't exists")
+			So(err.Error(), ShouldContainSubstring, "doesn't exist")
 		})
 
 		Convey("When the announcement is found", func() {
@@ -182,7 +198,8 @@ func TestAnnouncementFanOutWorkerCheckEntityExists(t *testing.T) {
 				EntityType: ptrEntityType(admindomain.CourseEntityType), EntityID: ptrStr("course-1"),
 			})
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "invalid payload")
+			So(err.Error(), ShouldContainSubstring, "checkEntityExists")
+			So(err.Error(), ShouldNotContainSubstring, "invalid payload")
 		})
 
 		Convey("When the entity doesn't exist", func() {
@@ -193,7 +210,7 @@ func TestAnnouncementFanOutWorkerCheckEntityExists(t *testing.T) {
 				EntityType: ptrEntityType(admindomain.CourseEntityType), EntityID: ptrStr("course-1"),
 			})
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "doesn't exists")
+			So(err.Error(), ShouldContainSubstring, "doesn't exist")
 		})
 
 		Convey("When the entity exists", func() {
@@ -206,14 +223,12 @@ func TestAnnouncementFanOutWorkerCheckEntityExists(t *testing.T) {
 }
 
 func TestAnnouncementFanOutWorkerGenerateIdempotencyKey(t *testing.T) {
-	Convey("Given an AnnouncementFanOutWorker", t, func() {
-		w := newTestAnnouncementFanOutWorker(&testutil.MockQueryRunner{}, nil, &mockAnnouncementRepo{}, defaultTestEntityConfigs())
-
-		Convey("When generating the idempotency key", func() {
-			key := w.generateIdempotencyKey(events.AnnouncementPayload{AnnouncementID: "ann-1"})
-			So(key, ShouldEqual, "announcement:approved:ann-1")
-		})
-	})
+	w := newTestAnnouncementFanOutWorker(&testutil.MockQueryRunner{}, nil, &mockAnnouncementRepo{}, defaultTestEntityConfigs())
+	runIdempotencyKeyTest(t, "AnnouncementPayload",
+		events.AnnouncementPayload{AnnouncementID: "ann-1"},
+		w.generateIdempotencyKey,
+		"announcement:approved:ann-1",
+	)
 }
 
 func TestAnnouncementFanOutWorkerProcessAndHandleFailureSuccess(t *testing.T) {

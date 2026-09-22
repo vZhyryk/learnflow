@@ -43,7 +43,7 @@ func TestInitiatePasswordResetUserLookup(t *testing.T) {
 }
 
 func validInitiateResetGetUserByEmail(_ context.Context, _ string) (*authdomain.User, error) {
-	return &authdomain.User{ID: "user-123", Email: "user@example.com"}, nil
+	return &authdomain.User{ID: TestUserID, Email: "user@example.com"}, nil
 }
 
 func TestInitiatePasswordResetProfileLookupFails(t *testing.T) {
@@ -73,7 +73,7 @@ func TestInitiatePasswordResetSuccess(t *testing.T) {
 				getUserByEmail: validInitiateResetGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
 					aliceName := "Alice"
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
+					return &authdomain.UserProfile{UserID: TestUserID, FirstName: &aliceName}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -88,7 +88,7 @@ func TestInitiatePasswordResetSuccess(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "password")
-			So(captured[1], ShouldEqual, "user-123")
+			So(captured[1], ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -99,7 +99,7 @@ func TestInitiatePasswordResetTokenCreationFails(t *testing.T) {
 			uRepo := &mockUserRepo{
 				getUserByEmail: validInitiateResetGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123"}, nil
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -136,7 +136,7 @@ func TestResetPasswordTokenLookup(t *testing.T) {
 			tRepo := &mockTokenRepo{
 				getPasswordResetToken: func(_ context.Context, _ string) (*authdomain.PasswordResetToken, error) {
 					return &authdomain.PasswordResetToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(-time.Hour)},
+						TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(-time.Hour)},
 					}, nil
 				},
 			}
@@ -151,12 +151,12 @@ func TestResetPasswordTokenLookup(t *testing.T) {
 
 func validResetPasswordToken(_ context.Context, _ string) (*authdomain.PasswordResetToken, error) {
 	return &authdomain.PasswordResetToken{
-		TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
+		TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(time.Hour)},
 	}, nil
 }
 
 func validResetPasswordGetUserByID(_ context.Context, _ string) (*authdomain.User, error) {
-	return &authdomain.User{ID: "user-123"}, nil
+	return &authdomain.User{ID: TestUserID}, nil
 }
 
 func TestResetPasswordUserLookupFails(t *testing.T) {
@@ -263,7 +263,7 @@ func TestResetPasswordSuccess(t *testing.T) {
 			err := srv.ResetPassword(context.Background(), authdomain.ResetPasswordRequest{Token: "tok", NewPassword: "new-password"})
 
 			So(err, ShouldBeNil)
-			So(gotRevokeUserID, ShouldEqual, "user-123")
+			So(gotRevokeUserID, ShouldEqual, TestUserID)
 			So(gotReason, ShouldEqual, authdomain.RevokeReasonPasswordReset)
 		})
 	})

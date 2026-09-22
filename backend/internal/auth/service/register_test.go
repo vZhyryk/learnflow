@@ -12,7 +12,7 @@ import (
 )
 
 func registerExistingUser() *authdomain.User {
-	return &authdomain.User{ID: "user-123", Email: "user@example.com"}
+	return &authdomain.User{ID: TestUserID, Email: "user@example.com"}
 }
 
 func fakeRegisterRequest() authdomain.RegisterRequest {
@@ -66,7 +66,7 @@ func TestRegisterExistingEmailNotifyGuard(t *testing.T) {
 					return registerExistingUser(), nil
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123"}, nil
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, testutil.NewFailingOutbox(testutil.ErrDBUnexpected), nil)
@@ -85,7 +85,7 @@ func TestRegisterExistingEmailNotifyGuard(t *testing.T) {
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
 					aliceName := "Alice"
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
+					return &authdomain.UserProfile{UserID: TestUserID, FirstName: &aliceName}, nil
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, testutil.NewCapturingOutbox(&captured), nil)
@@ -96,7 +96,7 @@ func TestRegisterExistingEmailNotifyGuard(t *testing.T) {
 			So(id, ShouldBeEmpty)
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "user")
-			So(captured[1], ShouldEqual, "user-123")
+			So(captured[1], ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -126,7 +126,7 @@ func TestRegisterCreateUserFailures(t *testing.T) {
 
 		Convey("When creating the user profile fails", func() {
 			uRepo := newRegisterNewUserRepo()
-			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return TestUserID, nil }
 			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error {
 				return testutil.ErrDBUnexpected
 			}
@@ -145,7 +145,7 @@ func TestRegisterCreateNotificationPreferencesFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When creating notification preferences fails", func() {
 			uRepo := newRegisterNewUserRepo()
-			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return TestUserID, nil }
 			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error { return nil }
 			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error {
 				return testutil.ErrDBUnexpected
@@ -164,7 +164,7 @@ func TestRegisterCreateVerificationTokenFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When creating the verification token fails", func() {
 			uRepo := newRegisterNewUserRepo()
-			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return TestUserID, nil }
 			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error { return nil }
 			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error { return nil }
 			tRepo := &mockTokenRepo{
@@ -188,7 +188,7 @@ func TestRegisterSuccess(t *testing.T) {
 			var capturedProfile *authdomain.UserProfile
 			var captured []any
 			uRepo := newRegisterNewUserRepo()
-			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return TestUserID, nil }
 			uRepo.createUserProfile = func(_ context.Context, p *authdomain.UserProfile) error {
 				capturedProfile = p
 				return nil
@@ -204,12 +204,12 @@ func TestRegisterSuccess(t *testing.T) {
 			})
 
 			So(err, ShouldBeNil)
-			So(id, ShouldEqual, "user-123")
-			So(capturedProfile.UserID, ShouldEqual, "user-123")
+			So(id, ShouldEqual, TestUserID)
+			So(capturedProfile.UserID, ShouldEqual, TestUserID)
 			So(*capturedProfile.FirstName, ShouldEqual, "Alice")
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "user")
-			So(captured[1], ShouldEqual, "user-123")
+			So(captured[1], ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -218,7 +218,7 @@ func TestRegisterMaxLengthPasswordHashing(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When the password is exactly 72 bytes of multi-byte runes (Validate's own limit)", func() {
 			uRepo := newRegisterNewUserRepo()
-			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return TestUserID, nil }
 			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error { return nil }
 			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error { return nil }
 			tRepo := &mockTokenRepo{
@@ -234,7 +234,7 @@ func TestRegisterMaxLengthPasswordHashing(t *testing.T) {
 			})
 
 			So(err, ShouldBeNil)
-			So(id, ShouldEqual, "user-123")
+			So(id, ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -244,9 +244,9 @@ func TestNewUserProfileFromRegisterRequest(t *testing.T) {
 		Convey("When optional fields are empty", func() {
 			req := authdomain.RegisterRequest{Email: "user@example.com", Password: "password123"}
 
-			p := newUserProfileFromRegisterRequest("user-123", req)
+			p := newUserProfileFromRegisterRequest(TestUserID, req)
 
-			So(p.UserID, ShouldEqual, "user-123")
+			So(p.UserID, ShouldEqual, TestUserID)
 			So(p.FirstName, ShouldBeNil)
 			So(p.LastName, ShouldBeNil)
 			So(p.PhoneNumber, ShouldBeNil)

@@ -17,6 +17,7 @@ type mockAnnouncementRepo struct {
 	getApprovedAnnouncements   func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
 	getExpiredAnnouncements    func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
 	getAnnouncementByID        func(ctx context.Context, id string) (*admindomain.Announcement, error)
+	getPublicAnnouncements     func(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error)
 }
 
 func (m *mockAnnouncementRepo) CreateAnnouncement(ctx context.Context, announcement *admindomain.Announcement) (*admindomain.Announcement, error) {
@@ -73,6 +74,13 @@ func (m *mockAnnouncementRepo) GetAnnouncementByID(ctx context.Context, id strin
 		panic("mockAnnouncementRepo.GetAnnouncementByID not set")
 	}
 	return m.getAnnouncementByID(ctx, id)
+}
+
+func (m *mockAnnouncementRepo) GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
+	if m.getPublicAnnouncements == nil {
+		panic("mockAnnouncementRepo.GetPublicAnnouncements not set")
+	}
+	return m.getPublicAnnouncements(ctx, params, userID)
 }
 
 func newTestService(repo *mockAnnouncementRepo) *Service {

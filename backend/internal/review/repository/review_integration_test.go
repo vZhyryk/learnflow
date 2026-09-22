@@ -18,21 +18,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func insertTestUser(t *testing.T, tx pgx.Tx) string {
-	t.Helper()
-	return testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "review-repo-integration"))
-}
-
-func insertTestCourse(t *testing.T, tx pgx.Tx) string {
-	t.Helper()
-	return testutil.InsertTestCourse(t, tx)
-}
-
-func insertTestContentItem(t *testing.T, tx pgx.Tx) string {
-	t.Helper()
-	return testutil.InsertTestContentItem(t, tx)
-}
-
 func newTestRepository(tx pgx.Tx) *Repository {
 	return &Repository{repository.BaseRepository{DB: tx}}
 }
@@ -46,8 +31,8 @@ func TestCreateCourseReview_Integration(t *testing.T) {
 		Convey("When creating a course review with valid course and user", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				comment := "great course"
 
 				got, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{
@@ -70,8 +55,8 @@ func TestCreateCourseReview_Integration(t *testing.T) {
 		Convey("When the user already has an active review for the course", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 
 				_, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 4})
 				So(err, ShouldBeNil)
@@ -85,7 +70,7 @@ func TestCreateCourseReview_Integration(t *testing.T) {
 		Convey("When course_id does not reference an existing course", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				userID := insertTestUser(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 
 				_, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{
 					CourseID: "00000000-0000-0000-0000-000000000000",
@@ -103,8 +88,8 @@ func TestCreateCourseReview_Integration(t *testing.T) {
 		Convey("When rating is outside the 1-5 range (DB-level CHECK, defense-in-depth below domain validation)", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 
 				_, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 6})
 
@@ -119,8 +104,8 @@ func TestCreateCourseReview_Integration(t *testing.T) {
 		Convey("When the same user reviews again after their first review was soft-deleted", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 
 				first, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
@@ -142,8 +127,8 @@ func TestCreateContentReview_Integration(t *testing.T) {
 		Convey("When creating a content review with valid content item and user", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				comment := "very helpful"
 
 				got, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{
@@ -164,8 +149,8 @@ func TestCreateContentReview_Integration(t *testing.T) {
 		Convey("When the user already has an active review for the content item", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 
 				_, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: userID, Rating: 4})
 				So(err, ShouldBeNil)
@@ -179,7 +164,7 @@ func TestCreateContentReview_Integration(t *testing.T) {
 		Convey("When content_item_id does not reference an existing content item", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				userID := insertTestUser(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 
 				_, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{
 					ContentID: "00000000-0000-0000-0000-000000000000",
@@ -205,8 +190,8 @@ func TestUpdateCourseReview_Integration(t *testing.T) {
 		Convey("When updating rating and comment of an existing review", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 2})
 				So(err, ShouldBeNil)
 
@@ -234,8 +219,8 @@ func TestUpdateCourseReview_Integration(t *testing.T) {
 		Convey("When the review is soft-deleted", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 2})
 				So(err, ShouldBeNil)
 				So(repo.DeleteCourseReview(ctx, created.ID, userID), ShouldBeNil)
@@ -255,8 +240,8 @@ func TestUpdateContentReview_Integration(t *testing.T) {
 		Convey("When updating rating and comment of an existing review", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: userID, Rating: 2})
 				So(err, ShouldBeNil)
 
@@ -292,8 +277,8 @@ func TestDeleteCourseReview_Integration(t *testing.T) {
 		Convey("When soft-deleting an existing review", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
 
@@ -307,8 +292,8 @@ func TestDeleteCourseReview_Integration(t *testing.T) {
 		Convey("When the review is already deleted (second delete affects 0 rows)", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
 				So(repo.DeleteCourseReview(ctx, created.ID, userID), ShouldBeNil)
@@ -323,7 +308,7 @@ func TestDeleteCourseReview_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
 
-				err := repo.DeleteCourseReview(ctx, "00000000-0000-0000-0000-000000000000", insertTestUser(t, tx))
+				err := repo.DeleteCourseReview(ctx, "00000000-0000-0000-0000-000000000000", testutil.InsertRandomTestUser(t, tx))
 
 				So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
 			})
@@ -338,8 +323,8 @@ func TestDeleteContentReview_Integration(t *testing.T) {
 		Convey("When soft-deleting an existing review", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
 
@@ -354,7 +339,7 @@ func TestDeleteContentReview_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
 
-				err := repo.DeleteContentReview(ctx, "00000000-0000-0000-0000-000000000000", insertTestUser(t, tx))
+				err := repo.DeleteContentReview(ctx, "00000000-0000-0000-0000-000000000000", testutil.InsertRandomTestUser(t, tx))
 
 				So(errors.Is(err, reviewdomain.ErrReviewNotFound), ShouldBeTrue)
 			})
@@ -371,8 +356,8 @@ func TestGetCourseReviewByID_Integration(t *testing.T) {
 		Convey("When the review exists", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 4})
 				So(err, ShouldBeNil)
 
@@ -402,8 +387,8 @@ func TestGetContentReviewByID_Integration(t *testing.T) {
 		Convey("When the review exists", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: userID, Rating: 4})
 				So(err, ShouldBeNil)
 
@@ -435,8 +420,8 @@ func TestGetCourseReviewByUserAndCourseID_Integration(t *testing.T) {
 		Convey("When the user has reviewed the course", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
 
@@ -450,8 +435,8 @@ func TestGetCourseReviewByUserAndCourseID_Integration(t *testing.T) {
 		Convey("When the user has not reviewed the course", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 
 				_, err := repo.GetCourseReviewByUserAndCourseID(ctx, userID, courseID)
 
@@ -462,8 +447,8 @@ func TestGetCourseReviewByUserAndCourseID_Integration(t *testing.T) {
 		Convey("When the user's review was soft-deleted", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
 				So(repo.DeleteCourseReview(ctx, created.ID, userID), ShouldBeNil)
@@ -483,8 +468,8 @@ func TestGetContentReviewByUserAndContentID_Integration(t *testing.T) {
 		Convey("When the user has reviewed the content item", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 				created, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: userID, Rating: 3})
 				So(err, ShouldBeNil)
 
@@ -498,8 +483,8 @@ func TestGetContentReviewByUserAndContentID_Integration(t *testing.T) {
 		Convey("When the user has not reviewed the content item", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 
 				_, err := repo.GetContentReviewByUserAndContentID(ctx, userID, contentID)
 
@@ -517,15 +502,15 @@ func TestGetCourseReviewList_Integration(t *testing.T) {
 	Convey("Given a course with multiple reviews, one soft-deleted", t, func() {
 		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 			repo := newTestRepository(tx)
-			courseID := insertTestCourse(t, tx)
+			courseID := testutil.InsertTestCourse(t, tx)
 
-			active1, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: insertTestUser(t, tx), Rating: 5})
+			active1, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: testutil.InsertRandomTestUser(t, tx), Rating: 5})
 			So(err, ShouldBeNil)
-			active2, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: insertTestUser(t, tx), Rating: 3})
+			active2, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: testutil.InsertRandomTestUser(t, tx), Rating: 3})
 			So(err, ShouldBeNil)
-			deleted, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: insertTestUser(t, tx), Rating: 1})
+			deleted, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: testutil.InsertRandomTestUser(t, tx), Rating: 1})
 			So(err, ShouldBeNil)
-			So(repo.DeleteCourseReview(ctx, deleted.ID, insertTestUser(t, tx)), ShouldBeNil)
+			So(repo.DeleteCourseReview(ctx, deleted.ID, testutil.InsertRandomTestUser(t, tx)), ShouldBeNil)
 
 			Convey("Listing returns only active reviews for that course", func() {
 				got, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), courseID, reviewdomain.ReviewFilter{})
@@ -545,7 +530,7 @@ func TestGetCourseReviewList_Integration(t *testing.T) {
 			})
 
 			Convey("A different course has no reviews", func() {
-				otherCourseID := insertTestCourse(t, tx)
+				otherCourseID := testutil.InsertTestCourse(t, tx)
 
 				got, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), otherCourseID, reviewdomain.ReviewFilter{})
 
@@ -581,13 +566,13 @@ func TestGetContentReviewList_Integration(t *testing.T) {
 	Convey("Given a content item with multiple reviews, one soft-deleted", t, func() {
 		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 			repo := newTestRepository(tx)
-			contentID := insertTestContentItem(t, tx)
+			contentID := testutil.InsertTestContentItem(t, tx)
 
-			active, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: insertTestUser(t, tx), Rating: 5})
+			active, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: testutil.InsertRandomTestUser(t, tx), Rating: 5})
 			So(err, ShouldBeNil)
-			deleted, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: insertTestUser(t, tx), Rating: 1})
+			deleted, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: testutil.InsertRandomTestUser(t, tx), Rating: 1})
 			So(err, ShouldBeNil)
-			So(repo.DeleteContentReview(ctx, deleted.ID, insertTestUser(t, tx)), ShouldBeNil)
+			So(repo.DeleteContentReview(ctx, deleted.ID, testutil.InsertRandomTestUser(t, tx)), ShouldBeNil)
 
 			Convey("Listing returns only active reviews for that content item", func() {
 				got, err := repo.GetContentReviewList(ctx, pagination.NewParams(1, 100), contentID, reviewdomain.ReviewFilter{})
@@ -619,7 +604,7 @@ func TestGetCourseReviewStats_Integration(t *testing.T) {
 		Convey("When a course has no reviews", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
 
 				rating, count, err := repo.GetCourseReviewStats(ctx, courseID)
 
@@ -632,15 +617,15 @@ func TestGetCourseReviewStats_Integration(t *testing.T) {
 		Convey("When a course has multiple active reviews and one soft-deleted", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				courseID := insertTestCourse(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
 
-				_, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: insertTestUser(t, tx), Rating: 4})
+				_, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: testutil.InsertRandomTestUser(t, tx), Rating: 4})
 				So(err, ShouldBeNil)
-				_, err = repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: insertTestUser(t, tx), Rating: 2})
+				_, err = repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: testutil.InsertRandomTestUser(t, tx), Rating: 2})
 				So(err, ShouldBeNil)
-				excluded, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: insertTestUser(t, tx), Rating: 1})
+				excluded, err := repo.CreateCourseReview(ctx, &reviewdomain.CourseReview{CourseID: courseID, UserID: testutil.InsertRandomTestUser(t, tx), Rating: 1})
 				So(err, ShouldBeNil)
-				So(repo.DeleteCourseReview(ctx, excluded.ID, insertTestUser(t, tx)), ShouldBeNil)
+				So(repo.DeleteCourseReview(ctx, excluded.ID, testutil.InsertRandomTestUser(t, tx)), ShouldBeNil)
 
 				rating, count, err := repo.GetCourseReviewStats(ctx, courseID)
 
@@ -659,7 +644,7 @@ func TestGetContentReviewStats_Integration(t *testing.T) {
 		Convey("When a content item has no reviews", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				contentID := insertTestContentItem(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
 
 				rating, count, err := repo.GetContentReviewStats(ctx, contentID)
 
@@ -672,11 +657,11 @@ func TestGetContentReviewStats_Integration(t *testing.T) {
 		Convey("When a content item has multiple active reviews", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := newTestRepository(tx)
-				contentID := insertTestContentItem(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
 
-				_, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: insertTestUser(t, tx), Rating: 5})
+				_, err := repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: testutil.InsertRandomTestUser(t, tx), Rating: 5})
 				So(err, ShouldBeNil)
-				_, err = repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: insertTestUser(t, tx), Rating: 3})
+				_, err = repo.CreateContentReview(ctx, &reviewdomain.ContentReview{ContentID: contentID, UserID: testutil.InsertRandomTestUser(t, tx), Rating: 3})
 				So(err, ShouldBeNil)
 
 				rating, count, err := repo.GetContentReviewStats(ctx, contentID)

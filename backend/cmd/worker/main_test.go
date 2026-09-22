@@ -3,16 +3,10 @@ package main
 import (
 	"testing"
 
+	"learnflow_backend/internal/shared/testutil"
+
 	. "github.com/smartystreets/goconvey/convey"
 )
-
-func setValidDBEnv(t *testing.T) {
-	t.Helper()
-	t.Setenv("DB_NAME", "learnflow")
-	t.Setenv("DB_USER", "learnflow")
-	t.Setenv("DB_HOST", "localhost")
-	t.Setenv("DB_PASSWORD", "secret")
-}
 
 func setValidSMTPEnv(t *testing.T) {
 	t.Helper()
@@ -96,14 +90,14 @@ func TestGetMailerConfig(t *testing.T) {
 func TestGetAppConfig(t *testing.T) {
 	Convey("getAppConfig", t, func() {
 		Convey("When DB and SMTP env vars are all valid, it succeeds", func() {
-			setValidDBEnv(t)
+			testutil.SetRequiredDBEnv(t)
 			setValidSMTPEnv(t)
 
 			cfg, err := getAppConfig("production")
 
 			So(err, ShouldBeNil)
 			So(cfg.Env, ShouldEqual, "production")
-			So(cfg.Database.DSN, ShouldContainSubstring, "learnflow")
+			So(cfg.Database.DSN, ShouldContainSubstring, "testdb")
 		})
 
 		Convey("When DB config is invalid (missing DB_NAME), it errors before touching SMTP", func() {
@@ -119,7 +113,7 @@ func TestGetAppConfig(t *testing.T) {
 		})
 
 		Convey("When DB config is valid but SMTP is invalid, it errors", func() {
-			setValidDBEnv(t)
+			testutil.SetRequiredDBEnv(t)
 			t.Setenv("SMTP_HOST", "")
 
 			_, err := getAppConfig("production")

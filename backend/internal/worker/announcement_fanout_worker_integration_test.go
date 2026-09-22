@@ -26,19 +26,6 @@ func insertNotificationPreferences(t *testing.T, ctx context.Context, tx pgx.Tx,
 	}
 }
 
-func insertCourseAccess(t *testing.T, ctx context.Context, tx pgx.Tx, userID, courseID, status string, expiresAt *time.Time) {
-	t.Helper()
-
-	_, err := tx.Exec(ctx,
-		`INSERT INTO user_course_access (user_id, course_id, access_type, status, granted_at, expires_at)
-		 VALUES ($1, $2, 'admin_granted', $3, now(), $4)`,
-		userID, courseID, status, expiresAt,
-	)
-	if err != nil {
-		t.Fatalf("insertCourseAccess: %v", err)
-	}
-}
-
 func TestAnnouncementFanOutWorkerQueryRecipients_PlatformWide_Integration(t *testing.T) {
 	pool := testutil.NewTestPool(t)
 
@@ -82,20 +69,24 @@ func TestAnnouncementFanOutWorkerQueryRecipients_Course_Integration(t *testing.T
 
 			activeUser := testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "fanout-course-active"))
 			insertNotificationPreferences(t, ctx, tx, activeUser, true)
-			insertCourseAccess(t, ctx, tx, activeUser, courseID, "active", nil)
+			testutil.GrantCourseAccess(t, tx, activeUser, courseID, testutil.AccessGrant{})
 
 			revokedUser := testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "fanout-course-revoked"))
 			insertNotificationPreferences(t, ctx, tx, revokedUser, true)
-			insertCourseAccess(t, ctx, tx, revokedUser, courseID, "revoked", nil)
+			testutil.GrantCourseAccess(t, tx, revokedUser, courseID, testutil.AccessGrant{Status: "revoked"})
 
+			created := time.Now().Add(-3 * time.Hour)
+			granted := time.Now().Add(-2 * time.Hour)
 			expired := time.Now().Add(-1 * time.Hour)
 			expiredUser := testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "fanout-course-expired"))
 			insertNotificationPreferences(t, ctx, tx, expiredUser, true)
-			insertCourseAccess(t, ctx, tx, expiredUser, courseID, "active", &expired)
+			testutil.GrantCourseAccess(t, tx, expiredUser, courseID, testutil.AccessGrant{
+				CreatedAt: &created, GrantedAt: &granted, ExpiresAt: &expired,
+			})
 
 			optedOutUser := testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "fanout-course-opted-out"))
 			insertNotificationPreferences(t, ctx, tx, optedOutUser, false)
-			insertCourseAccess(t, ctx, tx, optedOutUser, courseID, "active", nil)
+			testutil.GrantCourseAccess(t, tx, optedOutUser, courseID, testutil.AccessGrant{})
 
 			Convey("When querying course recipients", func() {
 				recipients, err := w.queryRecipients(ctx, getCourseAnnouncementUserListSQL, []any{courseID})
@@ -119,15 +110,11 @@ func TestAnnouncementFanOutWorkerQueryRecipients_ContentViaCourse_Integration(t 
 			courseID := testutil.InsertTestCourse(t, tx)
 			contentItemID := testutil.InsertTestContentItem(t, tx)
 
-			_, err := tx.Exec(ctx,
-				`INSERT INTO course_content_items (course_id, content_item_id, position, is_required) VALUES ($1, $2, 1, true)`,
-				courseID, contentItemID,
-			)
-			So(err, ShouldBeNil)
+			testutil.LinkContentItemToCourse(t, tx, courseID, contentItemID, 1, true)
 
 			viaCourse := testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "fanout-content-via-course"))
 			insertNotificationPreferences(t, ctx, tx, viaCourse, true)
-			insertCourseAccess(t, ctx, tx, viaCourse, courseID, "active", nil)
+			testutil.GrantCourseAccess(t, tx, viaCourse, courseID, testutil.AccessGrant{})
 
 			noAccess := testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "fanout-content-no-access"))
 			insertNotificationPreferences(t, ctx, tx, noAccess, true)
@@ -152,7 +139,7 @@ func TestAnnouncementFanOutWorkerFanOut_Integration(t *testing.T) {
 
 			optedIn := testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "fanout-e2e"))
 			insertNotificationPreferences(t, ctx, tx, optedIn, true)
-			announcementID := insertAnnouncementTx(t, ctx, tx, optedIn)
+			announcementID := insertTestAnnouncement(t, tx, optedIn)
 
 			Convey("When fanOut runs, it bulk-inserts announcement_email_deliveries rows", func() {
 				err := w.fanOut(ctx, &admindomain.Announcement{ID: announcementID})
@@ -167,12 +154,7 @@ func TestAnnouncementFanOutWorkerFanOut_Integration(t *testing.T) {
 				So(status, ShouldEqual, "pending")
 			})
 
-			Convey("When fanOut runs twice for the same announcement, the second run violates no unique constraint and duplicates the row", func() {
-				// Documents current behavior: announcement_email_deliveries has no
-				// UNIQUE(user_id, announcement_id) constraint, so re-running fan-out for
-				// the same announcement (e.g. after a re-approve, see NOTIFICATION_FLOW.md
-				// decision #7) inserts a second delivery row instead of failing or
-				// upserting — the recipient would get the email twice.
+			Convey("When fanOut runs twice for the same announcement, the unique index keeps a single delivery row", func() {
 				So(w.fanOut(ctx, &admindomain.Announcement{ID: announcementID}), ShouldBeNil)
 				So(w.fanOut(ctx, &admindomain.Announcement{ID: announcementID}), ShouldBeNil)
 
@@ -182,7 +164,7 @@ func TestAnnouncementFanOutWorkerFanOut_Integration(t *testing.T) {
 					optedIn, announcementID,
 				).Scan(&count)
 				So(err, ShouldBeNil)
-				So(count, ShouldEqual, 2)
+				So(count, ShouldEqual, 1)
 			})
 		})
 	})

@@ -13,7 +13,7 @@ import (
 
 func validChangeEmailToken(_ context.Context, _ string) (*authdomain.EmailChangeToken, error) {
 	return &authdomain.EmailChangeToken{
-		TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
+		TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(time.Hour)},
 		NewEmail:  "new@example.com",
 	}, nil
 }
@@ -37,15 +37,15 @@ func validGetUserByEmail(_ context.Context, _ string) (*authdomain.User, error) 
 }
 
 func initiateEmailChangeGetUserByID(_ context.Context, _ string) (*authdomain.User, error) {
-	return &authdomain.User{ID: "user-123", Email: "old@example.com"}, nil
+	return &authdomain.User{ID: TestUserID, Email: "old@example.com"}, nil
 }
 
 func validEmailChangeRequest() authdomain.EmailChangeRequest {
-	return authdomain.EmailChangeRequest{Token: "tok", UserID: "user-123"}
+	return authdomain.EmailChangeRequest{Token: "tok", UserID: TestUserID}
 }
 
 func validRequestEmailChangeRequest() authdomain.RequestEmailChangeRequest {
-	return authdomain.RequestEmailChangeRequest{UserID: "user-123", NewEmail: "new@example.com"}
+	return authdomain.RequestEmailChangeRequest{UserID: TestUserID, NewEmail: "new@example.com"}
 }
 
 func TestInitiateEmailChangeUserLookupFails(t *testing.T) {
@@ -71,7 +71,7 @@ func TestInitiateEmailChangeSameEmail(t *testing.T) {
 		Convey("When the new email equals the current email", func() {
 			uRepo := &mockUserRepo{
 				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Email: "new@example.com"}, nil
+					return &authdomain.User{ID: TestUserID, Email: "new@example.com"}, nil
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
@@ -160,7 +160,7 @@ func TestInitiateEmailChangeTokenIssued(t *testing.T) {
 				getUserByEmail: validGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
 					aliceName := "Alice"
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
+					return &authdomain.UserProfile{UserID: TestUserID, FirstName: &aliceName}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -175,7 +175,7 @@ func TestInitiateEmailChangeTokenIssued(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "email")
-			So(captured[1], ShouldEqual, "user-123")
+			So(captured[1], ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -187,7 +187,7 @@ func TestInitiateEmailChangeTokenCreationFails(t *testing.T) {
 				getUserByID:    initiateEmailChangeGetUserByID,
 				getUserByEmail: validGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123"}, nil
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -226,7 +226,7 @@ func TestChangeEmailTokenLookup(t *testing.T) {
 			tRepo := &mockTokenRepo{
 				getEmailChangeToken: func(_ context.Context, _ string) (*authdomain.EmailChangeToken, error) {
 					return &authdomain.EmailChangeToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(-time.Hour)},
+						TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(-time.Hour)},
 					}, nil
 				},
 			}
@@ -366,14 +366,14 @@ func TestChangeEmailWithSessionLogout(t *testing.T) {
 
 			err := srv.ChangeEmail(context.Background(), authdomain.EmailChangeRequest{
 				Token:                "tok",
-				UserID:               "user-123",
+				UserID:               TestUserID,
 				IsAllSessionsLogout:  true,
 				JTI:                  "jti-123",
 				AccessTokenExpiresAt: time.Now().UTC().Add(15 * time.Minute),
 			})
 
 			So(err, ShouldBeNil)
-			So(gotUserID, ShouldEqual, "user-123")
+			So(gotUserID, ShouldEqual, TestUserID)
 			So(gotReason, ShouldEqual, authdomain.RevokeReasonEmailChanged)
 		})
 	})
@@ -392,7 +392,7 @@ func TestChangeEmailSessionLogoutFails(t *testing.T) {
 			srv := newTestService(uRepo, sRepo, tRepo, nil, newSuccessfulMockRedis())
 
 			err := srv.ChangeEmail(context.Background(), authdomain.EmailChangeRequest{
-				Token: "tok", UserID: "user-123", IsAllSessionsLogout: true,
+				Token: "tok", UserID: TestUserID, IsAllSessionsLogout: true,
 			})
 
 			So(err, ShouldNotBeNil)

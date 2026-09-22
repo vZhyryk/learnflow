@@ -18,7 +18,7 @@ func newLoginTestUser(rawPassword string, status authdomain.UserStatus) *authdom
 	if err != nil {
 		panic(err)
 	}
-	return &authdomain.User{ID: "user-123", Role: authdomain.RoleUser, PasswordHash: string(hash), Status: status}
+	return &authdomain.User{ID: TestUserID, Role: authdomain.RoleUser, PasswordHash: string(hash), Status: status}
 }
 
 func validLoginReq() authdomain.LoginRequest {
@@ -183,7 +183,7 @@ func TestLoginWrongPassword(t *testing.T) {
 			_, err := srv.Login(context.Background(), validLoginReq())
 
 			So(errors.Is(err, authdomain.ErrInvalidCredentials), ShouldBeTrue)
-			So(gotUserID, ShouldEqual, "user-123")
+			So(gotUserID, ShouldEqual, TestUserID)
 		})
 
 		Convey("When incrementing the failed-attempt counter fails unexpectedly", func() {
@@ -347,9 +347,9 @@ func TestLoginSuccess(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(got.AccessToken, ShouldNotBeEmpty)
 			So(got.RefreshToken, ShouldNotBeEmpty)
-			So(got.UserID, ShouldEqual, "user-123")
+			So(got.UserID, ShouldEqual, TestUserID)
 			So(got.ExpiresAt, ShouldEqual, expiresAt)
-			So(gotSessionInput.UserID, ShouldEqual, "user-123")
+			So(gotSessionInput.UserID, ShouldEqual, TestUserID)
 			So(*gotSessionInput.UserAgent, ShouldEqual, validLoginReq().UserAgent)
 			So(*gotSessionInput.IPAddress, ShouldEqual, validLoginReq().IPAddress)
 		})

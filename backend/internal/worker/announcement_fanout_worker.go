@@ -59,6 +59,8 @@ const (
 	`
 )
 
+var errIsNotEmailAnnouncement = errors.New("is not email")
+
 // entityConfig bundles, per EntityType, everything both buildRecipientQuery and
 // checkEntityExists need — one lookup instead of two parallel switches over the same enum.
 type entityConfig struct {
@@ -143,9 +145,10 @@ func (w *AnnouncementFanOutWorker) Run(ctx context.Context) {
 		}
 
 		payload, announcement, key, msgErr := w.parseMessage(ctx, result[1])
-		if errors.Is(msgErr, errAlreadyProcessed) {
+		if errors.Is(msgErr, errAlreadyProcessed) || errors.Is(msgErr, errIsNotEmailAnnouncement) {
 			continue
 		}
+
 		if msgErr != nil {
 			w.logger.Error(msgErr, nil)
 			continue
@@ -163,6 +166,10 @@ func (w *AnnouncementFanOutWorker) parseMessage(ctx context.Context, message str
 	announcement, err := w.validatePayload(ctx, payload)
 	if err != nil {
 		return nil, nil, "", err
+	}
+
+	if !slices.Contains(announcement.Channels, admindomain.EmailChannel) {
+		return nil, nil, "", errIsNotEmailAnnouncement
 	}
 
 	key := w.generateIdempotencyKey(payload)
@@ -201,7 +208,7 @@ func (w *AnnouncementFanOutWorker) fetchAnnouncement(ctx context.Context, id str
 	}
 
 	if announcement == nil {
-		return nil, fmt.Errorf("announcement: invalid payload: announcement with id %s doesn't exists", id)
+		return nil, fmt.Errorf("announcement: invalid payload: announcement with id %s doesn't exist", id)
 	}
 
 	return announcement, nil
@@ -217,16 +224,16 @@ func (w *AnnouncementFanOutWorker) checkEntityExists(ctx context.Context, announ
 
 	cfg, ok := w.entityConfigs[*announcement.EntityType]
 	if !ok {
-		return fmt.Errorf("announcement: invalid payload: invalid announcement entity type %s", *announcement.EntityType)
+		return fmt.Errorf("announcement: checkEntityExists: invalid payload: invalid announcement entity type %s", *announcement.EntityType)
 	}
 
 	exists, err := cfg.checkExists(ctx, *announcement.EntityID)
 	if err != nil {
-		return fmt.Errorf("announcement: invalid payload: %w", err)
+		return fmt.Errorf("announcement: checkEntityExists: %w", err)
 	}
 
 	if !exists {
-		return fmt.Errorf("announcement: invalid payload: such %s with id %s doesn't exists", *announcement.EntityType, *announcement.EntityID)
+		return fmt.Errorf("announcement: checkEntityExists: invalid payload: such %s with id %s doesn't exist", *announcement.EntityType, *announcement.EntityID)
 	}
 
 	return nil

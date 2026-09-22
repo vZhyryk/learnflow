@@ -24,7 +24,7 @@ func fakeProfile(now time.Time) *usersdomain.UserProfile {
 	timezone, bio := "Europe/Kiev", "bio text"
 	avatarURL := ""
 	return &usersdomain.UserProfile{
-		UserID:      "user-123",
+		UserID:      testUserID,
 		FirstName:   &firstName,
 		LastName:    &lastName,
 		PhoneNumber: &phoneNumber,

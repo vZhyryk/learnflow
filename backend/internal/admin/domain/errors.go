@@ -15,4 +15,5 @@ var (
 
 	ErrEntityDataMisMatch   = errors.New("entity data mismatch")
 	ErrAnnouncementNotFound = errors.New("announcement not found")
+	ErrAnnouncementApproved = errors.New("announcement already approved")
 )

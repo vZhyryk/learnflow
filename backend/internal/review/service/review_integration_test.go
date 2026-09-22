@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"learnflow_backend/internal/access"
 	reviewdomain "learnflow_backend/internal/review/domain"
@@ -26,43 +27,6 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 )
-
-func insertTestUser(t *testing.T, tx pgx.Tx) string {
-	t.Helper()
-	return testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "review-service-integration"))
-}
-
-func insertTestCourse(t *testing.T, tx pgx.Tx) string {
-	t.Helper()
-	return testutil.InsertTestCourse(t, tx)
-}
-
-func insertTestContentItem(t *testing.T, tx pgx.Tx) string {
-	t.Helper()
-	return testutil.InsertTestContentItem(t, tx)
-}
-
-const grantCourseAccessSQL = `
-	INSERT INTO user_course_access (user_id, course_id, access_type, status, granted_at)
-	VALUES ($1, $2, 'admin_granted', 'active', now())`
-
-func grantCourseAccess(t *testing.T, tx pgx.Tx, userID, courseID string) {
-	t.Helper()
-	if _, err := tx.Exec(context.Background(), grantCourseAccessSQL, userID, courseID); err != nil {
-		t.Fatalf("grantCourseAccess: %v", err)
-	}
-}
-
-const grantContentAccessSQL = `
-	INSERT INTO user_content_access (user_id, content_item_id, access_type, status, granted_at)
-	VALUES ($1, $2, 'admin_granted', 'active', now())`
-
-func grantContentAccess(t *testing.T, tx pgx.Tx, userID, contentID string) {
-	t.Helper()
-	if _, err := tx.Exec(context.Background(), grantContentAccessSQL, userID, contentID); err != nil {
-		t.Fatalf("grantContentAccess: %v", err)
-	}
-}
 
 // newIntegrationService wires a Service against real repository + access implementations,
 // both backed by tx, with a NoopTransactor (see package doc comment above for why).
@@ -78,9 +42,9 @@ func TestCreateCourseReview_ServiceIntegration(t *testing.T) {
 		Convey("When the user has active course access and no prior review", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				srv, repo := newIntegrationService(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
-				grantCourseAccess(t, tx, userID, courseID)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
+				testutil.GrantCourseAccess(t, tx, userID, courseID, testutil.AccessGrant{})
 
 				err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{
 					CourseID: courseID, UserID: userID, Rating: 5,
@@ -96,8 +60,8 @@ func TestCreateCourseReview_ServiceIntegration(t *testing.T) {
 		Convey("When the user has no course access", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				srv, _ := newIntegrationService(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 
 				err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{
 					CourseID: courseID, UserID: userID, Rating: 5,
@@ -110,18 +74,16 @@ func TestCreateCourseReview_ServiceIntegration(t *testing.T) {
 		Convey("When the user's course access has expired", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				srv, _ := newIntegrationService(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
-				// created_at is set explicitly in the past too — the granted_at_after_created
-				// CHECK requires granted_at >= created_at, and created_at defaults to the real
-				// insert-time now() otherwise, which would always be later than a past granted_at.
-				_, err := tx.Exec(ctx, `
-					INSERT INTO user_course_access (user_id, course_id, access_type, status, created_at, granted_at, expires_at)
-					VALUES ($1, $2, 'purchased', 'active', now() - interval '3 days', now() - interval '2 days', now() - interval '1 day')`,
-					userID, courseID)
-				So(err, ShouldBeNil)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
+				created := time.Now().Add(-3 * 24 * time.Hour)
+				granted := time.Now().Add(-2 * 24 * time.Hour)
+				expires := time.Now().Add(-24 * time.Hour)
+				testutil.GrantCourseAccess(t, tx, userID, courseID, testutil.AccessGrant{
+					AccessType: "purchased", CreatedAt: &created, GrantedAt: &granted, ExpiresAt: &expires,
+				})
 
-				err = srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{
+				err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{
 					CourseID: courseID, UserID: userID, Rating: 5,
 				})
 
@@ -132,9 +94,9 @@ func TestCreateCourseReview_ServiceIntegration(t *testing.T) {
 		Convey("When the user already reviewed the course", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				srv, _ := newIntegrationService(tx)
-				courseID := insertTestCourse(t, tx)
-				userID := insertTestUser(t, tx)
-				grantCourseAccess(t, tx, userID, courseID)
+				courseID := testutil.InsertTestCourse(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
+				testutil.GrantCourseAccess(t, tx, userID, courseID, testutil.AccessGrant{})
 				So(srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: userID, Rating: 3}), ShouldBeNil)
 
 				err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: userID, Rating: 4})
@@ -152,9 +114,9 @@ func TestCreateContentReview_ServiceIntegration(t *testing.T) {
 		Convey("When the user has direct content access", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				srv, repo := newIntegrationService(tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
-				grantContentAccess(t, tx, userID, contentID)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
+				testutil.GrantContentAccess(t, tx, userID, contentID, testutil.AccessGrant{})
 
 				err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
 					ContentID: contentID, UserID: userID, Rating: 4,
@@ -170,14 +132,13 @@ func TestCreateContentReview_ServiceIntegration(t *testing.T) {
 		Convey("When the user has access via owning the course the content belongs to (not direct content access)", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				srv, _ := newIntegrationService(tx)
-				courseID := insertTestCourse(t, tx)
-				contentID := insertTestContentItem(t, tx)
-				_, err := tx.Exec(ctx, `INSERT INTO course_content_items (course_id, content_item_id, position, is_required) VALUES ($1, $2, 1, true)`, courseID, contentID)
-				So(err, ShouldBeNil)
-				userID := insertTestUser(t, tx)
-				grantCourseAccess(t, tx, userID, courseID)
+				courseID := testutil.InsertTestCourse(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				testutil.LinkContentItemToCourse(t, tx, courseID, contentID, 1, true)
+				userID := testutil.InsertRandomTestUser(t, tx)
+				testutil.GrantCourseAccess(t, tx, userID, courseID, testutil.AccessGrant{})
 
-				err = srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
+				err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
 					ContentID: contentID, UserID: userID, Rating: 5,
 				})
 
@@ -188,8 +149,8 @@ func TestCreateContentReview_ServiceIntegration(t *testing.T) {
 		Convey("When the user has no access to the content item at all", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				srv, _ := newIntegrationService(tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
 
 				err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
 					ContentID: contentID, UserID: userID, Rating: 5,
@@ -202,10 +163,10 @@ func TestCreateContentReview_ServiceIntegration(t *testing.T) {
 		Convey("When the user has active access to a DIFFERENT course that does not contain this content item", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				srv, _ := newIntegrationService(tx)
-				unrelatedCourseID := insertTestCourse(t, tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
-				grantCourseAccess(t, tx, userID, unrelatedCourseID)
+				unrelatedCourseID := testutil.InsertTestCourse(t, tx)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
+				testutil.GrantCourseAccess(t, tx, userID, unrelatedCourseID, testutil.AccessGrant{})
 
 				err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
 					ContentID: contentID, UserID: userID, Rating: 5,
@@ -218,9 +179,9 @@ func TestCreateContentReview_ServiceIntegration(t *testing.T) {
 		Convey("When the user's direct content access was revoked", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				srv, _ := newIntegrationService(tx)
-				contentID := insertTestContentItem(t, tx)
-				userID := insertTestUser(t, tx)
-				grantContentAccess(t, tx, userID, contentID)
+				contentID := testutil.InsertTestContentItem(t, tx)
+				userID := testutil.InsertRandomTestUser(t, tx)
+				testutil.GrantContentAccess(t, tx, userID, contentID, testutil.AccessGrant{})
 				_, err := tx.Exec(ctx, `UPDATE user_content_access SET status = 'revoked' WHERE user_id = $1 AND content_item_id = $2`, userID, contentID)
 				So(err, ShouldBeNil)
 
@@ -240,9 +201,9 @@ func TestUpdateContentReview_ServiceIntegration(t *testing.T) {
 	Convey("Given an existing content review", t, func() {
 		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 			srv, repo := newIntegrationService(tx)
-			contentID := insertTestContentItem(t, tx)
-			ownerID := insertTestUser(t, tx)
-			grantContentAccess(t, tx, ownerID, contentID)
+			contentID := testutil.InsertTestContentItem(t, tx)
+			ownerID := testutil.InsertRandomTestUser(t, tx)
+			testutil.GrantContentAccess(t, tx, ownerID, contentID, testutil.AccessGrant{})
 			So(srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{ContentID: contentID, UserID: ownerID, Rating: 2}), ShouldBeNil)
 			created, err := repo.GetContentReviewByUserAndContentID(ctx, ownerID, contentID)
 			So(err, ShouldBeNil)
@@ -260,7 +221,7 @@ func TestUpdateContentReview_ServiceIntegration(t *testing.T) {
 			})
 
 			Convey("When a different user tries to update it", func() {
-				otherUserID := insertTestUser(t, tx)
+				otherUserID := testutil.InsertRandomTestUser(t, tx)
 				newRating := 1
 
 				err := srv.UpdateContentReview(ctx, reviewdomain.UpdateContentReviewRequest{
@@ -291,9 +252,9 @@ func TestDeleteContentReview_ServiceIntegration(t *testing.T) {
 	Convey("Given an existing content review", t, func() {
 		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 			srv, repo := newIntegrationService(tx)
-			contentID := insertTestContentItem(t, tx)
-			ownerID := insertTestUser(t, tx)
-			grantContentAccess(t, tx, ownerID, contentID)
+			contentID := testutil.InsertTestContentItem(t, tx)
+			ownerID := testutil.InsertRandomTestUser(t, tx)
+			testutil.GrantContentAccess(t, tx, ownerID, contentID, testutil.AccessGrant{})
 			So(srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{ContentID: contentID, UserID: ownerID, Rating: 2}), ShouldBeNil)
 			created, err := repo.GetContentReviewByUserAndContentID(ctx, ownerID, contentID)
 			So(err, ShouldBeNil)
@@ -310,7 +271,7 @@ func TestDeleteContentReview_ServiceIntegration(t *testing.T) {
 			})
 
 			Convey("When a different user tries to delete it", func() {
-				otherUserID := insertTestUser(t, tx)
+				otherUserID := testutil.InsertRandomTestUser(t, tx)
 
 				err := srv.DeleteContentReview(ctx, created.ID, otherUserID)
 
@@ -326,9 +287,9 @@ func TestUpdateCourseReview_ServiceIntegration(t *testing.T) {
 	Convey("Given an existing course review", t, func() {
 		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 			srv, repo := newIntegrationService(tx)
-			courseID := insertTestCourse(t, tx)
-			ownerID := insertTestUser(t, tx)
-			grantCourseAccess(t, tx, ownerID, courseID)
+			courseID := testutil.InsertTestCourse(t, tx)
+			ownerID := testutil.InsertRandomTestUser(t, tx)
+			testutil.GrantCourseAccess(t, tx, ownerID, courseID, testutil.AccessGrant{})
 			So(srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: ownerID, Rating: 2}), ShouldBeNil)
 			created, err := repo.GetCourseReviewByUserAndCourseID(ctx, ownerID, courseID)
 			So(err, ShouldBeNil)
@@ -346,7 +307,7 @@ func TestUpdateCourseReview_ServiceIntegration(t *testing.T) {
 			})
 
 			Convey("When a different user tries to update it", func() {
-				otherUserID := insertTestUser(t, tx)
+				otherUserID := testutil.InsertRandomTestUser(t, tx)
 				newRating := 1
 
 				err := srv.UpdateCourseReview(ctx, reviewdomain.UpdateCourseReviewRequest{
@@ -377,9 +338,9 @@ func TestDeleteCourseReview_ServiceIntegration(t *testing.T) {
 	Convey("Given an existing course review", t, func() {
 		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 			srv, repo := newIntegrationService(tx)
-			courseID := insertTestCourse(t, tx)
-			ownerID := insertTestUser(t, tx)
-			grantCourseAccess(t, tx, ownerID, courseID)
+			courseID := testutil.InsertTestCourse(t, tx)
+			ownerID := testutil.InsertRandomTestUser(t, tx)
+			testutil.GrantCourseAccess(t, tx, ownerID, courseID, testutil.AccessGrant{})
 			So(srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: ownerID, Rating: 2}), ShouldBeNil)
 			created, err := repo.GetCourseReviewByUserAndCourseID(ctx, ownerID, courseID)
 			So(err, ShouldBeNil)
@@ -396,7 +357,7 @@ func TestDeleteCourseReview_ServiceIntegration(t *testing.T) {
 			})
 
 			Convey("When a different user tries to delete it", func() {
-				otherUserID := insertTestUser(t, tx)
+				otherUserID := testutil.InsertRandomTestUser(t, tx)
 
 				err := srv.DeleteCourseReview(ctx, created.ID, otherUserID)
 

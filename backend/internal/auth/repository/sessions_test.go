@@ -124,7 +124,7 @@ func TestGetActiveSessionsByUserID(t *testing.T) {
 
 		Convey("When the session exists", func() {
 			row = &testutil.MockRow{ScanFn: fakeScanUserSession(now)}
-			got, err := repo.GetActiveSessionsByUserID(context.Background(), "user-123")
+			got, err := repo.GetActiveSessionsByUserID(context.Background(), TestUserID)
 			userSession := fakeUserSession(now)
 			So(err, ShouldBeNil)
 			So(got, ShouldHaveLength, 1)
@@ -172,7 +172,7 @@ func TestGetActiveSessionsByUserID(t *testing.T) {
 					return pgx.Rows(&testutil.MockRows{RowsErr: testutil.ErrDBUnexpected}), nil
 				},
 			})
-			_, err := rowsErrRepo.GetActiveSessionsByUserID(context.Background(), "user-123")
+			_, err := rowsErrRepo.GetActiveSessionsByUserID(context.Background(), TestUserID)
 			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 	})
@@ -416,7 +416,7 @@ func TestGetActiveSessionsByUserIDFiltersRevokedSessions(t *testing.T) {
 		})
 
 		Convey("When listing active sessions for a user", func() {
-			_, err := repo.GetActiveSessionsByUserID(context.Background(), "user-123")
+			_, err := repo.GetActiveSessionsByUserID(context.Background(), TestUserID)
 			So(err, ShouldBeNil)
 			So(gotQuery, ShouldContainSubstring, "revoked_at IS NULL")
 		})
@@ -453,7 +453,7 @@ func TestRevokeAllUserSessionsOnlyTargetsActiveSessions(t *testing.T) {
 
 		Convey("When revoking all sessions for a user", func() {
 			revokedByUserID := "user-456"
-			err := repo.RevokeAllUserSessions(context.Background(), "user-123", &revokedByUserID, authdomain.RevokeReasonAdmin)
+			err := repo.RevokeAllUserSessions(context.Background(), TestUserID, &revokedByUserID, authdomain.RevokeReasonAdmin)
 			So(err, ShouldBeNil)
 			So(gotQuery, ShouldContainSubstring, "revoked_at IS NULL")
 		})

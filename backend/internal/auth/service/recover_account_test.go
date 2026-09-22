@@ -43,7 +43,7 @@ func TestInitRecoverAccountUserLookup(t *testing.T) {
 		Convey("When the account is not actually deleted", func() {
 			uRepo := &mockUserRepo{
 				getDeletedUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Status: authdomain.StatusActive}, nil
+					return &authdomain.User{ID: TestUserID, Status: authdomain.StatusActive}, nil
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
@@ -56,7 +56,7 @@ func TestInitRecoverAccountUserLookup(t *testing.T) {
 }
 
 func fakeRecoverAccountDeletedUser() *authdomain.User {
-	return &authdomain.User{ID: "user-123", Email: "user@example.com", Status: authdomain.StatusDeleted}
+	return &authdomain.User{ID: TestUserID, Email: "user@example.com", Status: authdomain.StatusDeleted}
 }
 
 func TestInitRecoverAccountProfileLookup(t *testing.T) {
@@ -86,7 +86,7 @@ func TestInitRecoverAccountProfileLookup(t *testing.T) {
 					return deletedUser, nil
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123"}, nil
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -116,7 +116,7 @@ func TestInitRecoverAccountTokenIssued(t *testing.T) {
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
 					aliceName := "Alice"
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
+					return &authdomain.UserProfile{UserID: TestUserID, FirstName: &aliceName}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -131,7 +131,7 @@ func TestInitRecoverAccountTokenIssued(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "account")
-			So(captured[1], ShouldEqual, "user-123")
+			So(captured[1], ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -155,7 +155,7 @@ func TestRecoverAccountTokenLookup(t *testing.T) {
 			tRepo := &mockTokenRepo{
 				getAccountRecoveryToken: func(_ context.Context, _ string) (*authdomain.AccountRecoveryToken, error) {
 					return &authdomain.AccountRecoveryToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(-time.Hour)},
+						TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(-time.Hour)},
 					}, nil
 				},
 			}
@@ -170,12 +170,12 @@ func TestRecoverAccountTokenLookup(t *testing.T) {
 
 func validRecoverAccountToken(_ context.Context, _ string) (*authdomain.AccountRecoveryToken, error) {
 	return &authdomain.AccountRecoveryToken{
-		TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
+		TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(time.Hour)},
 	}, nil
 }
 
 func recoverAccountGetDeletedUserByID(_ context.Context, _ string) (*authdomain.User, error) {
-	return &authdomain.User{ID: "user-123", Status: authdomain.StatusDeleted}, nil
+	return &authdomain.User{ID: TestUserID, Status: authdomain.StatusDeleted}, nil
 }
 
 func TestRecoverAccountUserLookup(t *testing.T) {
@@ -199,7 +199,7 @@ func TestRecoverAccountUserLookup(t *testing.T) {
 			tRepo := &mockTokenRepo{getAccountRecoveryToken: validRecoverAccountToken}
 			uRepo := &mockUserRepo{
 				getDeletedUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Status: authdomain.StatusActive}, nil
+					return &authdomain.User{ID: TestUserID, Status: authdomain.StatusActive}, nil
 				},
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
@@ -266,7 +266,7 @@ func TestRecoverAccountSuccess(t *testing.T) {
 			err := srv.RecoverAccount(context.Background(), authdomain.RecoverAccountRequest{Token: "tok"})
 
 			So(err, ShouldBeNil)
-			So(gotRestoredUserID, ShouldEqual, "user-123")
+			So(gotRestoredUserID, ShouldEqual, TestUserID)
 		})
 	})
 }

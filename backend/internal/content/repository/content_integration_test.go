@@ -4,10 +4,7 @@ package contentrepository
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"testing"
 
 	contentdomain "learnflow_backend/internal/content/domain"
@@ -20,21 +17,6 @@ import (
 
 	. "github.com/smartystreets/goconvey/convey"
 )
-
-func randomTestSlug(t *testing.T) string {
-	t.Helper()
-
-	buf := make([]byte, 8)
-	if _, err := rand.Read(buf); err != nil {
-		t.Fatalf("randomTestSlug: %v", err)
-	}
-	return fmt.Sprintf("content-repo-integration-%s", hex.EncodeToString(buf))
-}
-
-func insertTestUser(t *testing.T, tx pgx.Tx) string {
-	t.Helper()
-	return testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "content-repo-integration"))
-}
 
 // draftContentItem returns a ContentItem seed with every field populated, ready for
 // CreateContentItem — mirrors the shape a real CreateContentItemRequest would produce after
@@ -52,7 +34,7 @@ func draftContentItem(t *testing.T, tx pgx.Tx) *contentdomain.ContentItem {
 	canonicalURL := "https://example.com/content/slug"
 
 	return &contentdomain.ContentItem{
-		Slug:             randomTestSlug(t),
+		Slug:             testutil.RandomTestSlug(t, "content-repo-integration"),
 		Title:            "Integration Test Content Item",
 		ContentType:      contentdomain.VideoContent,
 		Description:      &description,
@@ -64,7 +46,7 @@ func draftContentItem(t *testing.T, tx pgx.Tx) *contentdomain.ContentItem {
 		OgImageURL:       &ogImageURL,
 		CanonicalURL:     &canonicalURL,
 		IsIndexable:      true,
-		CreatedByUserID:  insertTestUser(t, tx),
+		CreatedByUserID:  testutil.InsertRandomTestUser(t, tx),
 	}
 }
 
@@ -319,7 +301,7 @@ func TestUpdateContentItem_Integration(t *testing.T) {
 				So(err, ShouldBeNil)
 
 				newDescription := "Updated description"
-				created.Slug = randomTestSlug(t)
+				created.Slug = testutil.RandomTestSlug(t, "content-repo-integration")
 				created.Title = "Updated Title"
 				created.Description = &newDescription
 

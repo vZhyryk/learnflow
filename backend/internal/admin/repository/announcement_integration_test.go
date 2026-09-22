@@ -18,11 +18,6 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func insertTestUser(t *testing.T, tx pgx.Tx) string {
-	t.Helper()
-	return testutil.InsertTestUser(t, tx, testutil.RandomTestEmail(t, "admin-repo-integration"))
-}
-
 // draftAnnouncement returns a platform-wide (no entity) Announcement seed, ready for
 // CreateAnnouncement — mirrors the shape a real CreateAnnouncementRequest produces.
 func draftAnnouncement(t *testing.T, tx pgx.Tx) *admindomain.Announcement {
@@ -31,7 +26,7 @@ func draftAnnouncement(t *testing.T, tx pgx.Tx) *admindomain.Announcement {
 	return &admindomain.Announcement{
 		Title:           "Integration Test Announcement",
 		Body:            "Integration test announcement body.",
-		CreatedByUserID: insertTestUser(t, tx),
+		CreatedByUserID: testutil.InsertRandomTestUser(t, tx),
 		ExpiresAt:       time.Now().Add(24 * time.Hour).UTC().Truncate(time.Second),
 		Channels:        []admindomain.Channel{admindomain.EmailChannel},
 	}
@@ -192,6 +187,25 @@ func TestUpdateAnnouncement_Integration(t *testing.T) {
 			})
 		})
 
+		Convey("When the expiry is changed", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				created, err := repo.CreateAnnouncement(ctx, draftAnnouncement(t, tx))
+				So(err, ShouldBeNil)
+
+				updatedByUserID := created.CreatedByUserID
+				created.UpdatedByUserID = &updatedByUserID
+				created.ExpiresAt = time.Now().Add(72 * time.Hour).UTC().Truncate(time.Second)
+
+				err = repo.UpdateAnnouncement(ctx, created)
+				So(err, ShouldBeNil)
+
+				got, err := repo.GetAnnouncementByID(ctx, created.ID)
+				So(err, ShouldBeNil)
+				So(got.ExpiresAt.Equal(created.ExpiresAt), ShouldBeTrue)
+			})
+		})
+
 		Convey("When the announcement does not exist", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
@@ -200,8 +214,7 @@ func TestUpdateAnnouncement_Integration(t *testing.T) {
 
 				err := repo.UpdateAnnouncement(ctx, ghost)
 
-				So(err, ShouldNotBeNil)
-				So(err.Error(), ShouldContainSubstring, "repository.UpdateAnnouncement")
+				So(errors.Is(err, admindomain.ErrAnnouncementNotFound), ShouldBeTrue)
 			})
 		})
 
@@ -232,7 +245,7 @@ func TestApproveAnnouncement_Integration(t *testing.T) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 				created, err := repo.CreateAnnouncement(ctx, draftAnnouncement(t, tx))
 				So(err, ShouldBeNil)
-				approver := insertTestUser(t, tx)
+				approver := testutil.InsertRandomTestUser(t, tx)
 
 				err = repo.ApproveAnnouncement(ctx, created.ID, approver)
 				So(err, ShouldBeNil)
@@ -248,7 +261,7 @@ func TestApproveAnnouncement_Integration(t *testing.T) {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 
-				err := repo.ApproveAnnouncement(ctx, "00000000-0000-0000-0000-000000000000", insertTestUser(t, tx))
+				err := repo.ApproveAnnouncement(ctx, "00000000-0000-0000-0000-000000000000", testutil.InsertRandomTestUser(t, tx))
 
 				So(errors.Is(err, admindomain.ErrAnnouncementNotFound), ShouldBeTrue)
 			})
@@ -262,7 +275,7 @@ func TestApproveAnnouncement_Integration(t *testing.T) {
 				created, err := repo.CreateAnnouncement(ctx, seed)
 				So(err, ShouldBeNil)
 
-				err = repo.ApproveAnnouncement(ctx, created.ID, insertTestUser(t, tx))
+				err = repo.ApproveAnnouncement(ctx, created.ID, testutil.InsertRandomTestUser(t, tx))
 
 				So(errors.Is(err, admindomain.ErrAnnouncementNotFound), ShouldBeTrue)
 			})
@@ -282,13 +295,13 @@ func TestGetAnnouncementsByStatus_Integration(t *testing.T) {
 
 			approved, err := repo.CreateAnnouncement(ctx, draftAnnouncement(t, tx))
 			So(err, ShouldBeNil)
-			So(repo.ApproveAnnouncement(ctx, approved.ID, insertTestUser(t, tx)), ShouldBeNil)
+			So(repo.ApproveAnnouncement(ctx, approved.ID, testutil.InsertRandomTestUser(t, tx)), ShouldBeNil)
 
 			expiredSeed := draftAnnouncement(t, tx)
 			expiredSeed.ExpiresAt = time.Now().Add(1 * time.Second).UTC()
 			expired, err := repo.CreateAnnouncement(ctx, expiredSeed)
 			So(err, ShouldBeNil)
-			approver := insertTestUser(t, tx)
+			approver := testutil.InsertRandomTestUser(t, tx)
 			So(repo.ApproveAnnouncement(ctx, expired.ID, approver), ShouldBeNil)
 			// force it into the past now that it's approved, bypassing the
 			// "expires_at > now()" WHERE clause on ApproveAnnouncement itself.

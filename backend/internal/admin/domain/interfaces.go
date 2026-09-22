@@ -20,6 +20,7 @@ type AnnouncementRepository interface {
 	GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
 	GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
 	GetAnnouncementByID(ctx context.Context, id string) (*Announcement, error)
+	GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*AnnouncementPublic, error)
 }
 
 // Service defines the admin module's announcement business logic.
@@ -31,4 +32,5 @@ type Service interface {
 	GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
 	GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
 	GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
+	GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*AnnouncementPublic, error)
 }

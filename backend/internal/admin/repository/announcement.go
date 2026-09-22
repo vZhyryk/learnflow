@@ -29,7 +29,7 @@ func (rep *Repository) CreateAnnouncement(ctx context.Context, announcement *adm
 
 // UpdateAnnouncement updates an existing announcement.
 func (rep *Repository) UpdateAnnouncement(ctx context.Context, announcement *admindomain.Announcement) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateAnnouncementSQL, announcement.ID, announcement.Title, announcement.Body, announcement.EntityID, announcement.EntityType, announcement.Channels, announcement.UpdatedByUserID)
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateAnnouncementSQL, announcement.ID, announcement.Title, announcement.Body, announcement.EntityID, announcement.EntityType, announcement.Channels, announcement.UpdatedByUserID, announcement.ExpiresAt)
 	if db.IsCheckViolation(err, announcementEntityPairingCheckConstraint) {
 		return admindomain.ErrEntityDataMisMatch
 	}
@@ -76,6 +76,11 @@ func (rep *Repository) GetApprovedAnnouncements(ctx context.Context, params pagi
 // GetExpiredAnnouncements returns a paginated list of expired announcements.
 func (rep *Repository) GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
 	return repository.GetAndParseList(ctx, &rep.BaseRepository, getExpiredAnnouncementsSQL, "GetExpiredAnnouncements", params, scanAnnouncement)
+}
+
+// GetPublicAnnouncements returns a paginated list of approved banner announcements userID may see.
+func (rep *Repository) GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
+	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getPublicAnnouncementsSQL, "GetPublicAnnouncements", params, scanPublicAnnouncement, []any{userID})
 }
 
 // GetAnnouncementByID retrieves an announcement by ID.

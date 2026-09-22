@@ -15,6 +15,8 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+var articleID string = "article-123"
+
 func TestNewRepository(t *testing.T) {
 	Convey("Given a nil connection pool", t, func() {
 		Convey("NewRepository returns a non-nil Repository", func() {
@@ -84,7 +86,7 @@ func TestGetArticleByID(t *testing.T) {
 		Convey("When the article exists", func() {
 			expected := fakeArticle(now)
 			row = &testutil.MockRow{ScanFn: fakeArticleScan(expected)}
-			got, err := repo.GetArticleByID(context.Background(), "article-123")
+			got, err := repo.GetArticleByID(context.Background(), articleID)
 			So(err, ShouldBeNil)
 			So(got, ShouldResemble, expected)
 		})
@@ -97,7 +99,7 @@ func TestGetArticleByID(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
-			_, err := repo.GetArticleByID(context.Background(), "article-123")
+			_, err := repo.GetArticleByID(context.Background(), articleID)
 			testutil.AssertUnexpectedDBError(err, "db connection lost")
 		})
 	})
@@ -170,7 +172,7 @@ func TestUpdateArticle(t *testing.T) {
 				return execTag, execErr
 			},
 		})
-		item := &articledomain.Article{ID: "article-123"}
+		item := &articledomain.Article{ID: articleID}
 
 		Convey("When update succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
@@ -259,7 +261,7 @@ func TestCheckIfArticleExistsByID(t *testing.T) {
 				*testutil.CastBool(dest[0], 0) = true
 				return nil
 			}}
-			exists, err := repo.CheckIfArticleExistsByID(context.Background(), "article-123")
+			exists, err := repo.CheckIfArticleExistsByID(context.Background(), articleID)
 			So(err, ShouldBeNil)
 			So(exists, ShouldBeTrue)
 		})
@@ -269,14 +271,14 @@ func TestCheckIfArticleExistsByID(t *testing.T) {
 				*testutil.CastBool(dest[0], 0) = false
 				return nil
 			}}
-			exists, err := repo.CheckIfArticleExistsByID(context.Background(), "article-123")
+			exists, err := repo.CheckIfArticleExistsByID(context.Background(), articleID)
 			So(err, ShouldBeNil)
 			So(exists, ShouldBeFalse)
 		})
 
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
-			_, err := repo.CheckIfArticleExistsByID(context.Background(), "article-123")
+			_, err := repo.CheckIfArticleExistsByID(context.Background(), articleID)
 			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})

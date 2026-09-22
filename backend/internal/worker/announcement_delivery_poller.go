@@ -21,7 +21,7 @@ const (
 			aed.id,
 			aed.user_id,
 			aed.announcement_id,
-			up.first_name,
+			COALESCE(up.first_name, ''),
 			an.title,
 			an.body,
 			u.email
@@ -32,7 +32,7 @@ const (
 		WHERE aed.status = 'pending'
     	ORDER BY aed.created_at
 		LIMIT 100
-    	FOR UPDATE SKIP LOCKED
+    	FOR UPDATE OF aed SKIP LOCKED
 	`
 
 	queryMarkAnnouncementSend = `

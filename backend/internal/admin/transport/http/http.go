@@ -24,13 +24,15 @@ func NewHTTPHandler(svc admindomain.Service, jsonLogger *logger.Logger) *Handler
 }
 
 // RegisterRoutes registers all admin HTTP routes on the given mux.
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminChain alice.Chain) {
-	mux.Handle("POST /api/v1/admin/announcement", adminChain.ThenFunc(h.createAnnouncement))
-	mux.Handle("PUT /api/v1/admin/announcement", adminChain.ThenFunc(h.updateAnnouncement))
-	mux.Handle("PUT /api/v1/admin/announcement/{id}/approve", adminChain.ThenFunc(h.approveAnnouncement))
+func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminChain, staticChain alice.Chain) {
+	mux.Handle("GET /api/v1/announcements", staticChain.ThenFunc(h.getPublicAnnouncements))
 
-	mux.Handle("GET /api/v1/admin/announcement/all", adminChain.ThenFunc(h.getAnnouncements))
-	mux.Handle("GET /api/v1/admin/announcement/unapproved", adminChain.ThenFunc(h.getUnApprovedAnnouncements))
-	mux.Handle("GET /api/v1/admin/announcement/approved", adminChain.ThenFunc(h.getApprovedAnnouncements))
-	mux.Handle("GET /api/v1/admin/announcement/expired", adminChain.ThenFunc(h.getExpiredAnnouncements))
+	mux.Handle("POST /api/v1/admin/announcements", adminChain.ThenFunc(h.createAnnouncement))
+	mux.Handle("PUT /api/v1/admin/announcements", adminChain.ThenFunc(h.updateAnnouncement))
+	mux.Handle("PUT /api/v1/admin/announcements/{id}/approve", adminChain.ThenFunc(h.approveAnnouncement))
+
+	mux.Handle("GET /api/v1/admin/announcements/all", adminChain.ThenFunc(h.getAnnouncements))
+	mux.Handle("GET /api/v1/admin/announcements/unapproved", adminChain.ThenFunc(h.getUnApprovedAnnouncements))
+	mux.Handle("GET /api/v1/admin/announcements/approved", adminChain.ThenFunc(h.getApprovedAnnouncements))
+	mux.Handle("GET /api/v1/admin/announcements/expired", adminChain.ThenFunc(h.getExpiredAnnouncements))
 }

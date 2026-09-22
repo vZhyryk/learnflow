@@ -34,7 +34,7 @@ func TestCreateEmailVerificationToken(t *testing.T) {
 		Convey("When creation succeeds", func() {
 			rh.row = &testutil.MockRow{ScanFn: fakeScanToken(now)}
 			got, err := repo.CreateEmailVerificationToken(context.Background(), &authdomain.EmailVerificationToken{
-				TokenBase: authdomain.TokenBase{UserID: "user-123", TokenHash: "hash-abc", ExpiresAt: now},
+				TokenBase: authdomain.TokenBase{UserID: TestUserID, TokenHash: "hash-abc", ExpiresAt: now},
 			})
 			So(err, ShouldBeNil)
 			So(got.ID, ShouldEqual, "session_123")
@@ -122,7 +122,7 @@ func TestCreatePasswordResetToken(t *testing.T) {
 		Convey("When creation succeeds", func() {
 			rh.row = &testutil.MockRow{ScanFn: fakeScanToken(now)}
 			got, err := repo.CreatePasswordResetToken(context.Background(), &authdomain.PasswordResetToken{
-				TokenBase: authdomain.TokenBase{UserID: "user-123", TokenHash: "hash-abc", ExpiresAt: now},
+				TokenBase: authdomain.TokenBase{UserID: TestUserID, TokenHash: "hash-abc", ExpiresAt: now},
 			})
 			So(err, ShouldBeNil)
 			So(got.ID, ShouldEqual, "session_123")
@@ -176,7 +176,7 @@ func TestCreateEmailChangeToken(t *testing.T) {
 		Convey("When creation succeeds", func() {
 			rh.row = &testutil.MockRow{ScanFn: fakeScanEmailChangeToken(now)}
 			got, err := repo.CreateEmailChangeToken(context.Background(), &authdomain.EmailChangeToken{
-				TokenBase: authdomain.TokenBase{UserID: "user-123", TokenHash: "hash-abc", ExpiresAt: now},
+				TokenBase: authdomain.TokenBase{UserID: TestUserID, TokenHash: "hash-abc", ExpiresAt: now},
 				NewEmail:  "new@example.com",
 			})
 			So(err, ShouldBeNil)
@@ -233,7 +233,7 @@ func TestCreateAccountRecoveryToken(t *testing.T) {
 		Convey("When creation succeeds", func() {
 			rh.row = &testutil.MockRow{ScanFn: fakeScanToken(now)}
 			got, err := repo.CreateAccountRecoveryToken(context.Background(), &authdomain.AccountRecoveryToken{
-				TokenBase: authdomain.TokenBase{UserID: "user-123", TokenHash: "hash-abc", ExpiresAt: now},
+				TokenBase: authdomain.TokenBase{UserID: TestUserID, TokenHash: "hash-abc", ExpiresAt: now},
 			})
 			So(err, ShouldBeNil)
 			So(got.ID, ShouldEqual, "session_123")

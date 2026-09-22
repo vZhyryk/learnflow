@@ -61,6 +61,18 @@ type Announcement struct {
 	Channels         []Channel   `json:"channels"`
 }
 
+// AnnouncementPublic is the user-facing subset of Announcement, without audit fields.
+type AnnouncementPublic struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	// Body is plaintext only — never render via v-html.
+	Body       string      `json:"body"`
+	ApprovedAt time.Time   `json:"approved_at"`
+	ExpiresAt  time.Time   `json:"expires_at"`
+	EntityID   *string     `json:"entity_id"`
+	EntityType *EntityType `json:"entity_type"`
+}
+
 // CreateAnnouncementRequest is the input for creating a new Announcement.
 type CreateAnnouncementRequest struct {
 	Title           string      `json:"title"`

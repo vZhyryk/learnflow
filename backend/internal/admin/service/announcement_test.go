@@ -7,6 +7,7 @@ import (
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
+	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -77,6 +78,16 @@ func TestUpdateAnnouncement(t *testing.T) {
 
 			err := srv.UpdateAnnouncement(context.Background(), admindomain.UpdateAnnouncementRequest{ID: "announcement-123"})
 			So(errors.Is(err, admindomain.ErrEntityDataMisMatch), ShouldBeTrue)
+		})
+
+		Convey("When the announcement is already approved", func() {
+			approvedAt := time.Now()
+			repo.getAnnouncementByID = func(_ context.Context, _ string) (*admindomain.Announcement, error) {
+				return &admindomain.Announcement{ID: "announcement-123", ApprovedAt: &approvedAt}, nil
+			}
+
+			err := srv.UpdateAnnouncement(context.Background(), admindomain.UpdateAnnouncementRequest{ID: "announcement-123"})
+			So(errors.Is(err, admindomain.ErrAnnouncementApproved), ShouldBeTrue)
 		})
 
 		Convey("When the repository update fails", func() {
@@ -203,6 +214,39 @@ func TestGetApprovedAnnouncements(t *testing.T) {
 			got, err := srv.GetApprovedAnnouncements(context.Background(), params)
 			So(err, ShouldBeNil)
 			So(got, ShouldResemble, want)
+		})
+	})
+}
+
+func TestGetPublicAnnouncements(t *testing.T) {
+	Convey("Given an admin service", t, func() {
+		repo := &mockAnnouncementRepo{}
+		srv := newTestService(repo)
+		params := pagination.NewParams(1, 20)
+
+		Convey("When the repository returns an error", func() {
+			repo.getPublicAnnouncements = func(_ context.Context, _ pagination.Params, _ string) ([]*admindomain.AnnouncementPublic, error) {
+				return nil, testutil.ErrDBUnexpected
+			}
+			_, err := srv.GetPublicAnnouncements(context.Background(), params, "user-1")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "service.GetPublicAnnouncements")
+			So(err.Error(), ShouldContainSubstring, "db connection lost")
+		})
+
+		Convey("When it succeeds, the user ID and params reach the repository", func() {
+			var gotUserID string
+			var gotParams pagination.Params
+			want := []*admindomain.AnnouncementPublic{{ID: "announcement-1"}}
+			repo.getPublicAnnouncements = func(_ context.Context, p pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
+				gotParams, gotUserID = p, userID
+				return want, nil
+			}
+			got, err := srv.GetPublicAnnouncements(context.Background(), params, "user-1")
+			So(err, ShouldBeNil)
+			So(got, ShouldResemble, want)
+			So(gotUserID, ShouldEqual, "user-1")
+			So(gotParams, ShouldResemble, params)
 		})
 	})
 }

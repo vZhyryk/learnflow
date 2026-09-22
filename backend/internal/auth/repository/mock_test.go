@@ -28,7 +28,7 @@ func fakeProfile(now time.Time) *authdomain.UserProfile {
 	timezone, bio := "Europe/Kiev", "bio text"
 	avatarURL := ""
 	return &authdomain.UserProfile{
-		UserID:      "user-123",
+		UserID:      TestUserID,
 		FirstName:   &firstName,
 		LastName:    &lastName,
 		PhoneNumber: &phoneNumber,
@@ -68,7 +68,7 @@ func fakeScanProfile(now time.Time) func(dest ...any) error {
 
 func fakeUser(now time.Time) *authdomain.User {
 	return &authdomain.User{
-		ID:                "user-123",
+		ID:                TestUserID,
 		Email:             "john@gmail.com",
 		PasswordHash:      "some_password_hash",
 		Role:              authdomain.RoleAdmin,
@@ -111,7 +111,7 @@ func fakeScanUser(now time.Time) func(dest ...any) error {
 func fakeUserSession(now time.Time) *authdomain.UserSession {
 	return &authdomain.UserSession{
 		ID:                  "session-123",
-		UserID:              "user-123",
+		UserID:              TestUserID,
 		RefreshHash:         "some_refresh_hash",
 		UserAgent:           &[]string{"user-agent-string"}[0],
 		IPAddress:           &[]string{"ip-address"}[0],
