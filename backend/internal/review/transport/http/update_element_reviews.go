@@ -12,11 +12,13 @@ func (h *Handler) updateCourseReviewAdmin(w http.ResponseWriter, r *http.Request
 	user := appcontext.MustUserFromContext(ctx)
 
 	var req reviewdomain.UpdateCourseReviewRequest
-	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, func() {
+		req.UserID = user.ID
+	}) {
 		return
 	}
 
-	err := h.svc.UpdateCourseReviewAdmin(ctx, req)
+	err := h.svc.UpdateCourseReviewAdmin(ctx, req, user.ID)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
@@ -33,11 +35,13 @@ func (h *Handler) updateContentReviewAdmin(w http.ResponseWriter, r *http.Reques
 	user := appcontext.MustUserFromContext(ctx)
 
 	var req reviewdomain.UpdateContentReviewRequest
-	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, func() {
+		req.UserID = user.ID
+	}) {
 		return
 	}
 
-	err := h.svc.UpdateContentReviewAdmin(ctx, req)
+	err := h.svc.UpdateContentReviewAdmin(ctx, req, user.ID)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
@@ -100,11 +104,13 @@ func (h *Handler) updateArticleReviewAdmin(w http.ResponseWriter, r *http.Reques
 	user := appcontext.MustUserFromContext(ctx)
 
 	var req reviewdomain.UpdateArticleReviewRequest
-	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, func() {
+		req.UserID = user.ID
+	}) {
 		return
 	}
 
-	err := h.svc.UpdateArticleReviewAdmin(ctx, req)
+	err := h.svc.UpdateArticleReviewAdmin(ctx, req, user.ID)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return

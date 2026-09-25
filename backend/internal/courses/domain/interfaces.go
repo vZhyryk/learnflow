@@ -2,6 +2,7 @@ package coursedomain
 
 import (
 	"context"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 )
 
@@ -24,6 +25,11 @@ type CourseRepository interface {
 	GetCourseByID(ctx context.Context, courseID string) (*Course, error)
 	GetCourseBySlug(ctx context.Context, slug string) (*Course, error)
 	CheckIfCourseExistsByID(ctx context.Context, courseID string) (bool, error)
+}
+
+// AdminActionRepository persists the admin audit trail.
+type AdminActionRepository interface {
+	CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error
 }
 
 // Service defines the courses module's business logic operations.

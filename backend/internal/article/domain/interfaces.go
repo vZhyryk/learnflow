@@ -2,6 +2,7 @@ package articledomain
 
 import (
 	"context"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 )
 
@@ -24,6 +25,11 @@ type ArticleRepository interface {
 	GetArticleByID(ctx context.Context, articleID string) (*Article, error)
 	GetArticleBySlug(ctx context.Context, slug string) (*Article, error)
 	CheckIfArticleExistsByID(ctx context.Context, articleID string) (bool, error)
+}
+
+// AdminActionRepository persists the admin audit trail.
+type AdminActionRepository interface {
+	CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error
 }
 
 // Service defines the article module's business logic operations.

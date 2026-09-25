@@ -3,14 +3,21 @@ package articleservice
 import (
 	"context"
 	"fmt"
+	auditdomain "learnflow_backend/internal/audit/domain"
 )
 
 // DeleteArticle soft-deletes a article.
 func (s *Service) DeleteArticle(ctx context.Context, articleID, userID string) error {
-	err := s.articleRepo.DeleteArticle(ctx, articleID, userID)
-	if err != nil {
-		return fmt.Errorf("service.DeleteArticle: %w", err)
-	}
+	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		if err := s.articleRepo.DeleteArticle(ctx, articleID, userID); err != nil {
+			return fmt.Errorf("service.DeleteArticle: %w", err)
+		}
 
-	return nil
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionDeleteItem,
+			TargetType:  auditdomain.TargetArticle,
+			TargetID:    articleID,
+		})
+	})
 }

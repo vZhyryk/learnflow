@@ -321,35 +321,6 @@ func TestUpdateStatus(t *testing.T) {
 	})
 }
 
-func TestUpdateRole(t *testing.T) {
-	Convey("Given a users repository", t, func() {
-		var fakeErr error
-		var execTag pgconn.CommandTag
-		repo := newTestRepo(&testutil.MockQueryRunner{
-			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-				return execTag, fakeErr
-			},
-		})
-
-		Convey("When the database returns an unexpected error", func() {
-			fakeErr = testutil.ErrDB
-			err := repo.UpdateRole(context.Background(), TestUserID, authdomain.RoleAdmin)
-			testutil.AssertUnexpectedDBError(err, "db error")
-		})
-
-		Convey("When user not found", func() {
-			err := repo.UpdateRole(context.Background(), "unknown", authdomain.RoleAdmin)
-			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
-		})
-
-		Convey("When update succeeds", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.UpdateRole(context.Background(), TestUserID, authdomain.RoleAdmin)
-			So(err, ShouldBeNil)
-		})
-	})
-}
-
 func TestUpdateLastLoginAt(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var fakeErr error
@@ -461,35 +432,6 @@ func TestUpdateEmailVerifiedAt(t *testing.T) {
 		Convey("When update succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
 			err := repo.UpdateEmailVerifiedAt(context.Background(), TestUserID)
-			So(err, ShouldBeNil)
-		})
-	})
-}
-
-func TestDeleteUser(t *testing.T) {
-	Convey("Given a users repository", t, func() {
-		var fakeErr error
-		var execTag pgconn.CommandTag
-		repo := newTestRepo(&testutil.MockQueryRunner{
-			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-				return execTag, fakeErr
-			},
-		})
-
-		Convey("When the database returns an unexpected error", func() {
-			fakeErr = testutil.ErrDB
-			err := repo.DeleteUser(context.Background(), TestUserID)
-			testutil.AssertUnexpectedDBError(err, "db error")
-		})
-
-		Convey("When user not found", func() {
-			err := repo.DeleteUser(context.Background(), "unknown")
-			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
-		})
-
-		Convey("When delete succeeds", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.DeleteUser(context.Background(), TestUserID)
 			So(err, ShouldBeNil)
 		})
 	})

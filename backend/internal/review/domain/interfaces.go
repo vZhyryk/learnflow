@@ -2,6 +2,7 @@ package reviewdomain
 
 import (
 	"context"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 )
 
@@ -14,6 +15,11 @@ type Transactor interface {
 type AccessChecker interface {
 	HasAccessCourse(ctx context.Context, userID, courseID string) (bool, error)
 	HasAccessContent(ctx context.Context, userID, contentID string) (bool, error)
+}
+
+// AdminActionRepository persists the admin audit trail.
+type AdminActionRepository interface {
+	CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error
 }
 
 // CourseReviewRepository defines persistence operations for CourseReview.
@@ -61,9 +67,9 @@ type Service interface {
 	UpdateCourseReview(ctx context.Context, req UpdateCourseReviewRequest) error
 	UpdateContentReview(ctx context.Context, req UpdateContentReviewRequest) error
 	UpdateArticleReview(ctx context.Context, req UpdateArticleReviewRequest) error
-	UpdateCourseReviewAdmin(ctx context.Context, req UpdateCourseReviewRequest) error
-	UpdateContentReviewAdmin(ctx context.Context, req UpdateContentReviewRequest) error
-	UpdateArticleReviewAdmin(ctx context.Context, req UpdateArticleReviewRequest) error
+	UpdateCourseReviewAdmin(ctx context.Context, req UpdateCourseReviewRequest, adminID string) error
+	UpdateContentReviewAdmin(ctx context.Context, req UpdateContentReviewRequest, adminID string) error
+	UpdateArticleReviewAdmin(ctx context.Context, req UpdateArticleReviewRequest, adminID string) error
 
 	GetCourseReviews(ctx context.Context, params pagination.Params, courseID string, filter ReviewFilter) ([]*CourseReview, error)
 	GetContentReviews(ctx context.Context, params pagination.Params, contentID string, filter ReviewFilter) ([]*ContentReview, error)

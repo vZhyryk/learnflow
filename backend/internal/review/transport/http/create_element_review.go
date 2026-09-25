@@ -11,7 +11,9 @@ func (h *Handler) createCourseReviewAdmin(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
 	var req reviewdomain.CreateCourseReviewRequest
-	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, func() {
+		req.UserID = user.ID
+	}) {
 		return
 	}
 
@@ -30,7 +32,9 @@ func (h *Handler) createContentReviewAdmin(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
 	var req reviewdomain.CreateContentReviewRequest
-	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, func() {
+		req.UserID = user.ID
+	}) {
 		return
 	}
 
@@ -91,7 +95,9 @@ func (h *Handler) createArticleReviewAdmin(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
 	var req reviewdomain.CreateArticleReviewRequest
-	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, func() {
+		req.UserID = user.ID
+	}) {
 		return
 	}
 

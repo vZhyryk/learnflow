@@ -3,6 +3,7 @@ package articleservice
 import (
 	"context"
 	articledomain "learnflow_backend/internal/article/domain"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 )
@@ -109,7 +110,34 @@ func (m *mockArticleRepo) CheckIfArticleExistsByID(ctx context.Context, articleI
 }
 
 func newTestService(repo *mockArticleRepo) *Service {
-	return New(repo, &testutil.NoopTransactor{})
+	return newTestServiceWithActions(repo, noopAdminActions())
+}
+
+func newTestServiceWithActions(repo *mockArticleRepo, actions *mockAdminActionRepo) *Service {
+	return New(repo, actions, &testutil.NoopTransactor{})
+}
+
+type mockAdminActionRepo struct {
+	createAdminAction func(ctx context.Context, action *auditdomain.AdminAction) error
+}
+
+func (m *mockAdminActionRepo) CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error {
+	if m.createAdminAction == nil {
+		panic("mockAdminActionRepo.CreateAdminAction not set")
+	}
+
+	return m.createAdminAction(ctx, action)
+}
+
+func noopAdminActions() *mockAdminActionRepo {
+	return &mockAdminActionRepo{createAdminAction: func(_ context.Context, _ *auditdomain.AdminAction) error { return nil }}
+}
+
+func capturingAdminActions(got *[]*auditdomain.AdminAction, err error) *mockAdminActionRepo {
+	return &mockAdminActionRepo{createAdminAction: func(_ context.Context, action *auditdomain.AdminAction) error {
+		*got = append(*got, action)
+		return err
+	}}
 }
 
 // alwaysError is a getArticleByID/getArticleBySlug stub that always fails.

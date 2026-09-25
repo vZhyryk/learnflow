@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	articledomain "learnflow_backend/internal/article/domain"
+	auditdomain "learnflow_backend/internal/audit/domain"
 )
 
 // CreateArticle creates a new draft article after checking the slug is not already in use.
@@ -42,7 +43,12 @@ func (s *Service) CreateArticle(ctx context.Context, req articledomain.CreateArt
 		}
 
 		articleID = createdArticle.ID
-		return nil
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: req.CreatedByUserID,
+			ActionType:  auditdomain.ActionCreateItem,
+			TargetType:  auditdomain.TargetArticle,
+			TargetID:    articleID,
+		})
 	})
 
 	return articleID, err

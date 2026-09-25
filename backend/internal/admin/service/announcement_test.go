@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	admindomain "learnflow_backend/internal/admin/domain"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
@@ -40,6 +41,34 @@ func TestCreateAnnouncement(t *testing.T) {
 			So(id, ShouldEqual, "announcement-123")
 			So(got.CreatedByUserID, ShouldEqual, "user-1")
 		})
+
+		Convey("When it succeeds the audit entry is written", func() {
+			var actions []*auditdomain.AdminAction
+			srv = newTestServiceWithActions(repo, capturingAdminActions(&actions, nil))
+			repo.createAnnouncement = func(_ context.Context, _ *admindomain.Announcement) (*admindomain.Announcement, error) {
+				return &admindomain.Announcement{ID: "announcement-123"}, nil
+			}
+
+			_, err := srv.CreateAnnouncement(context.Background(), admindomain.CreateAnnouncementRequest{Title: "T", CreatedByUserID: "user-1"})
+			So(err, ShouldBeNil)
+			So(actions, ShouldResemble, []*auditdomain.AdminAction{{
+				AdminUserID: "user-1",
+				ActionType:  auditdomain.ActionCreateItem,
+				TargetType:  auditdomain.TargetAnnouncement,
+				TargetID:    "announcement-123",
+			}})
+		})
+
+		Convey("When the audit write fails", func() {
+			var actions []*auditdomain.AdminAction
+			srv = newTestServiceWithActions(repo, capturingAdminActions(&actions, testutil.ErrDBUnexpected))
+			repo.createAnnouncement = func(_ context.Context, _ *admindomain.Announcement) (*admindomain.Announcement, error) {
+				return &admindomain.Announcement{ID: "announcement-123"}, nil
+			}
+
+			_, err := srv.CreateAnnouncement(context.Background(), admindomain.CreateAnnouncementRequest{Title: "T", CreatedByUserID: "user-1"})
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
 	})
 }
 
@@ -54,12 +83,14 @@ func getValidAnnouncement(_ context.Context, _ string) (*admindomain.Announcemen
 	}, nil
 }
 
+func newUpdateAnnouncementFixture() (*mockAnnouncementRepo, *Service) {
+	repo := &mockAnnouncementRepo{getAnnouncementByID: getValidAnnouncement}
+	return repo, newTestService(repo)
+}
+
 func TestUpdateAnnouncement(t *testing.T) {
 	Convey("Given an admin service", t, func() {
-		repo := &mockAnnouncementRepo{
-			getAnnouncementByID: getValidAnnouncement,
-		}
-		srv := newTestService(repo)
+		repo, srv := newUpdateAnnouncementFixture()
 
 		Convey("When fetching the existing announcement fails", func() {
 			repo.getAnnouncementByID = func(_ context.Context, _ string) (*admindomain.Announcement, error) {
@@ -89,6 +120,12 @@ func TestUpdateAnnouncement(t *testing.T) {
 			err := srv.UpdateAnnouncement(context.Background(), admindomain.UpdateAnnouncementRequest{ID: "announcement-123"})
 			So(errors.Is(err, admindomain.ErrAnnouncementApproved), ShouldBeTrue)
 		})
+	})
+}
+
+func TestUpdateAnnouncementPersistence(t *testing.T) {
+	Convey("Given an admin service", t, func() {
+		repo, srv := newUpdateAnnouncementFixture()
 
 		Convey("When the repository update fails", func() {
 			repo.updateAnnouncement = func(_ context.Context, _ *admindomain.Announcement) error {
@@ -114,6 +151,32 @@ func TestUpdateAnnouncement(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(applied.Title, ShouldEqual, "new title")
 		})
+
+		Convey("When it succeeds the audit entry is written", func() {
+			var actions []*auditdomain.AdminAction
+			srv = newTestServiceWithActions(repo, capturingAdminActions(&actions, nil))
+			repo.updateAnnouncement = func(_ context.Context, _ *admindomain.Announcement) error { return nil }
+
+			err := srv.UpdateAnnouncement(context.Background(), admindomain.UpdateAnnouncementRequest{
+				ID: "announcement-123", UpdatedByUserID: "user-2",
+			})
+			So(err, ShouldBeNil)
+			So(actions, ShouldResemble, []*auditdomain.AdminAction{{
+				AdminUserID: "user-2",
+				ActionType:  auditdomain.ActionUpdateItem,
+				TargetType:  auditdomain.TargetAnnouncement,
+				TargetID:    "announcement-123",
+			}})
+		})
+
+		Convey("When the audit write fails", func() {
+			var actions []*auditdomain.AdminAction
+			srv = newTestServiceWithActions(repo, capturingAdminActions(&actions, testutil.ErrDBUnexpected))
+			repo.updateAnnouncement = func(_ context.Context, _ *admindomain.Announcement) error { return nil }
+
+			err := srv.UpdateAnnouncement(context.Background(), admindomain.UpdateAnnouncementRequest{ID: "announcement-123"})
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
 	})
 }
 
@@ -133,6 +196,30 @@ func TestApproveAnnouncement(t *testing.T) {
 			repo.approveAnnouncement = testutil.AlwaysNil2
 			err := srv.ApproveAnnouncement(context.Background(), "announcement-123", "user-1")
 			So(err, ShouldBeNil)
+		})
+
+		Convey("When it succeeds the approve audit entry is written", func() {
+			var actions []*auditdomain.AdminAction
+			srv = newTestServiceWithActions(repo, capturingAdminActions(&actions, nil))
+			repo.approveAnnouncement = testutil.AlwaysNil2
+
+			err := srv.ApproveAnnouncement(context.Background(), "announcement-123", "user-1")
+			So(err, ShouldBeNil)
+			So(actions, ShouldResemble, []*auditdomain.AdminAction{{
+				AdminUserID: "user-1",
+				ActionType:  auditdomain.ActionApproveItem,
+				TargetType:  auditdomain.TargetAnnouncement,
+				TargetID:    "announcement-123",
+			}})
+		})
+
+		Convey("When the audit write fails", func() {
+			var actions []*auditdomain.AdminAction
+			srv = newTestServiceWithActions(repo, capturingAdminActions(&actions, testutil.ErrDBUnexpected))
+			repo.approveAnnouncement = testutil.AlwaysNil2
+
+			err := srv.ApproveAnnouncement(context.Background(), "announcement-123", "user-1")
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
 	})
 }

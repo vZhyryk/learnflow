@@ -130,8 +130,10 @@ func TestCreateContentReview(t *testing.T) {
 func TestCreateCourseReviewAdmin(t *testing.T) {
 	Convey("POST /api/v1/admin/courses/reviews", t, func() {
 		var svcErr error
+		var gotAdminID string
 		svc := &mockService{
-			createCourseReviewAdmin: func(_ context.Context, _ reviewdomain.CreateCourseReviewRequest) error {
+			createCourseReviewAdmin: func(_ context.Context, req reviewdomain.CreateCourseReviewRequest) error {
+				gotAdminID = req.UserID
 				return svcErr
 			},
 		}
@@ -146,33 +148,40 @@ func TestCreateCourseReviewAdmin(t *testing.T) {
 			}, ShouldPanic)
 		})
 
-		Convey("invalid user_id in body → 400 (admin does not override user_id; request validation)", func() {
-			w := testutil.ServeHTTP(mux, withUser(newReq(`{"course_id":"`+validCourseID+`","user_id":"---","rating":5}`, nil)))
-			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		Convey("user_id in the body is ignored — the authenticated admin is used", func() {
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(`{"course_id":"`+validCourseID+`","user_id":"---","rating":5}`, nil)))
+			So(w.Code, ShouldEqual, http.StatusCreated)
+			So(gotAdminID, ShouldEqual, validUserID)
 		})
 
 		Convey("already reviewed → 422", func() {
 			svcErr = reviewdomain.ErrAlreadyReviewed
-			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
 		Convey("unexpected service error → 500", func() {
 			svcErr = testutil.ErrDBUnexpected
-			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid request → 201 with message", func() {
-			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
 			So(w.Code, ShouldEqual, http.StatusCreated)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["message"], ShouldEqual, "Course review created successfully")
 		})
 
+		Convey("Valid request → passes the authenticated user as adminID, not a user_id from the body", func() {
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldBeIn, http.StatusOK, http.StatusCreated)
+			So(gotAdminID, ShouldEqual, validUserID)
+		})
+
 		Convey("Valid request and the success response write fails → does not panic", func() {
 			So(func() {
-				mux.ServeHTTP(&errWriter{}, withUser(newReq(validBody, nil)))
+				mux.ServeHTTP(&errWriter{}, withValidUUIDUser(newReq(validBody, nil)))
 			}, ShouldNotPanic)
 		})
 	})
@@ -181,8 +190,10 @@ func TestCreateCourseReviewAdmin(t *testing.T) {
 func TestCreateContentReviewAdmin(t *testing.T) {
 	Convey("POST /api/v1/admin/content/reviews", t, func() {
 		var svcErr error
+		var gotAdminID string
 		svc := &mockService{
-			createContentReviewAdmin: func(_ context.Context, _ reviewdomain.CreateContentReviewRequest) error {
+			createContentReviewAdmin: func(_ context.Context, req reviewdomain.CreateContentReviewRequest) error {
+				gotAdminID = req.UserID
 				return svcErr
 			},
 		}
@@ -197,27 +208,34 @@ func TestCreateContentReviewAdmin(t *testing.T) {
 			}, ShouldPanic)
 		})
 
-		Convey("invalid user_id in body → 400 (admin does not override user_id; request validation)", func() {
-			w := testutil.ServeHTTP(mux, withUser(newReq(`{"content_id":"`+validContentID+`","user_id":"---","rating":4}`, nil)))
-			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		Convey("user_id in the body is ignored — the authenticated admin is used", func() {
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(`{"content_id":"`+validContentID+`","user_id":"---","rating":5}`, nil)))
+			So(w.Code, ShouldEqual, http.StatusCreated)
+			So(gotAdminID, ShouldEqual, validUserID)
 		})
 
 		Convey("unexpected service error → 500", func() {
 			svcErr = testutil.ErrDBUnexpected
-			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid request → 201 with message", func() {
-			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
 			So(w.Code, ShouldEqual, http.StatusCreated)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["message"], ShouldEqual, "Content review created successfully")
 		})
 
+		Convey("Valid request → passes the authenticated user as adminID, not a user_id from the body", func() {
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldBeIn, http.StatusOK, http.StatusCreated)
+			So(gotAdminID, ShouldEqual, validUserID)
+		})
+
 		Convey("Valid request and the success response write fails → does not panic", func() {
 			So(func() {
-				mux.ServeHTTP(&errWriter{}, withUser(newReq(validBody, nil)))
+				mux.ServeHTTP(&errWriter{}, withValidUUIDUser(newReq(validBody, nil)))
 			}, ShouldNotPanic)
 		})
 	})

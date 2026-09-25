@@ -2,6 +2,7 @@ package reviewservice
 
 import (
 	"context"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	reviewdomain "learnflow_backend/internal/review/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
@@ -203,9 +204,36 @@ func (m *mockAccessChecker) HasAccessContent(ctx context.Context, userID, conten
 }
 
 func newTestService(courseRepo, contentRepo *mockReviewRepo, accessChecker *mockAccessChecker) *Service {
-	return New(courseRepo, contentRepo, &mockReviewRepo{}, &testutil.NoopTransactor{}, accessChecker)
+	return New(courseRepo, contentRepo, &mockReviewRepo{}, &testutil.NoopTransactor{}, accessChecker, noopAdminActions())
 }
 
 func newTestServiceWithArticleRepo(articleRepo *mockReviewRepo) *Service {
-	return New(&mockReviewRepo{}, &mockReviewRepo{}, articleRepo, &testutil.NoopTransactor{}, &mockAccessChecker{})
+	return New(&mockReviewRepo{}, &mockReviewRepo{}, articleRepo, &testutil.NoopTransactor{}, &mockAccessChecker{}, noopAdminActions())
+}
+
+func newTestServiceWithActions(courseRepo, contentRepo, articleRepo *mockReviewRepo, actions *mockAdminActionRepo) *Service {
+	return New(courseRepo, contentRepo, articleRepo, &testutil.NoopTransactor{}, &mockAccessChecker{}, actions)
+}
+
+type mockAdminActionRepo struct {
+	createAdminAction func(ctx context.Context, action *auditdomain.AdminAction) error
+}
+
+func (m *mockAdminActionRepo) CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error {
+	if m.createAdminAction == nil {
+		panic("mockAdminActionRepo.CreateAdminAction not set")
+	}
+
+	return m.createAdminAction(ctx, action)
+}
+
+func noopAdminActions() *mockAdminActionRepo {
+	return &mockAdminActionRepo{createAdminAction: func(_ context.Context, _ *auditdomain.AdminAction) error { return nil }}
+}
+
+func capturingAdminActions(got *[]*auditdomain.AdminAction, err error) *mockAdminActionRepo {
+	return &mockAdminActionRepo{createAdminAction: func(_ context.Context, action *auditdomain.AdminAction) error {
+		*got = append(*got, action)
+		return err
+	}}
 }

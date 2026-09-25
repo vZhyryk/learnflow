@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	articledomain "learnflow_backend/internal/article/domain"
+	auditdomain "learnflow_backend/internal/audit/domain"
 )
 
 // UpdateArticle applies a partial update to an existing article, re-checking slug uniqueness if it changed.
@@ -28,6 +29,11 @@ func (s *Service) UpdateArticle(ctx context.Context, req articledomain.UpdateArt
 		if err := s.articleRepo.UpdateArticle(ctx, article, userID); err != nil {
 			return fmt.Errorf("service.UpdateArticle: update: %w", err)
 		}
-		return nil
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionUpdateItem,
+			TargetType:  auditdomain.TargetArticle,
+			TargetID:    req.ID,
+		})
 	})
 }

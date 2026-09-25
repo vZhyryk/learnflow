@@ -2,6 +2,7 @@ package admindomain
 
 import (
 	"context"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 )
 
@@ -23,6 +24,23 @@ type AnnouncementRepository interface {
 	GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*AnnouncementPublic, error)
 }
 
+// AdminActionRepository persists the admin audit trail.
+type AdminActionRepository interface {
+	CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error
+}
+
+// UserRepository defines admin persistence operations for user accounts.
+type UserRepository interface {
+	RevokeUserRole(ctx context.Context, userID string) error
+	AssignUserRole(ctx context.Context, userID string) error
+	DeleteUser(ctx context.Context, userID string) error
+	RestoreUser(ctx context.Context, userID string) error
+	BlockUser(ctx context.Context, userID string) error
+	UnBlockUser(ctx context.Context, userID string) error
+	GetUsersData(ctx context.Context, params pagination.Params) ([]*UserData, int, error)
+	GetUserDataByID(ctx context.Context, userID string) (*UserData, error)
+}
+
 // Service defines the admin module's announcement business logic.
 type Service interface {
 	CreateAnnouncement(ctx context.Context, req CreateAnnouncementRequest) (string, error)
@@ -33,4 +51,8 @@ type Service interface {
 	GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
 	GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
 	GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*AnnouncementPublic, error)
+
+	GetUsersData(ctx context.Context, params pagination.Params) ([]*UserData, int, error)
+	GetUserDataByID(ctx context.Context, userID string) (*UserData, error)
+	ChangeUserField(ctx context.Context, operationName, userID, adminID string) error
 }

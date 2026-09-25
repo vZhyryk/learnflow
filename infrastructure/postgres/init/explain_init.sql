@@ -1,6 +1,6 @@
 -- LearnFlow database initialization — annotated version
 -- PostgreSQL 17+; run once on empty volume via /docker-entrypoint-initdb.d/
--- Synced through: migration 000012
+-- Synced through: migration 000014
 --
 -- GLOBAL DESIGN DECISIONS
 -- ───────────────────────
@@ -1515,18 +1515,24 @@ CREATE TABLE admin_actions (
     admin_user_id   uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
 
     -- [Extended action_type list]: Covers all admin operations in scope.
+    -- 'unblock_user' / 'restore_user' — added in migration 000014 (reverse of block/delete);
+    -- 'deactivate_user' dropped in 000014 — redundant with 'block_user', never written.
     -- 'create_gift_coupon' / 'revoke_gift_coupon' — gift coupon lifecycle management.
-    -- 'publish_article' / 'delete_article' — admin-managed editorial content.
+    -- 'create_item' / 'update_item' / 'publish_item' / 'archive_item' / 'delete_item' / 'approve_item' —
+    -- generic entity lifecycle actions (courses, content items, articles, reviews, announcements),
+    -- discriminated by target_type; replace 'publish_article' / 'delete_article' in migration 000014.
+    -- 'grant_course_access' renamed to 'grant_item_access' in 000014 (covers content items too).
     -- admin_user_id references users.role which includes 'subadmin' — so subadmin
     -- actions are also captured here using the same table.
-    action_type     text        NOT NULL CONSTRAINT admin_actions_action_type_check CHECK (action_type IN ('confirm_booking', 'cancel_booking', 'grant_course_access', 'issue_refund', 'record_expense', 'block_user', 'reschedule_booking', 'close_support_chat', 'assign_subadmin', 'revoke_subadmin', 'deactivate_user', 'delete_user', 'create_gift_coupon', 'revoke_gift_coupon', 'publish_article', 'delete_article')),
+    action_type     text        NOT NULL CONSTRAINT admin_actions_action_type_check CHECK (action_type IN ('confirm_booking', 'cancel_booking', 'grant_item_access', 'issue_refund', 'record_expense', 'block_user', 'unblock_user', 'reschedule_booking', 'close_support_chat', 'assign_subadmin', 'revoke_subadmin', 'delete_user', 'create_gift_coupon', 'revoke_gift_coupon', 'publish_item', 'delete_item', 'archive_item', 'create_item', 'update_item', 'approve_item', 'restore_user')),
 
     -- [Extended target_type list]: 'review' and 'announcement' cover course_reviews/
     -- content_reviews and announcements. 'article' and 'gift_coupon' added for
-    -- the new editorial and coupon management flows.
+    -- the new editorial and coupon management flows. 'content_item' and 'expense'
+    -- added in migration 000014 (content admin actions, P&L expense recording).
     -- The polymorphic pattern (no FK, discriminated by target_type) is the same
     -- as payment_line_items.resource_id.
-    target_type     text        NOT NULL CONSTRAINT admin_actions_target_type_check CHECK (target_type IN ('user', 'booking', 'course', 'failed_job', 'payment', 'support_chat', 'review', 'announcement', 'article', 'gift_coupon')),
+    target_type     text        NOT NULL CONSTRAINT admin_actions_target_type_check CHECK (target_type IN ('user', 'booking', 'course', 'failed_job', 'payment', 'support_chat', 'review', 'announcement', 'article', 'gift_coupon', 'content_item', 'expense')),
 
     -- [no FK on target_id — polymorphic reference]:
     -- target_id may reference users, bookings, courses, failed_jobs, payments, etc.

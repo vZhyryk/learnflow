@@ -61,17 +61,15 @@ type UserRepository interface {
 	CreateNotificationPreferences(ctx context.Context, userID string) error
 	GetUserByID(ctx context.Context, userID string) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
-	UpdateStatus(ctx context.Context, userID string, status UserStatus) error
-	UpdateRole(ctx context.Context, userID string, role UserRole) error
 	UpdateLastLoginAt(ctx context.Context, userID string) error
 	UpdatePasswordHash(ctx context.Context, userID, passwordHash string) error
 	UpdateEmail(ctx context.Context, userID, newEmail string) error
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) error
-	DeleteUser(ctx context.Context, userID string) error
 	IncrementFailedLogin(ctx context.Context, userID, lockInterval string, loginCountLimit int) error
 	ResetFailedLogin(ctx context.Context, userID string) error
 	GetUserProfileByUserID(ctx context.Context, userID string) (*UserProfile, error)
 	GetDeletedUserByID(ctx context.Context, userID string) (*User, error)
-	RestoreUser(ctx context.Context, userID string) error
 	GetDeletedUserByEmail(ctx context.Context, email string) (*User, error)
+	UpdateStatus(ctx context.Context, userID string, status UserStatus) error
+	RestoreUser(ctx context.Context, userID string) error
 }

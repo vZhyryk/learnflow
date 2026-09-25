@@ -21,7 +21,7 @@ const (
 			aed.id,
 			aed.user_id,
 			aed.announcement_id,
-			COALESCE(up.first_name, ''),
+			COALESCE(up.first_name, 'User'),
 			an.title,
 			an.body,
 			u.email

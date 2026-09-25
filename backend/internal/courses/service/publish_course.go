@@ -3,6 +3,7 @@ package courseservice
 import (
 	"context"
 	"fmt"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	coursedomain "learnflow_backend/internal/courses/domain"
 )
 
@@ -28,6 +29,11 @@ func (s *Service) PublishCourse(ctx context.Context, courseID, userID string) er
 			return fmt.Errorf("service.PublishCourse: %w", err)
 		}
 
-		return nil
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionPublishItem,
+			TargetType:  auditdomain.TargetCourse,
+			TargetID:    courseID,
+		})
 	})
 }

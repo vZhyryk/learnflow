@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	contentdomain "learnflow_backend/internal/content/domain"
 )
 
@@ -28,6 +29,11 @@ func (s *Service) UpdateContentItem(ctx context.Context, req contentdomain.Updat
 		if err := s.contentRepo.UpdateContentItem(ctx, contentItem, userID); err != nil {
 			return fmt.Errorf("service.UpdateContentItem: update: %w", err)
 		}
-		return nil
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionUpdateItem,
+			TargetType:  auditdomain.TargetContentItem,
+			TargetID:    req.ID,
+		})
 	})
 }

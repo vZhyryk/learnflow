@@ -3,6 +3,7 @@ package contentservice
 import (
 	"context"
 	"fmt"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	contentdomain "learnflow_backend/internal/content/domain"
 )
 
@@ -28,6 +29,11 @@ func (s *Service) PublishContentItem(ctx context.Context, contentItemID, userID 
 			return fmt.Errorf("service.PublishContentItem: %w", err)
 		}
 
-		return nil
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionPublishItem,
+			TargetType:  auditdomain.TargetContentItem,
+			TargetID:    contentItemID,
+		})
 	})
 }

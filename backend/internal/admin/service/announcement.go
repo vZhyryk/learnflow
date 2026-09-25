@@ -4,27 +4,39 @@ import (
 	"context"
 	"fmt"
 	admindomain "learnflow_backend/internal/admin/domain"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/pagination"
 )
 
 // CreateAnnouncement creates a new announcement and returns its ID.
-func (srv *Service) CreateAnnouncement(ctx context.Context, req admindomain.CreateAnnouncementRequest) (string, error) {
-	createdAnnouncement, err := srv.announRepo.CreateAnnouncement(ctx, &admindomain.Announcement{
-		Title:           req.Title,
-		Body:            req.Body,
-		EntityID:        req.EntityID,
-		EntityType:      req.EntityType,
-		Channels:        req.Channels,
-		ExpiresAt:       req.ExpiresAt,
-		CreatedByUserID: req.CreatedByUserID,
+func (srv *Service) CreateAnnouncement(ctx context.Context, req admindomain.CreateAnnouncementRequest) (announcementID string, err error) {
+	err = srv.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		announcement, createErr := srv.announRepo.CreateAnnouncement(ctx, &admindomain.Announcement{
+			Title:           req.Title,
+			Body:            req.Body,
+			EntityID:        req.EntityID,
+			EntityType:      req.EntityType,
+			Channels:        req.Channels,
+			ExpiresAt:       req.ExpiresAt,
+			CreatedByUserID: req.CreatedByUserID,
+		})
+
+		if createErr != nil {
+			return fmt.Errorf("service.CreateAnnouncement: %w", createErr)
+		}
+
+		announcementID = announcement.ID
+
+		return srv.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: req.CreatedByUserID,
+			ActionType:  auditdomain.ActionCreateItem,
+			TargetType:  auditdomain.TargetAnnouncement,
+			TargetID:    announcementID,
+		})
 	})
 
-	if err != nil {
-		return "", fmt.Errorf("service.CreateAnnouncement: %w", err)
-	}
-
-	return createdAnnouncement.ID, nil
+	return announcementID, err
 }
 
 // UpdateAnnouncement applies req to an existing announcement.
@@ -49,22 +61,40 @@ func (srv *Service) UpdateAnnouncement(ctx context.Context, req admindomain.Upda
 			return fmt.Errorf("service.UpdateAnnouncement: %w", err)
 		}
 
-		return nil
+		return srv.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: req.UpdatedByUserID,
+			ActionType:  auditdomain.ActionUpdateItem,
+			TargetType:  auditdomain.TargetAnnouncement,
+			TargetID:    req.ID,
+		})
 	})
 }
 
 // ApproveAnnouncement marks an announcement as approved by the given user.
 func (srv *Service) ApproveAnnouncement(ctx context.Context, announcementID, userID string) error {
-	err := srv.announRepo.ApproveAnnouncement(ctx, announcementID, userID)
-	if err != nil {
-		return fmt.Errorf("service.ApproveAnnouncement: %w", err)
-	}
+	return srv.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		err := srv.announRepo.ApproveAnnouncement(ctx, announcementID, userID)
+		if err != nil {
+			return fmt.Errorf("service.ApproveAnnouncement: %w", err)
+		}
 
-	payload := events.AnnouncementPayload{
-		AnnouncementID: announcementID,
-	}
+		payload := events.AnnouncementPayload{
+			AnnouncementID: announcementID,
+		}
 
-	return srv.outbox.Emit(ctx, events.AggregationTypeAnnouncement, announcementID, events.EventAnnouncementApprove, payload)
+		err = srv.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionApproveItem,
+			TargetType:  auditdomain.TargetAnnouncement,
+			TargetID:    announcementID,
+		})
+
+		if err != nil {
+			return fmt.Errorf("service.ApproveAnnouncement: %w", err)
+		}
+
+		return srv.outbox.Emit(ctx, events.AggregationTypeAnnouncement, announcementID, events.EventAnnouncementApprove, payload)
+	})
 }
 
 // GetAnnouncements returns a paginated list of all announcements.

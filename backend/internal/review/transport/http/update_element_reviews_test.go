@@ -134,8 +134,10 @@ func TestUpdateContentReview(t *testing.T) {
 func TestUpdateCourseReviewAdmin(t *testing.T) {
 	Convey("PUT /api/v1/admin/courses/reviews", t, func() {
 		var svcErr error
+		var gotAdminID string
 		svc := &mockService{
-			updateCourseReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateCourseReviewRequest) error {
+			updateCourseReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateCourseReviewRequest, adminID string) error {
+				gotAdminID = adminID
 				return svcErr
 			},
 		}
@@ -174,6 +176,12 @@ func TestUpdateCourseReviewAdmin(t *testing.T) {
 			So(body["message"], ShouldEqual, "Course review updated successfully")
 		})
 
+		Convey("Valid request → passes the authenticated user as adminID, not a user_id from the body", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldBeIn, http.StatusOK, http.StatusCreated)
+			So(gotAdminID, ShouldEqual, "user-123")
+		})
+
 		Convey("Valid request and the success response write fails → does not panic", func() {
 			So(func() {
 				mux.ServeHTTP(&errWriter{}, withUser(newReq(validBody, nil)))
@@ -185,8 +193,10 @@ func TestUpdateCourseReviewAdmin(t *testing.T) {
 func TestUpdateContentReviewAdmin(t *testing.T) {
 	Convey("PUT /api/v1/admin/content/reviews", t, func() {
 		var svcErr error
+		var gotAdminID string
 		svc := &mockService{
-			updateContentReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateContentReviewRequest) error {
+			updateContentReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateContentReviewRequest, adminID string) error {
+				gotAdminID = adminID
 				return svcErr
 			},
 		}
@@ -223,6 +233,12 @@ func TestUpdateContentReviewAdmin(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["message"], ShouldEqual, "Content review updated successfully")
+		})
+
+		Convey("Valid request → passes the authenticated user as adminID, not a user_id from the body", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq(validBody, nil)))
+			So(w.Code, ShouldBeIn, http.StatusOK, http.StatusCreated)
+			So(gotAdminID, ShouldEqual, "user-123")
 		})
 
 		Convey("Valid request and the success response write fails → does not panic", func() {
@@ -288,7 +304,7 @@ func TestUpdateArticleReviewAdmin(t *testing.T) {
 	Convey("PUT /api/v1/admin/articles/reviews", t, func() {
 		var svcErr error
 		svc := &mockService{
-			updateArticleReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateArticleReviewRequest) error {
+			updateArticleReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateArticleReviewRequest, _ string) error {
 				return svcErr
 			},
 		}

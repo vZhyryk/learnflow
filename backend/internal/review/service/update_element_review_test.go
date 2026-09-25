@@ -209,7 +209,7 @@ func TestUpdateCourseReviewAdmin(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.UpdateCourseReviewAdmin(context.Background(), req)
+			err := srv.UpdateCourseReviewAdmin(context.Background(), req, "admin-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -219,7 +219,7 @@ func TestUpdateCourseReviewAdmin(t *testing.T) {
 				return testutil.ErrDBUnexpected
 			}
 
-			err := srv.UpdateCourseReviewAdmin(context.Background(), req)
+			err := srv.UpdateCourseReviewAdmin(context.Background(), req, "admin-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -229,7 +229,7 @@ func TestUpdateCourseReviewAdmin(t *testing.T) {
 				return nil
 			}
 
-			err := srv.UpdateCourseReviewAdmin(context.Background(), req)
+			err := srv.UpdateCourseReviewAdmin(context.Background(), req, "admin-1")
 			So(err, ShouldBeNil)
 		})
 	})
@@ -250,7 +250,7 @@ func TestUpdateContentReviewAdmin(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.UpdateContentReviewAdmin(context.Background(), req)
+			err := srv.UpdateContentReviewAdmin(context.Background(), req, "admin-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -260,7 +260,7 @@ func TestUpdateContentReviewAdmin(t *testing.T) {
 				return testutil.ErrDBUnexpected
 			}
 
-			err := srv.UpdateContentReviewAdmin(context.Background(), req)
+			err := srv.UpdateContentReviewAdmin(context.Background(), req, "admin-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -270,7 +270,7 @@ func TestUpdateContentReviewAdmin(t *testing.T) {
 				return nil
 			}
 
-			err := srv.UpdateContentReviewAdmin(context.Background(), req)
+			err := srv.UpdateContentReviewAdmin(context.Background(), req, "admin-1")
 			So(err, ShouldBeNil)
 		})
 	})
@@ -347,7 +347,7 @@ func TestUpdateArticleReviewAdmin(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.UpdateArticleReviewAdmin(context.Background(), req)
+			err := srv.UpdateArticleReviewAdmin(context.Background(), req, "admin-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -357,7 +357,7 @@ func TestUpdateArticleReviewAdmin(t *testing.T) {
 				return testutil.ErrDBUnexpected
 			}
 
-			err := srv.UpdateArticleReviewAdmin(context.Background(), req)
+			err := srv.UpdateArticleReviewAdmin(context.Background(), req, "admin-1")
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -367,7 +367,7 @@ func TestUpdateArticleReviewAdmin(t *testing.T) {
 				return nil
 			}
 
-			err := srv.UpdateArticleReviewAdmin(context.Background(), req)
+			err := srv.UpdateArticleReviewAdmin(context.Background(), req, "admin-1")
 			So(err, ShouldBeNil)
 		})
 	})

@@ -17,4 +17,7 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{BaseRepository: *repository.NewBaseRepository(pool)}
 }
 
-var _ admindomain.AnnouncementRepository = (*Repository)(nil)
+var (
+	_ admindomain.AnnouncementRepository = (*Repository)(nil)
+	_ admindomain.UserRepository         = (*Repository)(nil)
+)

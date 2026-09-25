@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	articledomain "learnflow_backend/internal/article/domain"
+	auditdomain "learnflow_backend/internal/audit/domain"
 )
 
 // PublishArticle publishes a draft Article, provided its article is ready.
@@ -27,6 +28,12 @@ func (s *Service) PublishArticle(ctx context.Context, articleID, userID string) 
 		if err != nil {
 			return fmt.Errorf("service.PublishArticle: %w", err)
 		}
-		return nil
+
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionPublishItem,
+			TargetType:  auditdomain.TargetArticle,
+			TargetID:    articleID,
+		})
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	contentdomain "learnflow_backend/internal/content/domain"
 )
 
@@ -49,7 +50,12 @@ func (s *Service) CreateContentItem(ctx context.Context, req contentdomain.Creat
 		}
 
 		contentItemID = createdContentItem.ID
-		return nil
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: req.CreatedByUserID,
+			ActionType:  auditdomain.ActionCreateItem,
+			TargetType:  auditdomain.TargetContentItem,
+			TargetID:    contentItemID,
+		})
 	})
 
 	return contentItemID, err

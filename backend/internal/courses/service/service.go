@@ -8,9 +8,10 @@ import (
 type Service struct {
 	courseRepo coursedomain.CourseRepository
 	transactor coursedomain.Transactor
+	actionRepo coursedomain.AdminActionRepository
 }
 
 // New returns a new Service wired to the given repository.
-func New(courseRepo coursedomain.CourseRepository, transactor coursedomain.Transactor) *Service {
-	return &Service{courseRepo: courseRepo, transactor: transactor}
+func New(courseRepo coursedomain.CourseRepository, actionRepo coursedomain.AdminActionRepository, transactor coursedomain.Transactor) *Service {
+	return &Service{courseRepo: courseRepo, transactor: transactor, actionRepo: actionRepo}
 }

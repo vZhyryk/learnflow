@@ -180,14 +180,6 @@ const (
 		FROM user_profiles WHERE user_id = $1
 	`
 
-	deleteUserSQL = `
-		UPDATE users
-		SET status = 'deleted',
-		deleted_at = now(),
-		updated_at = now()
-		WHERE id = $1
-	`
-
 	userColumns = `
 	id, email, password_hash, role, status, email_verified_at, last_login_at, deleted_at, created_at, updated_at,
 	password_changed_at, email_changed_at, failed_login_count, last_failed_login_at, login_locked_until `
@@ -223,12 +215,7 @@ const (
 		updated_at = now()
 		WHERE id = $2
 	`
-	updateUserRoleSQL = `
-		UPDATE users
-		SET role  = $1,
-		updated_at = now()
-		WHERE id = $2
-	`
+
 	updateUserStatusSQL = `
 		UPDATE users
 		SET status  = $1,

@@ -58,8 +58,8 @@ type mockService struct {
 
 	updateCourseReview       func(ctx context.Context, req reviewdomain.UpdateCourseReviewRequest) error
 	updateContentReview      func(ctx context.Context, req reviewdomain.UpdateContentReviewRequest) error
-	updateCourseReviewAdmin  func(ctx context.Context, req reviewdomain.UpdateCourseReviewRequest) error
-	updateContentReviewAdmin func(ctx context.Context, req reviewdomain.UpdateContentReviewRequest) error
+	updateCourseReviewAdmin  func(ctx context.Context, req reviewdomain.UpdateCourseReviewRequest, adminID string) error
+	updateContentReviewAdmin func(ctx context.Context, req reviewdomain.UpdateContentReviewRequest, adminID string) error
 
 	getCourseReviews         func(ctx context.Context, params pagination.Params, courseID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error)
 	getContentReviews        func(ctx context.Context, params pagination.Params, contentID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error)
@@ -73,7 +73,7 @@ type mockService struct {
 	createArticleReview      func(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) error
 	createArticleReviewAdmin func(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) error
 	updateArticleReview      func(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error
-	updateArticleReviewAdmin func(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error
+	updateArticleReviewAdmin func(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest, adminID string) error
 	getArticleReviews        func(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error)
 	getArticleReviewStats    func(ctx context.Context, articleID string) (rating float64, count int, err error)
 	deleteArticleReview      func(ctx context.Context, reviewID, userID string) error
@@ -122,18 +122,18 @@ func (m *mockService) UpdateContentReview(ctx context.Context, req reviewdomain.
 	return m.updateContentReview(ctx, req)
 }
 
-func (m *mockService) UpdateCourseReviewAdmin(ctx context.Context, req reviewdomain.UpdateCourseReviewRequest) error {
+func (m *mockService) UpdateCourseReviewAdmin(ctx context.Context, req reviewdomain.UpdateCourseReviewRequest, adminID string) error {
 	if m.updateCourseReviewAdmin == nil {
 		panic("mockService.updateCourseReviewAdmin not set")
 	}
-	return m.updateCourseReviewAdmin(ctx, req)
+	return m.updateCourseReviewAdmin(ctx, req, adminID)
 }
 
-func (m *mockService) UpdateContentReviewAdmin(ctx context.Context, req reviewdomain.UpdateContentReviewRequest) error {
+func (m *mockService) UpdateContentReviewAdmin(ctx context.Context, req reviewdomain.UpdateContentReviewRequest, adminID string) error {
 	if m.updateContentReviewAdmin == nil {
 		panic("mockService.updateContentReviewAdmin not set")
 	}
-	return m.updateContentReviewAdmin(ctx, req)
+	return m.updateContentReviewAdmin(ctx, req, adminID)
 }
 
 func (m *mockService) GetCourseReviews(ctx context.Context, params pagination.Params, courseID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error) {
@@ -213,11 +213,11 @@ func (m *mockService) UpdateArticleReview(ctx context.Context, req reviewdomain.
 	return m.updateArticleReview(ctx, req)
 }
 
-func (m *mockService) UpdateArticleReviewAdmin(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error {
+func (m *mockService) UpdateArticleReviewAdmin(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest, adminID string) error {
 	if m.updateArticleReviewAdmin == nil {
 		panic("mockService.updateArticleReviewAdmin not set")
 	}
-	return m.updateArticleReviewAdmin(ctx, req)
+	return m.updateArticleReviewAdmin(ctx, req, adminID)
 }
 
 func (m *mockService) GetArticleReviews(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {

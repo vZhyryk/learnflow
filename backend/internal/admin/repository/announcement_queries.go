@@ -2,14 +2,14 @@ package adminrepository
 
 const (
 	announcementColumns = `
-    id, title, body, created_at, created_by_user_id, updated_at, updated_by_user_id,
-	approved_at, approved_by_user_id, expires_at, entity_id, entity_type, channels
+		id, title, body, created_at, created_by_user_id, updated_at, updated_by_user_id,
+		approved_at, approved_by_user_id, expires_at, entity_id, entity_type, channels
 	`
 
 	createAnnouncementSQL = `
 		INSERT INTO announcements (title, body, created_by_user_id, expires_at, entity_id, entity_type, channels)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING` + announcementColumns
+		RETURNING ` + announcementColumns
 
 	updateAnnouncementSQL = `
 		UPDATE announcements

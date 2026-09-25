@@ -44,6 +44,9 @@ type mockService struct {
 	getApprovedAnnouncements   func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
 	getPublicAnnouncements     func(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error)
 	getExpiredAnnouncements    func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
+	getUsersData               func(ctx context.Context, params pagination.Params) ([]*admindomain.UserData, int, error)
+	getUserDataByID            func(ctx context.Context, userID string) (*admindomain.UserData, error)
+	changeUserField            func(ctx context.Context, operationName, userID, adminID string) error
 }
 
 func (m *mockService) CreateAnnouncement(ctx context.Context, req admindomain.CreateAnnouncementRequest) (string, error) {
@@ -100,4 +103,25 @@ func (m *mockService) GetExpiredAnnouncements(ctx context.Context, params pagina
 		panic("mockService.getExpiredAnnouncements not set")
 	}
 	return m.getExpiredAnnouncements(ctx, params)
+}
+
+func (m *mockService) GetUsersData(ctx context.Context, params pagination.Params) ([]*admindomain.UserData, int, error) {
+	if m.getUsersData == nil {
+		panic("mockService.getUsersData not set")
+	}
+	return m.getUsersData(ctx, params)
+}
+
+func (m *mockService) GetUserDataByID(ctx context.Context, userID string) (*admindomain.UserData, error) {
+	if m.getUserDataByID == nil {
+		panic("mockService.getUserDataByID not set")
+	}
+	return m.getUserDataByID(ctx, userID)
+}
+
+func (m *mockService) ChangeUserField(ctx context.Context, operationName, userID, adminID string) error {
+	if m.changeUserField == nil {
+		panic("mockService.changeUserField not set")
+	}
+	return m.changeUserField(ctx, operationName, userID, adminID)
 }

@@ -2,6 +2,7 @@ package contentservice
 
 import (
 	"context"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	contentdomain "learnflow_backend/internal/content/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
@@ -109,7 +110,34 @@ func (m *mockContentItemRepo) CheckIfContentItemExistsByID(ctx context.Context, 
 }
 
 func newTestService(repo *mockContentItemRepo) *Service {
-	return New(repo, &testutil.NoopTransactor{})
+	return newTestServiceWithActions(repo, noopAdminActions())
+}
+
+func newTestServiceWithActions(repo *mockContentItemRepo, actions *mockAdminActionRepo) *Service {
+	return New(repo, actions, &testutil.NoopTransactor{})
+}
+
+type mockAdminActionRepo struct {
+	createAdminAction func(ctx context.Context, action *auditdomain.AdminAction) error
+}
+
+func (m *mockAdminActionRepo) CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error {
+	if m.createAdminAction == nil {
+		panic("mockAdminActionRepo.CreateAdminAction not set")
+	}
+
+	return m.createAdminAction(ctx, action)
+}
+
+func noopAdminActions() *mockAdminActionRepo {
+	return &mockAdminActionRepo{createAdminAction: func(_ context.Context, _ *auditdomain.AdminAction) error { return nil }}
+}
+
+func capturingAdminActions(got *[]*auditdomain.AdminAction, err error) *mockAdminActionRepo {
+	return &mockAdminActionRepo{createAdminAction: func(_ context.Context, action *auditdomain.AdminAction) error {
+		*got = append(*got, action)
+		return err
+	}}
 }
 
 // alwaysError is a getContentItemByID/getContentItemBySlug stub that always fails.

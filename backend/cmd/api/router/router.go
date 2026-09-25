@@ -15,6 +15,7 @@ import (
 	"learnflow_backend/internal/article"
 	articlerepository "learnflow_backend/internal/article/repository"
 	articleservice "learnflow_backend/internal/article/service"
+	"learnflow_backend/internal/audit"
 	"learnflow_backend/internal/auth"
 	authdomain "learnflow_backend/internal/auth/domain"
 	authrepository "learnflow_backend/internal/auth/repository"
@@ -66,6 +67,8 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 		})
 	}))
 
+	adminAction := audit.New(a.DB)
+
 	transactor := db.NewTransactor(a.DB)
 	outbox := events.NewOutboxWriter(a.DB)
 
@@ -100,28 +103,28 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 
 	// Course Routes
 	courseRepo := courserepository.NewRepository(a.DB)
-	courseSvc := courseservice.New(courseRepo, transactor)
+	courseSvc := courseservice.New(courseRepo, adminAction, transactor)
 	courses.RegisterCourseRoutes(router, courseSvc, chains.Static, adminStaticWithAuth, a.Logger)
 
 	// Content Routes
 	contentRepo := contentrepository.NewRepository(a.DB)
-	contentSvc := contentservice.New(contentRepo, transactor)
+	contentSvc := contentservice.New(contentRepo, adminAction, transactor)
 	content.RegisterContentRoutes(router, contentSvc, chains.Static, adminStaticWithAuth, a.Logger)
 
 	// Article Routes
 	articleRepo := articlerepository.NewRepository(a.DB)
-	articleSvc := articleservice.New(articleRepo, transactor)
+	articleSvc := articleservice.New(articleRepo, adminAction, transactor)
 	article.RegisterArticleRoutes(router, articleSvc, chains.Static, adminStaticWithAuth, a.Logger)
 
 	// Review Routes
 	reviewRepo := reviewrepository.NewRepository(a.DB)
 	accessChecker := access.New(a.DB)
-	reviewSvc := reviewservice.New(reviewRepo, reviewRepo, reviewRepo, transactor, accessChecker)
+	reviewSvc := reviewservice.New(reviewRepo, reviewRepo, reviewRepo, transactor, accessChecker, adminAction)
 	review.RegisterReviewRoutes(router, reviewSvc, chains.Static, chains.StaticWithAuth, adminStaticWithAuth, a.Logger)
 
 	// Admin Routes
 	adminRepo := adminrepository.NewRepository(a.DB)
-	adminSvc := adminservice.New(adminRepo, transactor, outbox)
+	adminSvc := adminservice.New(adminRepo, adminRepo, adminAction, transactor, outbox)
 	admin.RegisterAdminRoutes(router, adminSvc, adminStaticWithAuth, chains.StaticWithAuth, a.Logger)
 
 	// Helper routes

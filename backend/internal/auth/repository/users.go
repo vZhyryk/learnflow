@@ -145,20 +145,6 @@ func (rep *Repository) UpdateStatus(ctx context.Context, userID string, status a
 	return nil
 }
 
-// UpdateRole sets the role for the given user.
-func (rep *Repository) UpdateRole(ctx context.Context, userID string, role authdomain.UserRole) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateUserRoleSQL, role, userID)
-	if err != nil {
-		return fmt.Errorf("repository.UpdateRole: %w", err)
-	}
-
-	if tag.RowsAffected() == 0 {
-		return authdomain.ErrUserNotFound
-	}
-
-	return nil
-}
-
 // UpdateLastLoginAt records the current time as last_login_at for the given user.
 func (rep *Repository) UpdateLastLoginAt(ctx context.Context, userID string) error {
 	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateLastLoginSQL, userID)
@@ -209,19 +195,6 @@ func (rep *Repository) UpdateEmailVerifiedAt(ctx context.Context, userID string)
 		return authdomain.ErrUserNotFound
 	}
 
-	return nil
-}
-
-// DeleteUser soft-deletes the user with the given ID.
-func (rep *Repository) DeleteUser(ctx context.Context, userID string) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, deleteUserSQL, userID)
-	if err != nil {
-		return fmt.Errorf("repository.DeleteUser: %w", err)
-	}
-
-	if tag.RowsAffected() == 0 {
-		return authdomain.ErrUserNotFound
-	}
 	return nil
 }
 

@@ -2,6 +2,7 @@ package contentdomain
 
 import (
 	"context"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 )
 
@@ -24,6 +25,11 @@ type ContentRepository interface {
 	GetContentItemByID(ctx context.Context, contentItemID string) (*ContentItem, error)
 	GetContentItemBySlug(ctx context.Context, slug string) (*ContentItem, error)
 	CheckIfContentItemExistsByID(ctx context.Context, contentItemID string) (bool, error)
+}
+
+// AdminActionRepository persists the admin audit trail.
+type AdminActionRepository interface {
+	CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error
 }
 
 // Service defines the content module's business logic operations.

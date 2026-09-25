@@ -16,4 +16,8 @@ var (
 	ErrEntityDataMisMatch   = errors.New("entity data mismatch")
 	ErrAnnouncementNotFound = errors.New("announcement not found")
 	ErrAnnouncementApproved = errors.New("announcement already approved")
+
+	ErrUserNotFound        = errors.New("user not found")
+	ErrForbiddenUserAction = errors.New("action on this user is not allowed")
+	ErrInvalidUserState    = errors.New("user is not in a valid state for this action")
 )

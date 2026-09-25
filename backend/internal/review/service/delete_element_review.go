@@ -3,6 +3,7 @@ package reviewservice
 import (
 	"context"
 	"fmt"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	reviewdomain "learnflow_backend/internal/review/domain"
 )
 
@@ -44,18 +45,32 @@ func (s *Service) DeleteContentReview(ctx context.Context, reviewID, userID stri
 
 // DeleteCourseReviewAdmin soft-deletes any course review, bypassing ownership checks.
 func (s *Service) DeleteCourseReviewAdmin(ctx context.Context, reviewID, userID string) error {
-	if err := s.courseRepo.DeleteCourseReview(ctx, reviewID, userID); err != nil {
-		return fmt.Errorf("service.DeleteCourseReviewAdmin: %w", err)
-	}
-	return nil
+	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		if err := s.courseRepo.DeleteCourseReview(ctx, reviewID, userID); err != nil {
+			return fmt.Errorf("service.DeleteCourseReviewAdmin: %w", err)
+		}
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionDeleteItem,
+			TargetType:  auditdomain.TargetReview,
+			TargetID:    reviewID,
+		})
+	})
 }
 
 // DeleteContentReviewAdmin soft-deletes any content review, bypassing ownership checks.
 func (s *Service) DeleteContentReviewAdmin(ctx context.Context, reviewID, userID string) error {
-	if err := s.contentRepo.DeleteContentReview(ctx, reviewID, userID); err != nil {
-		return fmt.Errorf("service.DeleteContentReviewAdmin: %w", err)
-	}
-	return nil
+	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		if err := s.contentRepo.DeleteContentReview(ctx, reviewID, userID); err != nil {
+			return fmt.Errorf("service.DeleteContentReviewAdmin: %w", err)
+		}
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionDeleteItem,
+			TargetType:  auditdomain.TargetReview,
+			TargetID:    reviewID,
+		})
+	})
 }
 
 // DeleteArticleReview soft-deletes an article review owned by the requesting user.
@@ -78,8 +93,15 @@ func (s *Service) DeleteArticleReview(ctx context.Context, reviewID, userID stri
 
 // DeleteArticleReviewAdmin soft-deletes any article review, bypassing ownership checks.
 func (s *Service) DeleteArticleReviewAdmin(ctx context.Context, reviewID, userID string) error {
-	if err := s.articleRepo.DeleteArticleReview(ctx, reviewID, userID); err != nil {
-		return fmt.Errorf("service.DeleteArticleReviewAdmin: %w", err)
-	}
-	return nil
+	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		if err := s.articleRepo.DeleteArticleReview(ctx, reviewID, userID); err != nil {
+			return fmt.Errorf("service.DeleteArticleReviewAdmin: %w", err)
+		}
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionDeleteItem,
+			TargetType:  auditdomain.TargetReview,
+			TargetID:    reviewID,
+		})
+	})
 }
