@@ -5,12 +5,12 @@ import (
 	"context"
 	"learnflow_backend/internal/infrastructure/bootstrap"
 	"learnflow_backend/internal/infrastructure/logger"
+	"learnflow_backend/internal/infrastructure/redis"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 )
 
 // Config holds all runtime configuration for the API server. Each field's doc comment
@@ -58,7 +58,7 @@ type App struct {
 	DB     *pgxpool.Pool
 	Ctx    context.Context
 	Cancel context.CancelFunc
-	Redis  *redis.Client
+	Redis  *redis.Instance
 }
 
 // noCopy prevents App from being copied after first use.

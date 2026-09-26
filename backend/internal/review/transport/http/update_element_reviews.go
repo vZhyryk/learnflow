@@ -18,7 +18,7 @@ func (h *Handler) updateCourseReviewAdmin(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err := h.svc.UpdateCourseReviewAdmin(ctx, req, user.ID)
+	err := h.svc.UpdateCourseReviewAdmin(ctx, req)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
@@ -41,7 +41,7 @@ func (h *Handler) updateContentReviewAdmin(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err := h.svc.UpdateContentReviewAdmin(ctx, req, user.ID)
+	err := h.svc.UpdateContentReviewAdmin(ctx, req)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
@@ -110,7 +110,7 @@ func (h *Handler) updateArticleReviewAdmin(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err := h.svc.UpdateArticleReviewAdmin(ctx, req, user.ID)
+	err := h.svc.UpdateArticleReviewAdmin(ctx, req)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return

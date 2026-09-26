@@ -86,9 +86,9 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 			Transactor:  transactor,
 		},
 		authservice.Utils{
-			Outbox:      outbox,
-			Token:       route.token,
-			RedisClient: a.Redis,
+			Outbox:    outbox,
+			Token:     route.token,
+			Blocklist: a.Redis,
 		},
 		authservice.Options{})
 	if err != nil {
@@ -124,7 +124,7 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 
 	// Admin Routes
 	adminRepo := adminrepository.NewRepository(a.DB)
-	adminSvc := adminservice.New(adminRepo, adminRepo, adminAction, transactor, outbox)
+	adminSvc := adminservice.New(adminRepo, adminRepo, adminAction, authRepo, transactor, outbox, a.Redis)
 	admin.RegisterAdminRoutes(router, adminSvc, adminStaticWithAuth, chains.StaticWithAuth, a.Logger)
 
 	// Helper routes

@@ -53,15 +53,15 @@ func main() {
 		worker.NewOutboxPoller(dbInstance, app.Publisher, app.Logger, transactor),
 		worker.NewDLQRetryWorker(dbInstance, app.Publisher, app.Logger, transactor),
 		worker.NewAnnouncementDeliveryPoller(dbInstance, app.Publisher, app.Logger, transactor),
-		worker.NewEmailVerificationWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
-		worker.NewEmailChangeWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
-		worker.NewPasswordResetWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
-		worker.NewRegistrationAttemptsWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
-		worker.NewAccountRecoveryWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
+		worker.NewEmailVerificationWorker(dbInstance, redisClient.Client, app.Logger, app.Mailer, baseURL),
+		worker.NewEmailChangeWorker(dbInstance, redisClient.Client, app.Logger, app.Mailer, baseURL),
+		worker.NewPasswordResetWorker(dbInstance, redisClient.Client, app.Logger, app.Mailer, baseURL),
+		worker.NewRegistrationAttemptsWorker(dbInstance, redisClient.Client, app.Logger, app.Mailer, baseURL),
+		worker.NewAccountRecoveryWorker(dbInstance, redisClient.Client, app.Logger, app.Mailer, baseURL),
 		worker.NewOutboxCleanupWorker(dbInstance, app.Logger, cleanUpPollInterval),
 		worker.NewAnnouncementCleanUpWorker(dbInstance, app.Logger, cleanUpPollInterval),
-		worker.NewAnnouncementFanOutWorker(dbInstance, redisClient, app.Logger, adminRepo, contentRepo, courseRepo, articleRepo),
-		worker.NewAnnouncementDeliveryWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
+		worker.NewAnnouncementFanOutWorker(dbInstance, redisClient.Client, app.Logger, adminRepo, contentRepo, courseRepo, articleRepo),
+		worker.NewAnnouncementDeliveryWorker(dbInstance, redisClient.Client, app.Logger, app.Mailer, baseURL),
 	}
 
 	for _, w := range workers {

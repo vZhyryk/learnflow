@@ -68,7 +68,7 @@ func (s *Service) UpdateContentReview(ctx context.Context, req reviewdomain.Upda
 }
 
 // UpdateCourseReviewAdmin updates any course review, bypassing ownership/access checks.
-func (s *Service) UpdateCourseReviewAdmin(ctx context.Context, req reviewdomain.UpdateCourseReviewRequest, adminID string) error {
+func (s *Service) UpdateCourseReviewAdmin(ctx context.Context, req reviewdomain.UpdateCourseReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.courseRepo.GetCourseReviewByID(ctx, req.ReviewID)
 		if err != nil {
@@ -81,7 +81,7 @@ func (s *Service) UpdateCourseReviewAdmin(ctx context.Context, req reviewdomain.
 			return fmt.Errorf("service.UpdateCourseReviewAdmin: %w", err)
 		}
 		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
-			AdminUserID: adminID,
+			AdminUserID: req.UserID,
 			ActionType:  auditdomain.ActionUpdateItem,
 			TargetType:  auditdomain.TargetReview,
 			TargetID:    req.ReviewID,
@@ -90,7 +90,7 @@ func (s *Service) UpdateCourseReviewAdmin(ctx context.Context, req reviewdomain.
 }
 
 // UpdateContentReviewAdmin updates any content review, bypassing ownership/access checks.
-func (s *Service) UpdateContentReviewAdmin(ctx context.Context, req reviewdomain.UpdateContentReviewRequest, adminID string) error {
+func (s *Service) UpdateContentReviewAdmin(ctx context.Context, req reviewdomain.UpdateContentReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.contentRepo.GetContentReviewByID(ctx, req.ReviewID)
 		if err != nil {
@@ -103,7 +103,7 @@ func (s *Service) UpdateContentReviewAdmin(ctx context.Context, req reviewdomain
 			return fmt.Errorf("service.UpdateContentReviewAdmin: %w", err)
 		}
 		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
-			AdminUserID: adminID,
+			AdminUserID: req.UserID,
 			ActionType:  auditdomain.ActionUpdateItem,
 			TargetType:  auditdomain.TargetReview,
 			TargetID:    req.ReviewID,
@@ -133,7 +133,7 @@ func (s *Service) UpdateArticleReview(ctx context.Context, req reviewdomain.Upda
 }
 
 // UpdateArticleReviewAdmin updates any article review, bypassing ownership checks.
-func (s *Service) UpdateArticleReviewAdmin(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest, adminID string) error {
+func (s *Service) UpdateArticleReviewAdmin(ctx context.Context, req reviewdomain.UpdateArticleReviewRequest) error {
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		currentReview, err := s.articleRepo.GetArticleReviewByID(ctx, req.ReviewID)
 		if err != nil {
@@ -145,7 +145,7 @@ func (s *Service) UpdateArticleReviewAdmin(ctx context.Context, req reviewdomain
 			return fmt.Errorf("service.UpdateArticleReviewAdmin: %w", err)
 		}
 		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
-			AdminUserID: adminID,
+			AdminUserID: req.UserID,
 			ActionType:  auditdomain.ActionUpdateItem,
 			TargetType:  auditdomain.TargetReview,
 			TargetID:    req.ReviewID,

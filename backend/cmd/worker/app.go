@@ -4,11 +4,11 @@ import (
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/bootstrap"
 	"learnflow_backend/internal/infrastructure/logger"
+	"learnflow_backend/internal/infrastructure/redis"
 	"learnflow_backend/internal/shared/mailer"
 	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 )
 
 // Config holds all runtime configuration for the worker process. Each field's doc comment
@@ -39,12 +39,12 @@ type App struct {
 	Outbox      *events.OutboxWriter
 	Publisher   *events.RedisPublisher
 	Mailer      *mailer.Mailer
-	RedisClient *redis.Client
+	RedisClient *redis.Instance
 }
 
 // NewApp wraps raw infra dependencies into the App container, mirroring how
 // cmd/api/router.NewRouter wraps cmd/api/app.App's DB/Redis into services.
-func NewApp(cfg Config, log *logger.Logger, dbInstance *pgxpool.Pool, redisClient *redis.Client) *App {
+func NewApp(cfg Config, log *logger.Logger, dbInstance *pgxpool.Pool, redisClient *redis.Instance) *App {
 	return &App{
 		Config:      cfg,
 		Logger:      log,

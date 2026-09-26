@@ -362,7 +362,7 @@ func TestChangeEmailWithSessionLogout(t *testing.T) {
 					return nil
 				},
 			}
-			srv := newTestService(uRepo, sRepo, tRepo, nil, newSuccessfulMockRedis())
+			srv := newTestService(uRepo, sRepo, tRepo, nil, newSuccessfulMockBlocklist())
 
 			err := srv.ChangeEmail(context.Background(), authdomain.EmailChangeRequest{
 				Token:                "tok",
@@ -389,7 +389,7 @@ func TestChangeEmailSessionLogoutFails(t *testing.T) {
 					return testutil.ErrDBUnexpected
 				},
 			}
-			srv := newTestService(uRepo, sRepo, tRepo, nil, newSuccessfulMockRedis())
+			srv := newTestService(uRepo, sRepo, tRepo, nil, newSuccessfulMockBlocklist())
 
 			err := srv.ChangeEmail(context.Background(), authdomain.EmailChangeRequest{
 				Token: "tok", UserID: TestUserID, IsAllSessionsLogout: true,

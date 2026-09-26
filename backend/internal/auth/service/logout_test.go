@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -177,25 +176,25 @@ func activeLogoutSessionRepo() *mockSessionRepo {
 func TestLogoutBlocklistsAccessToken(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When the session is active and redis blocklist succeeds", func() {
-			var redisCalled bool
-			var gotKey string
-			redisClient := &mockRedis{
-				setNX: func(_ context.Context, key string, _ any, _ time.Duration) *redis.BoolCmd {
-					redisCalled = true
-					gotKey = key
-					return redis.NewBoolResult(true, nil)
+			var blocked bool
+			var gotJTI string
+			blocklist := &mockBlocklist{
+				blockToken: func(_ context.Context, jti string, _ time.Duration) error {
+					blocked = true
+					gotJTI = jti
+					return nil
 				},
 			}
 			sRepo := activeLogoutSessionRepo()
-			srv := newTestService(nil, sRepo, nil, nil, redisClient)
+			srv := newTestService(nil, sRepo, nil, nil, blocklist)
 			ctx := newLogoutTestContext(&authdomain.User{ID: TestUserID})
 
 			userID, err := srv.Logout(ctx, logoutBlocklistRequest())
 
 			So(err, ShouldBeNil)
 			So(userID, ShouldEqual, TestUserID)
-			So(redisCalled, ShouldBeTrue)
-			So(gotKey, ShouldEqual, "blocklist:jti-123")
+			So(blocked, ShouldBeTrue)
+			So(gotJTI, ShouldEqual, "jti-123")
 		})
 	})
 }
@@ -203,9 +202,9 @@ func TestLogoutBlocklistsAccessToken(t *testing.T) {
 func TestLogoutBlocklistFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When the session is active but redis blocklist fails", func() {
-			redisClient := mockRedisSetNXError(testutil.ErrRedisUnavailable)
+			blocklist := mockBlocklistBlockTokenError(testutil.ErrRedisUnavailable)
 			sRepo := activeLogoutSessionRepo()
-			srv := newTestService(nil, sRepo, nil, nil, redisClient)
+			srv := newTestService(nil, sRepo, nil, nil, blocklist)
 			ctx := newLogoutTestContext(&authdomain.User{ID: TestUserID})
 
 			_, err := srv.Logout(ctx, logoutBlocklistRequest())

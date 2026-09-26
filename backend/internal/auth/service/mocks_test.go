@@ -4,8 +4,6 @@ import (
 	"context"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 // mockUserRepo implements authdomain.UserRepository via function fields.
@@ -335,23 +333,41 @@ func (m *mockTokenRepo) MarkAccountRecoveryTokenUsed(ctx context.Context, tokenH
 	return m.markAccountRecoveryTokenUsed(ctx, tokenHash)
 }
 
-// mockRedis implements NXSetter for JTI blocklist tests.
-type mockRedis struct {
-	setNX func(ctx context.Context, key string, value any, exp time.Duration) *redis.BoolCmd
+// mockBlocklist implements authdomain.TokenBlocklist via function fields.
+type mockBlocklist struct {
+	blockToken  func(ctx context.Context, jti string, ttl time.Duration) error
+	unBlockUser func(ctx context.Context, userID string) error
 }
 
-func (m *mockRedis) SetNX(ctx context.Context, key string, value any, expiration time.Duration) *redis.BoolCmd {
-	if m.setNX == nil {
-		panic("mockRedis.setNX not set")
+func (m *mockBlocklist) BlockToken(ctx context.Context, jti string, ttl time.Duration) error {
+	if m.blockToken == nil {
+		panic("mockBlocklist.blockToken not set")
 	}
-	return m.setNX(ctx, key, value, expiration)
+	return m.blockToken(ctx, jti, ttl)
 }
 
-// mockRedisSetNXError returns a mockRedis whose SetNX always fails with err.
-func mockRedisSetNXError(err error) *mockRedis {
-	return &mockRedis{
-		setNX: func(_ context.Context, _ string, _ any, _ time.Duration) *redis.BoolCmd {
-			return redis.NewBoolResult(false, err)
+func (m *mockBlocklist) UnBlockUser(ctx context.Context, userID string) error {
+	if m.unBlockUser == nil {
+		panic("mockBlocklist.unBlockUser not set")
+	}
+	return m.unBlockUser(ctx, userID)
+}
+
+// mockBlocklistBlockTokenError returns a mockBlocklist whose BlockToken always fails with err.
+func mockBlocklistBlockTokenError(err error) *mockBlocklist {
+	return &mockBlocklist{
+		blockToken: func(_ context.Context, _ string, _ time.Duration) error { return err },
+	}
+}
+
+// mockBlocklistUnBlockUser returns a mockBlocklist whose UnBlockUser records the user IDs in unblocked and fails with err.
+func mockBlocklistUnBlockUser(unblocked *[]string, err error) *mockBlocklist {
+	return &mockBlocklist{
+		unBlockUser: func(_ context.Context, userID string) error {
+			if unblocked != nil {
+				*unblocked = append(*unblocked, userID)
+			}
+			return err
 		},
 	}
 }

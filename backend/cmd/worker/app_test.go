@@ -20,7 +20,7 @@ func TestNewApp(t *testing.T) {
 			},
 		}
 		log := testutil.NewTestLogger()
-		redisClient := testutil.UnreachableRedis()
+		redisClient := testutil.UnreachableRedisInstance()
 		defer redisClient.Close() //nolint:errcheck // best-effort cleanup
 
 		app := NewApp(cfg, log, nil, redisClient)

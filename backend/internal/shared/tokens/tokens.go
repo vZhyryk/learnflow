@@ -13,6 +13,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// AccessTokenTTL is the lifetime of an access JWT; anything that must outlive issued tokens (e.g. a block marker) uses it.
+const AccessTokenTTL = 15 * time.Minute
+
 const (
 	tokenByteLength = 32
 	jtibyteLength   = 32

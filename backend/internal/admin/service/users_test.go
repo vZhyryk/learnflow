@@ -7,6 +7,7 @@ import (
 	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
+	"learnflow_backend/internal/shared/tokens"
 	"testing"
 	"time"
 
@@ -331,5 +332,136 @@ func TestChangeUserFieldActorLoadFailure(t *testing.T) {
 		err := srv.ChangeUserField(context.Background(), "BlockUser", validUserID, testAdminID)
 		So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		So(err.Error(), ShouldContainSubstring, "load actor")
+	})
+}
+
+type sessionCall struct {
+	userID  string
+	adminID string
+}
+
+func newSessionFixture(sessionErr error) (srv *Service, calls *[]sessionCall) {
+	noop := func(_ context.Context, _ string) error { return nil }
+	users := &mockUserRepo{
+		revokeUserRole:  noop,
+		assignUserRole:  noop,
+		deleteUser:      noop,
+		restoreUser:     noop,
+		blockUser:       noop,
+		unBlockUser:     noop,
+		getUserDataByID: userLookup(admindomain.RoleAdmin, admindomain.RoleUser),
+	}
+	actions := &mockAdminActionRepo{createAdminAction: func(_ context.Context, _ *auditdomain.AdminAction) error { return nil }}
+	var recorded []sessionCall
+	sessions := &mockSessionRepo{revokeAllUserSessionsAdmin: func(_ context.Context, userID, adminID string) error {
+		recorded = append(recorded, sessionCall{userID: userID, adminID: adminID})
+		return sessionErr
+	}}
+
+	return newTestUserServiceWithSessions(users, actions, sessions), &recorded
+}
+
+func wantSessionCalls(revoked bool) []sessionCall {
+	if !revoked {
+		return nil
+	}
+
+	return []sessionCall{{userID: validUserID, adminID: testAdminID}}
+}
+
+func TestChangeUserFieldRevokesSessions(t *testing.T) {
+	revokes := map[string]bool{
+		"BlockUser":      true,
+		"DeleteUser":     true,
+		"UnBlockUser":    false,
+		"RestoreUser":    false,
+		"AssignUserRole": false,
+		"RevokeUserRole": false,
+	}
+
+	Convey("Given an admin service that records session revocations", t, func() {
+		for operation, revoked := range revokes {
+			Convey(operation, func() {
+				srv, calls := newSessionFixture(nil)
+				So(srv.ChangeUserField(context.Background(), operation, validUserID, testAdminID), ShouldBeNil)
+				So(*calls, ShouldResemble, wantSessionCalls(revoked))
+			})
+		}
+	})
+}
+
+func TestChangeUserFieldSessionRevokeFailure(t *testing.T) {
+	Convey("Given session revocation fails while blocking a user", t, func() {
+		srv, _ := newSessionFixture(testutil.ErrDBUnexpected)
+
+		err := srv.ChangeUserField(context.Background(), "BlockUser", validUserID, testAdminID)
+		So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+	})
+}
+
+func newBlocklistFixture(setErr, delErr, auditErr error) (srv *Service, calls *[]blocklistCall) {
+	noop := func(_ context.Context, _ string) error { return nil }
+	users := &mockUserRepo{
+		revokeUserRole:  noop,
+		assignUserRole:  noop,
+		deleteUser:      noop,
+		restoreUser:     noop,
+		blockUser:       noop,
+		unBlockUser:     noop,
+		getUserDataByID: userLookup(admindomain.RoleAdmin, admindomain.RoleUser),
+	}
+	actions := &mockAdminActionRepo{createAdminAction: func(_ context.Context, _ *auditdomain.AdminAction) error {
+		return auditErr
+	}}
+	var recorded []blocklistCall
+	blocklist := recordingBlocklist(&recorded, setErr, delErr)
+
+	return newTestUserServiceFull(users, actions, noopSessions(), blocklist), &recorded
+}
+
+func TestChangeUserFieldUpdatesBlocklist(t *testing.T) {
+	want := map[string][]blocklistCall{
+		"BlockUser":      {{op: "block", userID: validUserID, ttl: tokens.AccessTokenTTL}},
+		"DeleteUser":     {{op: "block", userID: validUserID, ttl: tokens.AccessTokenTTL}},
+		"UnBlockUser":    {{op: "unblock", userID: validUserID}},
+		"RestoreUser":    {{op: "unblock", userID: validUserID}},
+		"AssignUserRole": nil,
+		"RevokeUserRole": nil,
+	}
+
+	Convey("Given an admin service that records blocklist calls", t, func() {
+		for operation, expected := range want {
+			Convey(operation, func() {
+				srv, calls := newBlocklistFixture(nil, nil, nil)
+				So(srv.ChangeUserField(context.Background(), operation, validUserID, testAdminID), ShouldBeNil)
+				So(*calls, ShouldResemble, expected)
+			})
+		}
+	})
+}
+
+func TestChangeUserFieldBlocklistFailures(t *testing.T) {
+	Convey("Given Redis fails", t, func() {
+		Convey("When blocking the user", func() {
+			srv, _ := newBlocklistFixture(testutil.ErrRedisUnavailable, nil, nil)
+			err := srv.ChangeUserField(context.Background(), "BlockUser", validUserID, testAdminID)
+			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)
+		})
+
+		Convey("When unblocking the user", func() {
+			srv, _ := newBlocklistFixture(nil, testutil.ErrRedisUnavailable, nil)
+			err := srv.ChangeUserField(context.Background(), "UnBlockUser", validUserID, testAdminID)
+			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)
+		})
+	})
+}
+
+func TestChangeUserFieldSkipsBlocklistWhenAuditFails(t *testing.T) {
+	Convey("Given the audit write fails while blocking a user", t, func() {
+		srv, calls := newBlocklistFixture(nil, nil, testutil.ErrDBUnexpected)
+
+		err := srv.ChangeUserField(context.Background(), "BlockUser", validUserID, testAdminID)
+		So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		So(*calls, ShouldBeEmpty)
 	})
 }

@@ -84,6 +84,10 @@ func (s *Service) RecoverAccount(ctx context.Context, req authdomain.RecoverAcco
 			return fmt.Errorf("recover_account: restore user: %w", err)
 		}
 
+		if err = s.blocklist.UnBlockUser(ctx, token.UserID); err != nil {
+			return fmt.Errorf("recover_account: clear user_blocked: %w", err)
+		}
+
 		err = s.tokenRepo.MarkAccountRecoveryTokenUsed(ctx, tokenHash)
 		if err != nil {
 			return fmt.Errorf("recover_account: mark token used: %w", err)

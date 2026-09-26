@@ -2,11 +2,18 @@ package authdomain
 
 import (
 	"context"
+	"time"
 )
 
 // Transactor executes a function within a database transaction.
 type Transactor interface {
 	InTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+// TokenBlocklist revokes access tokens that are still valid: one token by jti, or every token of a user.
+type TokenBlocklist interface {
+	BlockToken(ctx context.Context, jti string, ttl time.Duration) error
+	UnBlockUser(ctx context.Context, userID string) error
 }
 
 // Service defines all authentication use cases.

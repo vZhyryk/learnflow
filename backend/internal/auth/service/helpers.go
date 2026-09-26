@@ -17,8 +17,7 @@ func (s *Service) revokeUserSessions(ctx context.Context, caller, jti string, ac
 	// no state divergence, at the cost of Redis outages also blocking the DB change.
 	remaining := time.Until(accessTokenExpiresAt)
 	if remaining > 0 && jti != "" {
-		_, err := s.redisClient.SetNX(ctx, "blocklist:"+jti, "1", remaining).Result()
-		if err != nil {
+		if err := s.blocklist.BlockToken(ctx, jti, remaining); err != nil {
 			return fmt.Errorf("%s: session blocklist: %w", caller, err)
 		}
 	}

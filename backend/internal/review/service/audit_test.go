@@ -49,7 +49,7 @@ func courseActionCases() []adminActionCase {
 		{
 			name: "course review update (admin)",
 			run: func(actions *mockAdminActionRepo) error {
-				return courseSvc(repo, actions).UpdateCourseReviewAdmin(ctx, reviewdomain.UpdateCourseReviewRequest{ReviewID: "target-1"}, "admin-1")
+				return courseSvc(repo, actions).UpdateCourseReviewAdmin(ctx, reviewdomain.UpdateCourseReviewRequest{ReviewID: "target-1", UserID: "admin-1"})
 			},
 			want: reviewAction(auditdomain.ActionUpdateItem),
 		},
@@ -91,7 +91,7 @@ func contentActionCases() []adminActionCase {
 		{
 			name: "content review update (admin)",
 			run: func(actions *mockAdminActionRepo) error {
-				return contentSvc(repo, actions).UpdateContentReviewAdmin(ctx, reviewdomain.UpdateContentReviewRequest{ReviewID: "target-1"}, "admin-1")
+				return contentSvc(repo, actions).UpdateContentReviewAdmin(ctx, reviewdomain.UpdateContentReviewRequest{ReviewID: "target-1", UserID: "admin-1"})
 			},
 			want: reviewAction(auditdomain.ActionUpdateItem),
 		},
@@ -133,7 +133,7 @@ func articleActionCases() []adminActionCase {
 		{
 			name: "article review update (admin)",
 			run: func(actions *mockAdminActionRepo) error {
-				return articleSvc(repo, actions).UpdateArticleReviewAdmin(ctx, reviewdomain.UpdateArticleReviewRequest{ReviewID: "target-1"}, "admin-1")
+				return articleSvc(repo, actions).UpdateArticleReviewAdmin(ctx, reviewdomain.UpdateArticleReviewRequest{ReviewID: "target-1", UserID: "admin-1"})
 			},
 			want: reviewAction(auditdomain.ActionUpdateItem),
 		},

@@ -4,6 +4,7 @@ import (
 	"context"
 	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
+	"time"
 )
 
 // Transactor executes a function within a database transaction.
@@ -27,6 +28,17 @@ type AnnouncementRepository interface {
 // AdminActionRepository persists the admin audit trail.
 type AdminActionRepository interface {
 	CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error
+}
+
+// SessionRepository revokes user sessions on behalf of an admin.
+type SessionRepository interface {
+	RevokeAllUserSessionsAdmin(ctx context.Context, userID string, revokedByUserID string) error
+}
+
+// UserBlocklist marks users as blocked (or clears the mark) so their already-issued access tokens are rejected.
+type UserBlocklist interface {
+	BlockUser(ctx context.Context, userID string, ttl time.Duration) error
+	UnBlockUser(ctx context.Context, userID string) error
 }
 
 // UserRepository defines admin persistence operations for user accounts.

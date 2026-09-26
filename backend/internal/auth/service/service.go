@@ -1,7 +1,6 @@
 package authservice
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -9,14 +8,13 @@ import (
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/tokens"
 
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // accessTokenTTL/refreshTokenTTL drive JWT expiry; the rest bound single-use action
 // tokens (verify/reset/change/recover) emailed to the user before they expire.
 const (
-	accessTokenTTL            = 15 * time.Minute
+	accessTokenTTL            = tokens.AccessTokenTTL
 	refreshTokenTTL           = 7 * 24 * time.Hour
 	emailVerificationTokenTTL = 24 * time.Hour
 	passwordResetTokenTTL     = 1 * time.Hour
@@ -36,7 +34,7 @@ type Service struct {
 	dummyPasswordHash []byte
 	cost              int
 	token             *tokens.Tokens
-	redisClient       NXSetter
+	blocklist         authdomain.TokenBlocklist
 }
 
 // Repos groups the repository dependencies required by the auth Service.
@@ -49,9 +47,9 @@ type Repos struct {
 
 // Utils groups the infrastructure utilities required by the auth Service.
 type Utils struct {
-	Outbox      *events.OutboxWriter
-	Token       *tokens.Tokens
-	RedisClient NXSetter
+	Outbox    *events.OutboxWriter
+	Token     *tokens.Tokens
+	Blocklist authdomain.TokenBlocklist
 }
 
 // New returns a new auth Service with the given repositories and configuration.
@@ -78,7 +76,7 @@ func New(
 		transactor:        repos.Transactor,
 		outbox:            utils.Outbox,
 		token:             utils.Token,
-		redisClient:       utils.RedisClient,
+		blocklist:         utils.Blocklist,
 		cost:              cost,
 		dummyPasswordHash: dummyPasswordHash,
 	}
@@ -89,9 +87,4 @@ func New(
 // Options configures optional parameters for the auth Service.
 type Options struct {
 	BcryptCost int // default hashDefaultCost (12), bcrypt.MinCost (4) in tests
-}
-
-// NXSetter is the subset of redis.Client methods used by the auth Service.
-type NXSetter interface {
-	SetNX(ctx context.Context, key string, value any, expiration time.Duration) *redis.BoolCmd
 }

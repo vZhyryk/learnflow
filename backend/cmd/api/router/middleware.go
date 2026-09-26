@@ -6,6 +6,7 @@ import (
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
+	"learnflow_backend/internal/shared/rediskeys"
 	"net"
 	"net/http"
 	"runtime/debug"
@@ -87,7 +88,7 @@ func (route *RouteHandler) NewRouteRateLimiter(rps float64, duration time.Durati
 			}
 
 			key := getKeyFunc(r)
-			allowed, err := redisRateLimit(r.Context(), route.App.Redis, key, rps, burst, duration)
+			allowed, err := route.RedisRateLimit(r.Context(), key, rps, burst, duration)
 			if err != nil {
 				route.respondRateLimiterError(w, r, key, err)
 				return
@@ -186,12 +187,18 @@ func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 		}
 
 		jti := claims.ID
-		err = route.authUserRedis(w, r, "blocklist:", jti)
+		err = route.authUserRedis(w, r, func() (bool, string, error) {
+			exists, blockErr := route.App.Redis.IsTokenBlocked(r.Context(), jti)
+			return exists, rediskeys.JTIBlocklistPrefix, blockErr
+		})
 		if err != nil {
 			return
 		}
 
-		err = route.authUserRedis(w, r, "user_blocked:", claims.Subject)
+		err = route.authUserRedis(w, r, func() (bool, string, error) {
+			exists, blockErr := route.App.Redis.IsUserBlocked(r.Context(), claims.Subject)
+			return exists, rediskeys.UserBlockedPrefix, blockErr
+		})
 		if err != nil {
 			return
 		}
@@ -209,8 +216,8 @@ func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 	})
 }
 
-func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request, key, obj string) error {
-	blocked, err := route.App.Redis.Exists(r.Context(), key+obj).Result()
+func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request, fn func() (bool, string, error)) error {
+	blocked, key, err := fn()
 	if err != nil {
 		wrapped := fmt.Errorf("AuthenticateUser: %s: %w", key, err)
 		route.App.Logger.Error(wrapped, map[string]any{
@@ -226,7 +233,7 @@ func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request,
 		})
 		return wrapped
 	}
-	if blocked > 0 {
+	if blocked {
 		helpers.LogRespondError(route.App.Logger, r, "auth_blocked_response_write", map[string]any{"method": r.Method}, func() error {
 			return helpers.InvalidCredentialsResponse(w)
 		})

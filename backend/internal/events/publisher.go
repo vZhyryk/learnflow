@@ -4,8 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"github.com/redis/go-redis/v9"
+	"learnflow_backend/internal/infrastructure/redis"
 )
 
 // Publisher publishes domain events to a message queue.
@@ -15,11 +14,11 @@ type Publisher interface {
 
 // RedisPublisher publishes events to Redis lists via LPUSH.
 type RedisPublisher struct {
-	client *redis.Client
+	client *redis.Instance
 }
 
 // NewRedisPublisher returns a new RedisPublisher backed by the given Redis client.
-func NewRedisPublisher(client *redis.Client) *RedisPublisher {
+func NewRedisPublisher(client *redis.Instance) *RedisPublisher {
 	return &RedisPublisher{client: client}
 }
 

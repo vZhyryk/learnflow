@@ -10,11 +10,10 @@ import (
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
-	lredis "learnflow_backend/internal/infrastructure/redis"
+	redis "learnflow_backend/internal/infrastructure/redis"
 	"learnflow_backend/internal/infrastructure/sanitizer"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 )
 
 // NewLogger builds the process logger for a cmd/ entrypoint, defaulting to error-level
@@ -63,19 +62,19 @@ func LoadDatabaseConfig() (DatabaseConfig, error) {
 }
 
 // GetRedis builds a Redis client from environment-configured pool settings and pings it.
-func GetRedis() (*redis.Client, error) {
-	pool := lredis.PoolConfig{
+func GetRedis() (*redis.Instance, error) {
+	pool := redis.PoolConfig{
 		PoolSize:        env.GetIntEnv("REDIS_POOL_SIZE", 10),
 		MinIdleConns:    env.GetIntEnv("REDIS_MIN_IDLE_CONNS", 2),
 		MaxRetries:      env.GetIntEnv("REDIS_MAX_RETRIES", 3),
 		ConnMaxLifetime: env.GetDurationEnv("REDIS_CONN_MAX_LIFETIME", 5*time.Minute),
 	}
-	return lredis.InitRedis(env.GetStringEnv("REDIS_ADDR", "redis:6379"), env.GetStringEnv("REDIS_PASSWORD", ""), pool)
+	return redis.InitRedis(env.GetStringEnv("REDIS_ADDR", "redis:6379"), env.GetStringEnv("REDIS_PASSWORD", ""), pool)
 }
 
 // MustInitInfra inits the DB pool and Redis client (jsonLogger.Fatal on failure) and
 // returns a cleanup func closing both in reverse order — `defer cleanup()` immediately.
-func MustInitInfra(dbCfg DatabaseConfig, jsonLogger *logger.Logger) (*pgxpool.Pool, *redis.Client, func()) {
+func MustInitInfra(dbCfg DatabaseConfig, jsonLogger *logger.Logger) (*pgxpool.Pool, *redis.Instance, func()) {
 	dbInstance, err := db.InitDatabase(dbCfg.DSN, dbCfg.MaxIdleTime, dbCfg.MaxLifetime, int32(dbCfg.MaxOpenConns), int32(dbCfg.MinOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
 	if err != nil {
 		jsonLogger.Fatal(fmt.Errorf("bootstrap: db init failed (dsn=%s): %w", db.MaskDSN(dbCfg.DSN), err), nil)

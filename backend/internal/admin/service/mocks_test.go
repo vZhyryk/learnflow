@@ -6,6 +6,7 @@ import (
 	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
+	"time"
 )
 
 // mockAnnouncementRepo implements admindomain.AnnouncementRepository via function fields.
@@ -89,7 +90,7 @@ func newTestService(repo *mockAnnouncementRepo) *Service {
 }
 
 func newTestServiceWithActions(repo *mockAnnouncementRepo, actions *mockAdminActionRepo) *Service {
-	return New(repo, &mockUserRepo{}, actions, &testutil.NoopTransactor{}, testutil.NewNoopOutbox())
+	return New(repo, &mockUserRepo{}, actions, noopSessions(), &testutil.NoopTransactor{}, testutil.NewNoopOutbox(), noopBlocklist())
 }
 
 // mockUserRepo implements admindomain.UserRepository via function fields.
@@ -184,5 +185,82 @@ func capturingAdminActions(got *[]*auditdomain.AdminAction, err error) *mockAdmi
 }
 
 func newTestUserService(users *mockUserRepo, actions *mockAdminActionRepo) *Service {
-	return New(&mockAnnouncementRepo{}, users, actions, &testutil.NoopTransactor{}, testutil.NewNoopOutbox())
+	return newTestUserServiceWithSessions(users, actions, noopSessions())
+}
+
+func newTestUserServiceWithSessions(users *mockUserRepo, actions *mockAdminActionRepo, sessions *mockSessionRepo) *Service {
+	return newTestUserServiceFull(users, actions, sessions, noopBlocklist())
+}
+
+func newTestUserServiceFull(users *mockUserRepo, actions *mockAdminActionRepo, sessions *mockSessionRepo, blocklist *mockBlocklist) *Service {
+	return New(&mockAnnouncementRepo{}, users, actions, sessions, &testutil.NoopTransactor{}, testutil.NewNoopOutbox(), blocklist)
+}
+
+// mockBlocklist implements admindomain.UserBlocklist via function fields.
+type mockBlocklist struct {
+	blockUser   func(ctx context.Context, userID string, ttl time.Duration) error
+	unBlockUser func(ctx context.Context, userID string) error
+}
+
+func (m *mockBlocklist) BlockUser(ctx context.Context, userID string, ttl time.Duration) error {
+	if m.blockUser == nil {
+		panic("mockBlocklist.BlockUser not set")
+	}
+
+	return m.blockUser(ctx, userID, ttl)
+}
+
+func (m *mockBlocklist) UnBlockUser(ctx context.Context, userID string) error {
+	if m.unBlockUser == nil {
+		panic("mockBlocklist.UnBlockUser not set")
+	}
+
+	return m.unBlockUser(ctx, userID)
+}
+
+func noopBlocklist() *mockBlocklist {
+	return recordingBlocklist(nil, nil, nil)
+}
+
+type blocklistCall struct {
+	op     string
+	userID string
+	ttl    time.Duration
+}
+
+// recordingBlocklist appends every call to calls (when non-nil) and fails BlockUser/UnBlockUser with blockErr/unBlockErr.
+func recordingBlocklist(calls *[]blocklistCall, blockErr, unBlockErr error) *mockBlocklist {
+	return &mockBlocklist{
+		blockUser: func(_ context.Context, userID string, ttl time.Duration) error {
+			if calls != nil {
+				*calls = append(*calls, blocklistCall{op: "block", userID: userID, ttl: ttl})
+			}
+
+			return blockErr
+		},
+		unBlockUser: func(_ context.Context, userID string) error {
+			if calls != nil {
+				*calls = append(*calls, blocklistCall{op: "unblock", userID: userID})
+			}
+
+			return unBlockErr
+		},
+	}
+}
+
+// mockSessionRepo implements admindomain.SessionRepository via a function field.
+type mockSessionRepo struct {
+	revokeAllUserSessionsAdmin func(ctx context.Context, userID, adminID string) error
+}
+
+func (m *mockSessionRepo) RevokeAllUserSessionsAdmin(ctx context.Context, userID, adminID string) error {
+	if m.revokeAllUserSessionsAdmin == nil {
+		panic("mockSessionRepo.RevokeAllUserSessionsAdmin not set")
+	}
+
+	return m.revokeAllUserSessionsAdmin(ctx, userID, adminID)
+}
+
+func noopSessions() *mockSessionRepo {
+	return &mockSessionRepo{revokeAllUserSessionsAdmin: func(_ context.Context, _, _ string) error { return nil }}
 }

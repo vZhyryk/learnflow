@@ -22,7 +22,7 @@ import (
 func newTestRouteHandler() *RouteHandler {
 	a := &app.App{
 		Logger: testutil.NewTestLogger(),
-		Redis:  testutil.UnreachableRedis(),
+		Redis:  testutil.UnreachableRedisInstance(),
 	}
 	a.Config.Timeouts.RequestTimeout = time.Second
 	return &RouteHandler{App: a, token: tokens.NewTokens("test-secret-that-is-long-enough-32b", "", "learnflow", "learnflow-users")}

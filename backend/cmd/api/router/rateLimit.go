@@ -39,11 +39,12 @@ var rateLimitScript = redis.NewScript(`
 	return allowed
 `)
 
-func redisRateLimit(ctx context.Context, rdb *redis.Client, key string, rps float64, burst int, window time.Duration) (bool, error) {
+// RedisRateLimit reports whether key may proceed under a token-bucket of rps/burst refilled over window, using the shared Redis.
+func (route *RouteHandler) RedisRateLimit(ctx context.Context, key string, rps float64, burst int, window time.Duration) (bool, error) {
 	now := time.Now().UnixNano()
 	ttl := max(int(window.Seconds())*2, 1)
 
-	result, err := rateLimitScript.Run(ctx, rdb, []string{key}, now, rps, burst, ttl).Int()
+	result, err := rateLimitScript.Run(ctx, route.App.Redis, []string{key}, now, rps, burst, ttl).Int()
 	if err != nil {
 		return false, fmt.Errorf("redisRateLimit: %w", err)
 	}

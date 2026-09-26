@@ -236,12 +236,26 @@ func TestRecoverAccountRestoreFailures(t *testing.T) {
 				getDeletedUserByID: recoverAccountGetDeletedUserByID,
 				restoreUser:        testutil.AlwaysNil,
 			}
-			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+			srv := newTestService(uRepo, nil, tRepo, nil, mockBlocklistUnBlockUser(nil, nil))
 
 			err := srv.RecoverAccount(context.Background(), authdomain.RecoverAccountRequest{Token: "tok"})
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "mark token used")
+		})
+
+		Convey("When clearing the Redis block mark fails", func() {
+			tRepo := &mockTokenRepo{getAccountRecoveryToken: validRecoverAccountToken}
+			uRepo := &mockUserRepo{
+				getDeletedUserByID: recoverAccountGetDeletedUserByID,
+				restoreUser:        testutil.AlwaysNil,
+			}
+			srv := newTestService(uRepo, nil, tRepo, nil, mockBlocklistUnBlockUser(nil, testutil.ErrRedisUnavailable))
+
+			err := srv.RecoverAccount(context.Background(), authdomain.RecoverAccountRequest{Token: "tok"})
+
+			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "clear user_blocked")
 		})
 	})
 }
@@ -261,12 +275,14 @@ func TestRecoverAccountSuccess(t *testing.T) {
 					return nil
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+			var unblocked []string
+			srv := newTestService(uRepo, nil, tRepo, nil, mockBlocklistUnBlockUser(&unblocked, nil))
 
 			err := srv.RecoverAccount(context.Background(), authdomain.RecoverAccountRequest{Token: "tok"})
 
 			So(err, ShouldBeNil)
 			So(gotRestoredUserID, ShouldEqual, TestUserID)
+			So(unblocked, ShouldResemble, []string{TestUserID})
 		})
 	})
 }

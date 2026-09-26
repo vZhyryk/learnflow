@@ -14,9 +14,9 @@ import (
 func TestRevokeUserSessions(t *testing.T) {
 	Convey("revokeUserSessions", t, func() {
 		Convey("when fn fails, it wraps and returns the error without touching Redis", func() {
-			// mockRedis with setNX left unset — if revokeUserSessions ever calls SetNX
+			// mockBlocklist with blockToken left unset — if revokeUserSessions ever calls BlockToken
 			// here, the mock panics with a clear "not set" message, failing the test.
-			srv := newTestService(nil, nil, nil, nil, &mockRedis{})
+			srv := newTestService(nil, nil, nil, nil, &mockBlocklist{})
 
 			fnErr := errors.New("db failure")
 			err := srv.revokeUserSessions(context.Background(), "test_caller", "jti-1", time.Now().Add(time.Hour), func(context.Context) error {
@@ -51,8 +51,8 @@ func TestRevokeUserSessions(t *testing.T) {
 			So(err, ShouldBeNil)
 		})
 
-		Convey("when fn succeeds and Redis SetNX succeeds", func() {
-			srv := newTestService(nil, nil, nil, nil, newSuccessfulMockRedis())
+		Convey("when fn succeeds and BlockToken succeeds", func() {
+			srv := newTestService(nil, nil, nil, nil, newSuccessfulMockBlocklist())
 
 			err := srv.revokeUserSessions(context.Background(), "test_caller", "jti-1", time.Now().Add(time.Hour), func(context.Context) error {
 				return nil
@@ -61,9 +61,9 @@ func TestRevokeUserSessions(t *testing.T) {
 			So(err, ShouldBeNil)
 		})
 
-		Convey("when fn succeeds but Redis SetNX fails, the error is wrapped and returned", func() {
+		Convey("when fn succeeds but BlockToken fails, the error is wrapped and returned", func() {
 			redisErr := testutil.ErrRedisUnavailable
-			srv := newTestService(nil, nil, nil, nil, mockRedisSetNXError(redisErr))
+			srv := newTestService(nil, nil, nil, nil, mockBlocklistBlockTokenError(redisErr))
 
 			err := srv.revokeUserSessions(context.Background(), "test_caller", "jti-1", time.Now().Add(time.Hour), func(context.Context) error {
 				return nil

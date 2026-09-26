@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -36,7 +35,7 @@ func TestNew(t *testing.T) {
 }
 
 // newTestService assembles a Service from mocks
-func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockTokenRepo, outbox *events.OutboxWriter, redisClient *mockRedis) *Service {
+func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockTokenRepo, outbox *events.OutboxWriter, blocklist *mockBlocklist) *Service {
 	if uRepo == nil {
 		uRepo = &mockUserRepo{}
 	}
@@ -50,9 +49,9 @@ func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockToke
 	srv, err := New(
 		Repos{UserRepo: uRepo, SessionRepo: sRepo, TokenRepo: tRepo, Transactor: &testutil.NoopTransactor{}},
 		Utils{
-			Token:       tokens.NewTokens("test-secret", "", "learnflow", "learnflow-users"),
-			Outbox:      outbox,
-			RedisClient: redisClient,
+			Token:     tokens.NewTokens("test-secret", "", "learnflow", "learnflow-users"),
+			Outbox:    outbox,
+			Blocklist: blocklist,
 		},
 		Options{BcryptCost: 4},
 	)
@@ -62,11 +61,9 @@ func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockToke
 	return srv
 }
 
-func newSuccessfulMockRedis() *mockRedis {
-	return &mockRedis{
-		setNX: func(_ context.Context, _ string, _ any, _ time.Duration) *redis.BoolCmd {
-			return redis.NewBoolResult(true, nil)
-		},
+func newSuccessfulMockBlocklist() *mockBlocklist {
+	return &mockBlocklist{
+		blockToken: func(_ context.Context, _ string, _ time.Duration) error { return nil },
 	}
 }
 

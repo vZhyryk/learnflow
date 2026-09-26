@@ -74,6 +74,16 @@ func (rep *Repository) RevokeAllUserSessions(ctx context.Context, userID string,
 	return nil
 }
 
+// RevokeAllUserSessionsAdmin revokes all active sessions for a user on behalf of an admin (reason "admin").
+func (rep *Repository) RevokeAllUserSessionsAdmin(ctx context.Context, userID, revokedByUserID string) error {
+	_, err := rep.QueryRunner(ctx).Exec(ctx, revokeAllUserSessionsSQL, authdomain.RevokeReasonAdmin, revokedByUserID, userID)
+	if err != nil {
+		return fmt.Errorf("repository.RevokeAllUserSessionsAdmin: %w", err)
+	}
+
+	return nil
+}
+
 // GetActiveSessionsByUserID returns all non-revoked sessions for the given user.
 func (rep *Repository) GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
 	rows, err := rep.QueryRunner(ctx).Query(ctx, getActiveUserSessionSQL, userID)

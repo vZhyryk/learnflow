@@ -67,9 +67,9 @@ type Service interface {
 	UpdateCourseReview(ctx context.Context, req UpdateCourseReviewRequest) error
 	UpdateContentReview(ctx context.Context, req UpdateContentReviewRequest) error
 	UpdateArticleReview(ctx context.Context, req UpdateArticleReviewRequest) error
-	UpdateCourseReviewAdmin(ctx context.Context, req UpdateCourseReviewRequest, adminID string) error
-	UpdateContentReviewAdmin(ctx context.Context, req UpdateContentReviewRequest, adminID string) error
-	UpdateArticleReviewAdmin(ctx context.Context, req UpdateArticleReviewRequest, adminID string) error
+	UpdateCourseReviewAdmin(ctx context.Context, req UpdateCourseReviewRequest) error
+	UpdateContentReviewAdmin(ctx context.Context, req UpdateContentReviewRequest) error
+	UpdateArticleReviewAdmin(ctx context.Context, req UpdateArticleReviewRequest) error
 
 	GetCourseReviews(ctx context.Context, params pagination.Params, courseID string, filter ReviewFilter) ([]*CourseReview, error)
 	GetContentReviews(ctx context.Context, params pagination.Params, contentID string, filter ReviewFilter) ([]*ContentReview, error)

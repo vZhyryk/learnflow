@@ -7,11 +7,13 @@ import (
 
 // Service implements admindomain.Service.
 type Service struct {
-	announRepo admindomain.AnnouncementRepository
-	userRepo   admindomain.UserRepository
-	actionRepo admindomain.AdminActionRepository
-	transactor admindomain.Transactor
-	outbox     *events.OutboxWriter
+	announRepo  admindomain.AnnouncementRepository
+	userRepo    admindomain.UserRepository
+	actionRepo  admindomain.AdminActionRepository
+	sessionRepo admindomain.SessionRepository
+	transactor  admindomain.Transactor
+	outbox      *events.OutboxWriter
+	blocklist   admindomain.UserBlocklist
 }
 
 var _ admindomain.Service = (*Service)(nil)
@@ -21,8 +23,10 @@ func New(
 	announRepo admindomain.AnnouncementRepository,
 	userRepo admindomain.UserRepository,
 	actionRepo admindomain.AdminActionRepository,
+	sessionRepo admindomain.SessionRepository,
 	transactor admindomain.Transactor,
 	outbox *events.OutboxWriter,
+	blocklist admindomain.UserBlocklist,
 ) *Service {
-	return &Service{announRepo: announRepo, userRepo: userRepo, actionRepo: actionRepo, transactor: transactor, outbox: outbox}
+	return &Service{announRepo: announRepo, userRepo: userRepo, actionRepo: actionRepo, sessionRepo: sessionRepo, transactor: transactor, outbox: outbox, blocklist: blocklist}
 }

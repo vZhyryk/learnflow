@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/redis/go-redis/v9"
-
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -141,7 +139,7 @@ func TestChangePasswordWithSessionLogout(t *testing.T) {
 					return nil
 				},
 			}
-			srv := newTestService(uRepo, sRepo, nil, nil, newSuccessfulMockRedis())
+			srv := newTestService(uRepo, sRepo, nil, nil, newSuccessfulMockBlocklist())
 
 			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest(time.Now().UTC().Add(15*time.Minute)))
 
@@ -157,7 +155,7 @@ func TestChangePasswordWithSessionLogout(t *testing.T) {
 					return testutil.ErrDBUnexpected
 				},
 			}
-			srv := newTestService(uRepo, sRepo, nil, nil, newSuccessfulMockRedis())
+			srv := newTestService(uRepo, sRepo, nil, nil, newSuccessfulMockBlocklist())
 
 			err := srv.ChangePassword(context.Background(), authdomain.ChangePasswordRequest{
 				UserID:              TestUserID,
@@ -177,8 +175,8 @@ func TestChangePasswordSessionBlocklistFails(t *testing.T) {
 		Convey("When IsAllSessionsLogout is true and blocklisting the JTI fails", func() {
 			uRepo := validChangePasswordUserRepo()
 			sRepo := validChangePasswordSessionRepo()
-			redisClient := mockRedisSetNXError(testutil.ErrRedisUnavailable)
-			srv := newTestService(uRepo, sRepo, nil, nil, redisClient)
+			blocklist := mockBlocklistBlockTokenError(testutil.ErrRedisUnavailable)
+			srv := newTestService(uRepo, sRepo, nil, nil, blocklist)
 
 			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest(time.Now().UTC().Add(15*time.Minute)))
 
@@ -191,21 +189,21 @@ func TestChangePasswordSessionBlocklistFails(t *testing.T) {
 func TestChangePasswordSkipsBlocklistWhenTokenExpired(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When the access token is already expired, blocklisting is skipped", func() {
-			var redisCalled bool
+			var blocked bool
 			uRepo := validChangePasswordUserRepo()
 			sRepo := validChangePasswordSessionRepo()
-			redisClient := &mockRedis{
-				setNX: func(_ context.Context, _ string, _ any, _ time.Duration) *redis.BoolCmd {
-					redisCalled = true
-					return redis.NewBoolResult(true, nil)
+			blocklist := &mockBlocklist{
+				blockToken: func(_ context.Context, _ string, _ time.Duration) error {
+					blocked = true
+					return nil
 				},
 			}
-			srv := newTestService(uRepo, sRepo, nil, nil, redisClient)
+			srv := newTestService(uRepo, sRepo, nil, nil, blocklist)
 
 			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest(time.Now().UTC().Add(-time.Minute)))
 
 			So(err, ShouldBeNil)
-			So(redisCalled, ShouldBeFalse)
+			So(blocked, ShouldBeFalse)
 		})
 	})
 }

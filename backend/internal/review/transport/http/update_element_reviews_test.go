@@ -136,8 +136,8 @@ func TestUpdateCourseReviewAdmin(t *testing.T) {
 		var svcErr error
 		var gotAdminID string
 		svc := &mockService{
-			updateCourseReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateCourseReviewRequest, adminID string) error {
-				gotAdminID = adminID
+			updateCourseReviewAdmin: func(_ context.Context, req reviewdomain.UpdateCourseReviewRequest) error {
+				gotAdminID = req.UserID
 				return svcErr
 			},
 		}
@@ -195,8 +195,8 @@ func TestUpdateContentReviewAdmin(t *testing.T) {
 		var svcErr error
 		var gotAdminID string
 		svc := &mockService{
-			updateContentReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateContentReviewRequest, adminID string) error {
-				gotAdminID = adminID
+			updateContentReviewAdmin: func(_ context.Context, req reviewdomain.UpdateContentReviewRequest) error {
+				gotAdminID = req.UserID
 				return svcErr
 			},
 		}
@@ -304,7 +304,7 @@ func TestUpdateArticleReviewAdmin(t *testing.T) {
 	Convey("PUT /api/v1/admin/articles/reviews", t, func() {
 		var svcErr error
 		svc := &mockService{
-			updateArticleReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateArticleReviewRequest, _ string) error {
+			updateArticleReviewAdmin: func(_ context.Context, _ reviewdomain.UpdateArticleReviewRequest) error {
 				return svcErr
 			},
 		}
