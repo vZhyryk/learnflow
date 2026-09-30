@@ -296,6 +296,35 @@ func TestRevokeAllUserSessions(t *testing.T) {
 	})
 }
 
+func TestRevokeAllUserSessionsAdmin(t *testing.T) {
+	Convey("Given a users repository", t, func() {
+		var fakeErr error
+		var gotArgs []any
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, args ...any) (pgconn.CommandTag, error) {
+				gotArgs = args
+				return pgconn.NewCommandTag("UPDATE 2"), fakeErr
+			},
+		})
+
+		Convey("When revocation succeeds, it passes the admin reason, the admin id and the target user", func() {
+			err := repo.RevokeAllUserSessionsAdmin(context.Background(), "user-1", "admin-1")
+
+			So(err, ShouldBeNil)
+			So(gotArgs, ShouldResemble, []any{authdomain.RevokeReasonAdmin, "admin-1", "user-1"})
+		})
+
+		Convey("When the database returns an unexpected error, it wraps it with the method name", func() {
+			fakeErr = testutil.ErrDBUnexpected
+
+			err := repo.RevokeAllUserSessionsAdmin(context.Background(), "user-1", "admin-1")
+
+			testutil.AssertUnexpectedDBError(err, "db connection lost")
+			So(err.Error(), ShouldContainSubstring, "repository.RevokeAllUserSessionsAdmin")
+		})
+	})
+}
+
 func TestUpdateSessionToken(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	userSession := fakeUserSession(now)

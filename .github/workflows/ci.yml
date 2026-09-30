@@ -84,8 +84,16 @@ jobs:
                   DB_SSLMODE=disable
                   EOF
 
-            - name: Integration tests
-              run: make test_integration
+            - name: Integration tests and coverage gate
+              run: make test_integration_coverage
+
+            - name: Upload coverage profile
+              if: always()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: backend-coverage-all
+                  path: tests/coverage_all.out
+                  if-no-files-found: ignore
 
             - name: Cleanup integration stack
               if: always()

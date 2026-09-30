@@ -40,3 +40,9 @@ func TestCreateAdminAction(t *testing.T) {
 		})
 	})
 }
+
+func TestNew(t *testing.T) {
+	Convey("New returns an Audit backed by the given pool", t, func() {
+		So(New(nil), ShouldNotBeNil)
+	})
+}

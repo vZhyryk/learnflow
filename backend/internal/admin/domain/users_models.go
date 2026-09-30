@@ -28,6 +28,7 @@ type UserData struct {
 	UserID      string     `json:"user_id"`
 	FirstName   *string    `json:"first_name"`
 	LastName    *string    `json:"last_name"`
+	Email       *string    `json:"email"`
 	PhoneNumber *string    `json:"phone_number"`
 	Country     *string    `json:"country"`
 	City        *string    `json:"city"`
@@ -41,4 +42,13 @@ type UserData struct {
 	// Purchases   []any      `json:"purchases"`
 	Status UserStatus `json:"status"`
 	Role   UserRole   `json:"role"`
+}
+
+// DisplayName returns the first name, or a generic "User" when it is unset.
+func (u *UserData) DisplayName() string {
+	if u.FirstName != nil && *u.FirstName != "" {
+		return *u.FirstName
+	}
+
+	return "User"
 }

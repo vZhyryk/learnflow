@@ -22,10 +22,21 @@ const insertUserProfileSQL = `
 	VALUES ($1, 'Ada', 'Lovelace', '1990-05-17')
 `
 
-func insertProfiledUser(t *testing.T, tx pgx.Tx) string {
+func insertProfiledUser(t *testing.T, tx pgx.Tx) {
 	t.Helper()
 
-	userID := testutil.InsertRandomTestUser(t, tx)
+	insertProfiledUserWithEmail(t, tx, "")
+}
+
+func insertProfiledUserWithEmail(t *testing.T, tx pgx.Tx, email string) string {
+	t.Helper()
+
+	var userID string
+	if email == "" {
+		userID = testutil.InsertRandomTestUser(t, tx)
+	} else {
+		userID = testutil.InsertTestUser(t, tx, email)
+	}
 	if _, err := tx.Exec(context.Background(), insertUserProfileSQL, userID); err != nil {
 		t.Fatalf("insert user profile: %v", err)
 	}
@@ -40,12 +51,13 @@ func TestGetUserDataByID_Integration(t *testing.T) {
 		Convey("When the user has a profile with a date of birth", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
-				userID := insertProfiledUser(t, tx)
+				userID := insertProfiledUserWithEmail(t, tx, "ada.lovelace@example.com")
 
 				got, err := repo.GetUserDataByID(ctx, userID)
 
 				So(err, ShouldBeNil)
 				So(got.UserID, ShouldEqual, userID)
+				So(*got.Email, ShouldEqual, "ada.lovelace@example.com")
 				So(*got.FirstName, ShouldEqual, "Ada")
 				So(*got.DateOfBirth, ShouldEqual, "1990-05-17")
 				So(got.DeletedAt, ShouldBeNil)
@@ -61,6 +73,7 @@ func TestGetUserDataByID_Integration(t *testing.T) {
 				got, err := repo.GetUserDataByID(ctx, userID)
 
 				So(err, ShouldBeNil)
+				So(got.Email, ShouldNotBeNil)
 				So(got.FirstName, ShouldBeNil)
 				So(got.DateOfBirth, ShouldBeNil)
 			})
@@ -92,6 +105,7 @@ func TestGetUsersData_Integration(t *testing.T) {
 				page1, total, err := repo.GetUsersData(ctx, pagination.NewParams(1, 2))
 				So(err, ShouldBeNil)
 				So(page1, ShouldHaveLength, 2)
+				So(page1[0].Email, ShouldNotBeNil)
 				So(total, ShouldBeGreaterThanOrEqualTo, 3)
 
 				pageBeyond, _, err := repo.GetUsersData(ctx, pagination.NewParams(total, 1))

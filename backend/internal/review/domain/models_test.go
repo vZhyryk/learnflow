@@ -2,6 +2,7 @@ package reviewdomain
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -452,6 +453,110 @@ func TestUpdateContentReviewRequestValidate(t *testing.T) {
 			empty := "   "
 			req.Comment = &empty
 			So(errors.Is(req.Validate(), ErrInvalidComment), ShouldBeTrue)
+		})
+	})
+}
+
+func validCreateArticleReviewRequest() CreateArticleReviewRequest {
+	comment := "comment"
+	return CreateArticleReviewRequest{
+		ArticleID: validUUID,
+		UserID:    validUUID,
+		Rating:    5,
+		Comment:   &comment,
+	}
+}
+
+func TestCreateArticleReviewRequestValidate(t *testing.T) {
+	Convey("CreateArticleReviewRequest.Validate", t, func() {
+		Convey("When every field is valid, it passes", func() {
+			req := validCreateArticleReviewRequest()
+
+			So(req.Validate(), ShouldBeNil)
+		})
+
+		Convey("When the comment is nil, it passes", func() {
+			req := validCreateArticleReviewRequest()
+			req.Comment = nil
+
+			So(req.Validate(), ShouldBeNil)
+		})
+
+		Convey("When several fields are invalid, the article id is reported first", func() {
+			req := CreateArticleReviewRequest{Rating: 0}
+
+			So(errors.Is(req.Validate(), ErrInvalidArticleID), ShouldBeTrue)
+		})
+	})
+}
+
+func TestCreateArticleReviewRequestValidateIDs(t *testing.T) {
+	Convey("CreateArticleReviewRequest ids", t, func() {
+		for _, id := range []string{"", "not-a-uuid"} {
+			Convey("When the article id is invalid ("+id+"), it returns ErrInvalidArticleID", func() {
+				req := validCreateArticleReviewRequest()
+				req.ArticleID = id
+
+				So(errors.Is(req.Validate(), ErrInvalidArticleID), ShouldBeTrue)
+			})
+
+			Convey("When the user id is invalid ("+id+"), it returns ErrInvalidUserID", func() {
+				req := validCreateArticleReviewRequest()
+				req.UserID = id
+
+				So(errors.Is(req.Validate(), ErrInvalidUserID), ShouldBeTrue)
+			})
+		}
+	})
+}
+
+func TestCreateArticleReviewRequestValidateRatingRange(t *testing.T) {
+	Convey("CreateArticleReviewRequest rating", t, func() {
+		for _, rating := range []int{-1, 0, 6, 100} {
+			Convey("When the rating is "+strconv.Itoa(rating)+", it returns ErrInvalidRating", func() {
+				req := validCreateArticleReviewRequest()
+				req.Rating = rating
+
+				So(errors.Is(req.Validate(), ErrInvalidRating), ShouldBeTrue)
+			})
+		}
+
+		for _, rating := range []int{1, 5} {
+			Convey("When the rating is the boundary value "+strconv.Itoa(rating)+", it passes", func() {
+				req := validCreateArticleReviewRequest()
+				req.Rating = rating
+
+				So(req.Validate(), ShouldBeNil)
+			})
+		}
+	})
+}
+
+func TestCreateArticleReviewRequestValidateCommentLength(t *testing.T) {
+	Convey("CreateArticleReviewRequest comment", t, func() {
+		Convey("When the comment is blank, it returns ErrInvalidComment", func() {
+			for _, blank := range []string{"", "   ", "\n\t"} {
+				req := validCreateArticleReviewRequest()
+				req.Comment = &blank
+
+				So(errors.Is(req.Validate(), ErrInvalidComment), ShouldBeTrue)
+			}
+		})
+
+		Convey("When the comment is longer than 2000 characters, it returns ErrInvalidComment", func() {
+			req := validCreateArticleReviewRequest()
+			tooLong := strings.Repeat("я", 2001)
+			req.Comment = &tooLong
+
+			So(errors.Is(req.Validate(), ErrInvalidComment), ShouldBeTrue)
+		})
+
+		Convey("When the comment is exactly 2000 characters, it passes", func() {
+			req := validCreateArticleReviewRequest()
+			atLimit := strings.Repeat("я", 2000)
+			req.Comment = &atLimit
+
+			So(req.Validate(), ShouldBeNil)
 		})
 	})
 }

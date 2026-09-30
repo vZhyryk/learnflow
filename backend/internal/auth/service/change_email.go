@@ -6,7 +6,6 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
-	"learnflow_backend/internal/shared/ptr"
 	"learnflow_backend/internal/shared/tokens"
 	"strings"
 	"time"
@@ -35,12 +34,12 @@ func (s *Service) InitiateEmailChange(ctx context.Context, req authdomain.Reques
 					return nil, fmt.Errorf("init_email_change: create token: %w", err)
 				}
 
-				return events.InitEmailChangeToken{
+				return events.TokenPayload{
 					UserID:    req.UserID,
 					Email:     req.NewEmail,
 					ExpiresAt: expiresAt,
 					RawToken:  rawToken,
-					UserName:  ptr.StringOrEmpty(userProfile.FirstName),
+					UserName:  userProfile.GetFirstName(),
 				}, nil
 			},
 		)

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
-	"learnflow_backend/internal/shared/ptr"
 	"learnflow_backend/internal/shared/tokens"
 	"time"
 
@@ -45,12 +44,12 @@ func (s *Service) InitiatePasswordReset(ctx context.Context, req authdomain.Requ
 					return nil, fmt.Errorf("init_password_reset: create token: %w", err)
 				}
 
-				return events.InitPasswordResetToken{
+				return events.TokenPayload{
 					UserID:    user.ID,
 					Email:     user.Email,
 					ExpiresAt: expiresAt,
 					RawToken:  rawToken,
-					UserName:  ptr.StringOrEmpty(userProfile.FirstName),
+					UserName:  userProfile.GetFirstName(),
 				}, nil
 			},
 		)

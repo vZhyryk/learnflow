@@ -161,6 +161,15 @@ type UserProfile struct {
 	UpdatedAt   time.Time
 }
 
+// GetFirstName returns the first name, or "User" when it is not set, so emails always have a greeting.
+func (u *UserProfile) GetFirstName() string {
+	if u.FirstName != nil && *u.FirstName != "" {
+		return *u.FirstName
+	}
+
+	return "User"
+}
+
 // RegisterRequest carries credentials and profile data for new account creation.
 type RegisterRequest struct {
 	Email       string  `json:"email"`

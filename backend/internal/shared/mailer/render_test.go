@@ -116,3 +116,24 @@ func TestMailerSendDialFailure(t *testing.T) {
 		})
 	})
 }
+
+func TestRenderEmailUserStatusTemplates(t *testing.T) {
+	Convey("user status email templates", t, func() {
+		cases := map[string]string{
+			"email_user_block.html":   "blocked",
+			"email_user_unblock.html": "unblocked",
+			"email_user_delete.html":  "deleted",
+			"email_user_restore.html": "restored",
+		}
+		for tmpl, word := range cases {
+			Convey(tmpl+" renders subject, plain and html bodies", func() {
+				subject, plainBody, htmlBody, err := renderEmail(tmpl, map[string]string{"name": "Alice"})
+
+				So(err, ShouldBeNil)
+				So(subject, ShouldContainSubstring, word)
+				So(plainBody, ShouldContainSubstring, "Alice")
+				So(htmlBody, ShouldContainSubstring, "Alice")
+			})
+		}
+	})
+}

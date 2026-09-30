@@ -1,12 +1,11 @@
 package adminrepository
 
 const (
-	// No deleted_at filter on getUserDataSQL / getUserDetailsByIDSQL: the admin view intentionally lists soft-deleted users.
-	getUserDataSQL = `
-		SELECT
+	selectColumns = `
 			u.id AS user_id,
 			up.first_name,
 			up.last_name,
+			u.email,
 			up.phone_number,
 			up.country,
 			up.city,
@@ -19,6 +18,9 @@ const (
 			u.last_login_at,
 			u.status,
 			u.role
+		`
+	getUserDataSQL = `
+		SELECT ` + selectColumns + `
 		FROM users u
 		LEFT JOIN user_profiles up ON up.user_id = u.id
 		ORDER BY u.created_at DESC
@@ -72,22 +74,7 @@ const (
 	`
 
 	getUserDetailsByIDSQL = `
-		SELECT
-			u.id AS user_id,
-			up.first_name,
-			up.last_name,
-			up.phone_number,
-			up.country,
-			up.city,
-			up.date_of_birth,
-			up.gender,
-			up.avatar_url,
-			up.bio,
-			u.created_at,
-			u.deleted_at,
-			u.last_login_at,
-			u.status,
-			u.role
+		SELECT ` + selectColumns + `
 		FROM users u
 		LEFT JOIN user_profiles up ON up.user_id = u.id
 		WHERE u.id = $1

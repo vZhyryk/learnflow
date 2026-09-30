@@ -5,6 +5,7 @@ import (
 	"fmt"
 	admindomain "learnflow_backend/internal/admin/domain"
 	auditdomain "learnflow_backend/internal/audit/domain"
+	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/tokens"
 	"learnflow_backend/internal/shared/validator"
@@ -144,16 +145,26 @@ func (srv *Service) runUserOperation(ctx context.Context, operationName string, 
 		return fmt.Errorf("service.ChangeUserField: %s audit: %w", operationName, err)
 	}
 
-	if inUserBlocked(operation.action) {
-		if err = srv.blockUserRedis(ctx, userID, adminID); err != nil {
-			return fmt.Errorf("service.ChangeUserField: %s: %w", operationName, err)
-		}
+	if err = srv.sendEmail(ctx, operation.action, target); err != nil {
+		return fmt.Errorf("service.ChangeUserField: %s: %w", operationName, err)
 	}
 
-	if inUserUnBlocked(operation.action) {
-		if err = srv.blocklist.UnBlockUser(ctx, userID); err != nil {
-			return fmt.Errorf("service.ChangeUserField: %s: %w", operationName, err)
-		}
+	if err = srv.applyRedisEffects(ctx, operation.action, userID, adminID); err != nil {
+		return fmt.Errorf("service.ChangeUserField: %s: %w", operationName, err)
+	}
+
+	return nil
+}
+
+// applyRedisEffects runs last, after every in-transaction write: Redis is not rolled back with the DB, so nothing
+// that can still fail may run after it.
+func (srv *Service) applyRedisEffects(ctx context.Context, action auditdomain.AdminActionType, userID, adminID string) error {
+	if inUserBlocked(action) {
+		return srv.blockUserRedis(ctx, userID, adminID)
+	}
+
+	if inUserUnBlocked(action) {
+		return srv.blocklist.UnBlockUser(ctx, userID)
 	}
 
 	return nil
@@ -171,4 +182,38 @@ func (srv *Service) blockUserRedis(ctx context.Context, userID, adminID string) 
 	}
 
 	return nil
+}
+
+// sendEmail emits the notification event for the action; a target without an email is skipped so a notification
+// problem never blocks the admin action itself.
+func (srv *Service) sendEmail(ctx context.Context, action auditdomain.AdminActionType, target *admindomain.UserData) error {
+	if target == nil || target.Email == nil || *target.Email == "" {
+		return nil
+	}
+
+	var eventType events.EventType
+	switch action {
+	case auditdomain.ActionUnblockUser:
+		eventType = events.EventUserUnBlocked
+	case auditdomain.ActionBlockUser:
+		eventType = events.EventUserBlocked
+	case auditdomain.ActionDeleteUser:
+		eventType = events.EventUserDeleted
+	case auditdomain.ActionRestoreUser:
+		eventType = events.EventUserRestored
+	default:
+		return nil
+	}
+
+	_, hash, err := tokens.GenerateSecureToken()
+	if err != nil {
+		return fmt.Errorf("service.sendEmail: %w", err)
+	}
+
+	return srv.outbox.Emit(ctx, events.AggregationTypeUser, target.UserID, eventType, events.UserNotificationPayload{
+		UserID:   target.UserID,
+		Email:    *target.Email,
+		UserName: target.DisplayName(),
+		EventID:  hash,
+	})
 }

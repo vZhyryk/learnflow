@@ -57,6 +57,7 @@ func scanUserData(row repository.RowScanner) (*admindomain.UserData, error) {
 		&userData.UserID,
 		&userData.FirstName,
 		&userData.LastName,
+		&userData.Email,
 		&userData.PhoneNumber,
 		&userData.Country,
 		&userData.City,

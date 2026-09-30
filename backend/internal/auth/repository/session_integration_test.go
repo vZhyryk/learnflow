@@ -304,6 +304,51 @@ func TestRevokeUserSession_Integration(t *testing.T) {
 	})
 }
 
+func TestRevokeAllUserSessionsAdmin_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+	Convey("RevokeAllUserSessionsAdmin", t, func() {
+		Convey("revokes every session of the target user as 'admin' and leaves other users untouched", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				targetID := newTestUser(t, ctx, repo)
+				otherID := newTestUser(t, ctx, repo)
+				adminID := newTestUser(t, ctx, repo)
+				createSessions(t, ctx, repo, targetID, 2)
+				createSessions(t, ctx, repo, otherID, 1)
+
+				err := repo.RevokeAllUserSessionsAdmin(ctx, targetID, adminID)
+				So(err, ShouldBeNil)
+
+				target, err := repo.GetAllSessionsByUserID(ctx, targetID)
+				So(err, ShouldBeNil)
+				So(target, ShouldHaveLength, 2)
+				for _, session := range target {
+					So(session.RevokedAt, ShouldNotBeNil)
+					So(*session.RevokeReason, ShouldEqual, authdomain.RevokeReasonAdmin)
+					So(*session.RevokedByUserID, ShouldEqual, adminID)
+				}
+
+				active, err := repo.GetActiveSessionsByUserID(ctx, targetID)
+				So(err, ShouldBeNil)
+				So(active, ShouldBeEmpty)
+
+				otherActive, err := repo.GetActiveSessionsByUserID(ctx, otherID)
+				So(err, ShouldBeNil)
+				So(otherActive, ShouldHaveLength, 1)
+			})
+		})
+
+		Convey("a user without sessions is not an error", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				adminID := newTestUser(t, ctx, repo)
+
+				So(repo.RevokeAllUserSessionsAdmin(ctx, nonExistentUUID, adminID), ShouldBeNil)
+			})
+		})
+	})
+}
+
 func TestRevokeAllUserSessions_Integration(t *testing.T) {
 	pool := testutil.NewTestPool(t)
 	Convey("RevokeAllUserSessions", t, func() {

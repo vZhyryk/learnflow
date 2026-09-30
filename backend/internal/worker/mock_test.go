@@ -11,6 +11,16 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+// runIdempotencyKeyTest is shared across the fan-out worker idempotency-key generator tests.
+func runIdempotencyKeyTest[T any](t *testing.T, payloadType string, payload T, generate func(T) string, want string) {
+	t.Helper()
+	Convey(fmt.Sprintf("Given an %s payload", payloadType), t, func() {
+		Convey("When generating the idempotency key", func() {
+			So(generate(payload), ShouldEqual, want)
+		})
+	})
+}
+
 // mockMailer implements the Mailer interface via a function field.
 type mockMailer struct {
 	send func(templateFile string, data any, ccUser mailer.CCUser, attachmentList []string) error
@@ -51,26 +61,15 @@ func capturingExecFn(query *string, args *[]any) func(context.Context, string, .
 	}
 }
 
-// runValidatePayloadTest is shared across the 5 email-worker Validate*Payload tests.
-func runValidatePayloadTest[T any](t *testing.T, tokenType string, valid, invalid T, validate func(T) error) {
-	t.Helper()
-	Convey(fmt.Sprintf("Given an %s payload", tokenType), t, func() {
-		Convey("When all required fields are present", func() {
-			So(validate(valid), ShouldBeNil)
-		})
-
-		Convey("When required fields are missing", func() {
-			So(validate(invalid), ShouldNotBeNil)
-		})
-	})
+// testPayload is a minimal requiredFielder for generic EmailWorker tests.
+type testPayload struct {
+	Value string `json:"value"`
 }
 
-// runIdempotencyKeyTest is shared across the worker idempotency-key generator tests.
-func runIdempotencyKeyTest[T any](t *testing.T, tokenType string, payload T, generate func(T) string, want string) {
-	t.Helper()
-	Convey(fmt.Sprintf("Given an %s payload", tokenType), t, func() {
-		Convey("When generating the idempotency key", func() {
-			So(generate(payload), ShouldEqual, want)
-		})
-	})
+func (p testPayload) RequiredFields() []events.Field {
+	return []events.Field{{Name: "Value", IsValid: func() bool { return p.Value != "" }}}
 }
+
+func (p testPayload) GetIdempotencyKey() []string { return []string{p.Value} }
+
+func (p testPayload) GetEmail() string { return "user@example.com" }

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"learnflow_backend/internal/shared/mailer"
 	"learnflow_backend/internal/shared/testutil"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,11 +27,11 @@ func uniqueEventType(prefix string) string {
 	return fmt.Sprintf("%s:%d:%d", prefix, time.Now().UnixNano(), runTestSeq.Add(1))
 }
 
-// newRunIntegrationWorker wires an EmailWorker[map[string]string] to the real docker-compose
+// newRunIntegrationWorker wires an EmailWorker[testPayload] to the real docker-compose
 // Redis (localhost:6379) and Postgres (via testutil.NewTestPool) so Run's full
 // BLPop -> validate -> idempotency -> process -> retry -> DLQ loop can be exercised
 // end-to-end, unlike newRealRedisEmailWorker, which only drives handleMessage in isolation.
-func newRunIntegrationWorker(t *testing.T, eventType string, process func(map[string]string) error) (*EmailWorker[map[string]string], *pgxpool.Pool) {
+func newRunIntegrationWorker(t *testing.T, eventType string, process func(map[string]string) error) (*EmailWorker[testPayload], *pgxpool.Pool) {
 	t.Helper()
 
 	pool := testutil.NewTestPool(t)
@@ -45,16 +46,23 @@ func newRunIntegrationWorker(t *testing.T, eventType string, process func(map[st
 		redisClient.Close()
 	})
 
-	w := &EmailWorker[map[string]string]{
+	w := &EmailWorker[testPayload]{
 		redisClient: redisClient,
 		logger:      testutil.NewTestLogger(),
 		dlq:         NewDLQ(pool, testutil.NewTestLogger()),
-		cfg: Config[map[string]string]{
-			EventType:      eventType,
-			Validate:       func(_ map[string]string) error { return nil },
-			IdempotencyKey: func(p map[string]string) string { return fmt.Sprintf("%s:%s", eventType, p["id"]) },
-			Process: func(p map[string]string, _ string, _ Mailer) error {
-				return process(p)
+		mailer: &mockMailer{send: func(_ string, data any, _ mailer.CCUser, _ []string) error {
+			dataMap, ok := data.(map[string]string)
+			if !ok {
+				return errors.New("unexpected mail data type")
+			}
+			return process(dataMap)
+		}},
+		cfg: Config[testPayload]{
+			EventType: eventType,
+			Name:      eventType,
+			Schema:    "test.html",
+			SchemaFields: []SchemaField[testPayload]{
+				{Name: "value", Value: func(p testPayload, _ string) string { return p.Value }},
 			},
 		},
 	}
@@ -64,7 +72,7 @@ func newRunIntegrationWorker(t *testing.T, eventType string, process func(map[st
 
 // pushMessage marshals payload and LPushes it onto eventType's list, the way
 // a real producer would.
-func pushMessage(t *testing.T, w *EmailWorker[map[string]string], eventType string, payload map[string]string) {
+func pushMessage(t *testing.T, w *EmailWorker[testPayload], eventType string, payload testPayload) {
 	t.Helper()
 
 	raw, err := json.Marshal(payload)
@@ -78,7 +86,7 @@ func pushMessage(t *testing.T, w *EmailWorker[map[string]string], eventType stri
 
 // startRun launches w.Run in a goroutine and returns a cancel func plus a
 // channel closed once Run has returned.
-func startRun(w *EmailWorker[map[string]string]) (cancel context.CancelFunc, done <-chan struct{}) {
+func startRun(w *EmailWorker[testPayload]) (cancel context.CancelFunc, done <-chan struct{}) {
 	ctx, cancelFn := context.WithCancel(context.Background())
 	doneCh := make(chan struct{})
 	go func() {
@@ -141,9 +149,9 @@ func TestRun_ProcessesMessageSuccessfully_Integration(t *testing.T) {
 				return nil
 			})
 
-			payload := map[string]string{"id": "msg-1", "value": "hello"}
+			payload := testPayload{Value: "msg-1"}
 			t.Cleanup(func() {
-				w.redisClient.Del(context.Background(), w.cfg.IdempotencyKey(payload))
+				w.redisClient.Del(context.Background(), GenerateIdempotencyKey(eventType, payload))
 			})
 			pushMessage(t, w, eventType, payload)
 
@@ -151,7 +159,7 @@ func TestRun_ProcessesMessageSuccessfully_Integration(t *testing.T) {
 
 			select {
 			case got := <-processedCh:
-				So(got, ShouldResemble, payload)
+				So(got, ShouldResemble, map[string]string{"value": payload.Value})
 			case <-time.After(10 * time.Second):
 				t.Fatal("timed out waiting for Process to be called")
 			}
@@ -173,8 +181,8 @@ func TestRun_SkipsAlreadyProcessedMessage_Integration(t *testing.T) {
 				return nil
 			})
 
-			payload := map[string]string{"id": "msg-dup", "value": "hello"}
-			key := w.cfg.IdempotencyKey(payload)
+			payload := testPayload{Value: "msg-dup"}
+			key := GenerateIdempotencyKey(eventType, payload)
 			t.Cleanup(func() { w.redisClient.Del(context.Background(), key) })
 			So(w.redisClient.SetNX(context.Background(), key, 1, time.Hour).Err(), ShouldBeNil)
 
@@ -203,8 +211,8 @@ func TestRun_WritesToDLQAfterRetriesExhausted_Integration(t *testing.T) {
 				return processErr
 			})
 
-			payload := map[string]string{"id": "msg-dlq", "value": "hello"}
-			key := w.cfg.IdempotencyKey(payload)
+			payload := testPayload{Value: "msg-dlq"}
+			key := GenerateIdempotencyKey(eventType, payload)
 			t.Cleanup(func() { w.redisClient.Del(context.Background(), key) })
 			pushMessage(t, w, eventType, payload)
 

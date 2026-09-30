@@ -20,7 +20,7 @@ CODE_REVIEW_GRAPH_BIN := code-review-graph
 REPO_ROOT := $(CURDIR)
 MIGRATE_DIRECTION ?= up
 
-.PHONY: help tidy_and_verify cleanup run run_obs run_full stop logs migrate migrate_up migrate_down migrate_docker run_no_docker run_with_graph_watch run_no_docker_with_graph_watch run_dev_all run_init_sonar run_sonar_backend run_sonar_frontend run_sonar_all run_test_sonar test_integration_up test_integration_migrate test_integration test_integration_down run_graph_build run_graph_watch run_graph_status push_code run_test_coverage_backend run_test_coverage_once_backend run_test_coverage_frontend run_test_coverage_once_frontend run_test_goconvey lint lint_backend lint_frontend backup backup_list restore
+.PHONY: help tidy_and_verify cleanup run run_obs run_full stop logs migrate migrate_up migrate_down migrate_docker run_no_docker run_with_graph_watch run_no_docker_with_graph_watch run_dev_all run_init_sonar run_sonar_backend run_sonar_frontend run_sonar_all run_test_sonar test_integration_up test_integration_migrate test_integration test_integration_coverage test_integration_down run_graph_build run_graph_watch run_graph_status push_code run_test_coverage_backend run_test_coverage_once_backend run_test_coverage_frontend run_test_coverage_once_frontend run_test_goconvey lint lint_backend lint_frontend backup backup_list restore
 
 help:
 	@printf '%s\n' \
@@ -48,6 +48,7 @@ help:
 		'  make test_integration_up    - start sonar_db + redis for integration tests (no sonarqube app)' \
 		'  make test_integration_migrate - apply migrations against the learnflow_test database' \
 		'  make test_integration       - run backend integration tests (-tags=integration) against real Postgres/Redis' \
+		'  make test_integration_coverage - integration tests + merged coverage, fails below COVERAGE_MIN (default $(COVERAGE_MIN))' \
 		'  make test_integration_down  - stop the integration test stack' \
 		'  make run_graph_build        - rebuild code-review-graph for the repo' \
 		'  make run_graph_watch        - watch repo changes and auto-update graph' \
@@ -187,8 +188,20 @@ test_integration_migrate: test_integration_up
 
 test_integration: test_integration_migrate
 	cd $(BACKEND_DIR) && \
-		env $$(grep -v '^#' ../.env.test | xargs) DB_HOST=localhost DB_PORT=5433 \
+		env $$(grep -v '^#' ../.env.test | xargs) DB_HOST=localhost DB_PORT=5434 \
 		go test -tags=integration ./...
+
+# Merged unit+integration coverage gate; baseline 93.3% (2026-09-29), COVERAGE_MIN keeps ~1 pp of headroom.
+COVERAGE_MIN ?= 92.0
+COVERAGE_OUT := $(CURDIR)/$(TESTS_DIR)/coverage_all.out
+
+test_integration_coverage: test_integration_migrate
+	mkdir -p tests
+	cd $(BACKEND_DIR) && \
+		env $$(grep -v '^#' ../.env.test | xargs) DB_HOST=localhost DB_PORT=5434 \
+		go test -tags=integration -coverpkg=./... -coverprofile=$(COVERAGE_OUT) ./...
+	cd $(BACKEND_DIR) && go tool cover -func=$(COVERAGE_OUT) | awk -v min=$(COVERAGE_MIN) \
+		'/^total:/ { gsub("%", "", $$3); printf "total coverage: %s%% (min %s%%)\n", $$3, min; if ($$3 + 0 < min + 0) { print "FAIL: coverage below minimum"; exit 1 } }'
 
 test_integration_down:
 	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' down

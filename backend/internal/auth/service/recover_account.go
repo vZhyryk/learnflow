@@ -6,7 +6,6 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
-	"learnflow_backend/internal/shared/ptr"
 	"learnflow_backend/internal/shared/tokens"
 	"time"
 )
@@ -45,12 +44,12 @@ func (s *Service) InitRecoverAccount(ctx context.Context, req authdomain.Request
 				if err != nil {
 					return nil, fmt.Errorf("init_recover_account: create token: %w", err)
 				}
-				return events.InitAccountRecoveryToken{
+				return events.TokenPayload{
 					UserID:    user.ID,
 					Email:     user.Email,
 					ExpiresAt: expiresAt,
 					RawToken:  rawToken,
-					UserName:  ptr.StringOrEmpty(userProfile.FirstName),
+					UserName:  userProfile.GetFirstName(),
 				}, nil
 			},
 		)

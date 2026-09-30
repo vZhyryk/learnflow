@@ -97,6 +97,26 @@ func TestRegisterExistingEmailNotifyGuard(t *testing.T) {
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "user")
 			So(captured[1], ShouldEqual, TestUserID)
+			So(captured[3], ShouldContainSubstring, `"user_name":"Alice"`)
+		})
+
+		Convey("When the email is already registered and the profile has no first name, the warning still names the user", func() {
+			var captured []any
+			uRepo := &mockUserRepo{
+				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
+					return registerExistingUser(), nil
+				},
+				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
+				},
+			}
+			srv := newTestService(uRepo, nil, nil, testutil.NewCapturingOutbox(&captured), nil)
+
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
+
+			So(errors.Is(err, authdomain.ErrUserAlreadyExists), ShouldBeTrue)
+			So(captured, ShouldHaveLength, 4)
+			So(captured[3], ShouldContainSubstring, `"user_name":"User"`)
 		})
 	})
 }

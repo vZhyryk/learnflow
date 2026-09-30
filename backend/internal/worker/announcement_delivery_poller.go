@@ -64,6 +64,28 @@ type AnnouncementDeliver struct {
 	Email          string `json:"email"`
 }
 
+// RequiredFields lists the fields that must be valid before the email is sent.
+func (p AnnouncementDeliver) RequiredFields() []events.Field {
+	return []events.Field{
+		{Name: "UserID", IsValid: func() bool { return p.UserID != "" }},
+		{Name: "Email", IsValid: func() bool { return p.Email != "" }},
+		{Name: "AnnouncementID", IsValid: func() bool { return p.AnnouncementID != "" }},
+		{Name: "FirstName", IsValid: func() bool { return p.FirstName != "" }},
+		{Name: "Title", IsValid: func() bool { return p.Title != "" }},
+		{Name: "Body", IsValid: func() bool { return p.Body != "" }},
+	}
+}
+
+// GetEmail returns the recipient address.
+func (p AnnouncementDeliver) GetEmail() string {
+	return p.Email
+}
+
+// GetIdempotencyKey returns the parts of the dedupe key: user and announcement.
+func (p AnnouncementDeliver) GetIdempotencyKey() []string {
+	return []string{p.UserID, p.AnnouncementID}
+}
+
 func scanAnnouncementDeliveryPoller(row entryScanner) (PollerEntry[AnnouncementDeliveryPoller], error) {
 	var entry AnnouncementDeliver
 	var pollerEntry PollerEntry[AnnouncementDeliveryPoller]

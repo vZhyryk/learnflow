@@ -69,12 +69,12 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 				return nil, fmt.Errorf("register: create verification token: %w", err)
 			}
 
-			return events.UserRegisteredPayload{
+			return events.TokenPayload{
 				UserID:    id,
 				Email:     user.Email,
 				ExpiresAt: expiresAt,
 				RawToken:  rawToken,
-				UserName:  ptr.StringOrEmpty(userProfile.FirstName),
+				UserName:  userProfile.GetFirstName(),
 			}, nil
 		})
 	})
@@ -95,7 +95,7 @@ func (s *Service) handleGetUserByEmailRegisterError(ctx context.Context, user *a
 	emitErr := s.outbox.Emit(ctx, events.AggregationTypeUser, user.ID, events.EventRegistrationAttemptOnExistingEmail, events.RegistrationAttemptPayload{
 		Email:    user.Email,
 		UserID:   user.ID,
-		UserName: ptr.StringOrEmpty(userEmailUserProfile.FirstName),
+		UserName: userEmailUserProfile.GetFirstName(),
 	})
 	if emitErr != nil {
 		return fmt.Errorf("register: inform user: %w", emitErr)

@@ -87,12 +87,14 @@ func fakeAnnouncementPublicScan(a *admindomain.AnnouncementPublic) func(dest ...
 
 func fakeUserData(n int) *admindomain.UserData {
 	firstName := fmt.Sprintf("First%d", n)
+	email := fmt.Sprintf("user%d@example.com", n)
 	dob := "1990-05-17"
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	return &admindomain.UserData{
 		UserID:      fmt.Sprintf("user-%d", n),
 		FirstName:   &firstName,
+		Email:       &email,
 		DateOfBirth: &dob,
 		CreatedAt:   now,
 		Status:      admindomain.StatusActive,
@@ -107,24 +109,25 @@ func fakeUserDataScan(u *admindomain.UserData) func(dest ...any) error {
 		*testutil.CastStr(dest[0], 0) = u.UserID
 		*testutil.CastPtrStr(dest[1], 1) = u.FirstName
 		*testutil.CastPtrStr(dest[2], 2) = u.LastName
-		*testutil.CastPtrStr(dest[3], 3) = u.PhoneNumber
-		*testutil.CastPtrStr(dest[4], 4) = u.Country
-		*testutil.CastPtrStr(dest[5], 5) = u.City
+		*testutil.CastPtrStr(dest[3], 3) = u.Email
+		*testutil.CastPtrStr(dest[4], 4) = u.PhoneNumber
+		*testutil.CastPtrStr(dest[5], 5) = u.Country
+		*testutil.CastPtrStr(dest[6], 6) = u.City
 		if u.DateOfBirth != nil {
 			parsed, err := time.Parse(dobLayout, *u.DateOfBirth)
 			if err != nil {
 				return fmt.Errorf("parse date of birth: %w", err)
 			}
-			*testutil.CastPgtypeDate(dest[6], 6) = pgtype.Date{Time: parsed, Valid: true}
+			*testutil.CastPgtypeDate(dest[7], 7) = pgtype.Date{Time: parsed, Valid: true}
 		}
-		*testutil.CastPtrStr(dest[7], 7) = u.Gender
-		*testutil.CastPtrStr(dest[8], 8) = u.AvatarURL
-		*testutil.CastPtrStr(dest[9], 9) = u.Bio
-		*testutil.CastTime(dest[10], 10) = u.CreatedAt
-		*testutil.CastPtrTime(dest[11], 11) = u.DeletedAt
-		*testutil.CastPtrTime(dest[12], 12) = u.LastLoginAt
-		*testutil.CastEnum[admindomain.UserStatus](dest[13], 13) = u.Status
-		*testutil.CastEnum[admindomain.UserRole](dest[14], 14) = u.Role
+		*testutil.CastPtrStr(dest[8], 8) = u.Gender
+		*testutil.CastPtrStr(dest[9], 9) = u.AvatarURL
+		*testutil.CastPtrStr(dest[10], 10) = u.Bio
+		*testutil.CastTime(dest[11], 11) = u.CreatedAt
+		*testutil.CastPtrTime(dest[12], 12) = u.DeletedAt
+		*testutil.CastPtrTime(dest[13], 13) = u.LastLoginAt
+		*testutil.CastEnum[admindomain.UserStatus](dest[14], 14) = u.Status
+		*testutil.CastEnum[admindomain.UserRole](dest[15], 15) = u.Role
 		return nil
 	}
 }

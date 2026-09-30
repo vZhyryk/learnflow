@@ -375,3 +375,110 @@ func TestNewRouteRateLimiter(t *testing.T) {
 		})
 	})
 }
+
+// --- authUserRedis ---
+
+func TestAuthUserRedis(t *testing.T) {
+	Convey("authUserRedis", t, func() {
+		route := newTestRouteHandler()
+
+		Convey("When the check reports not blocked, it writes nothing and returns nil", func() {
+			w, r := newTestRequest("/")
+
+			err := route.authUserRedis(w, r, func() (bool, string, error) { return false, "user_blocked:", nil })
+
+			So(err, ShouldBeNil)
+			So(w.Code, ShouldEqual, http.StatusOK)
+			So(w.Body.Len(), ShouldEqual, 0)
+		})
+
+		Convey("When the check reports blocked, it responds 401 and returns an error naming the key", func() {
+			w, r := newTestRequest("/")
+
+			err := route.authUserRedis(w, r, func() (bool, string, error) { return true, "user_blocked:", nil })
+
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "user_blocked:")
+			So(err.Error(), ShouldContainSubstring, "blocked")
+			So(w.Code, ShouldEqual, http.StatusUnauthorized)
+		})
+
+		Convey("When the check fails, it fails closed with 500 and wraps the cause", func() {
+			w, r := newTestRequest("/")
+
+			err := route.authUserRedis(w, r, func() (bool, string, error) {
+				return false, "blocklist:", testutil.ErrRedisUnavailable
+			})
+
+			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "blocklist:")
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("When the check fails and reports blocked, the error wins over the blocked flag", func() {
+			w, r := newTestRequest("/")
+
+			err := route.authUserRedis(w, r, func() (bool, string, error) {
+				return true, "blocklist:", testutil.ErrRedisUnavailable
+			})
+
+			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+	})
+}
+
+// --- RequireRole ---
+
+func TestRequireRole(t *testing.T) {
+	Convey("RequireRole", t, func() {
+		route := newTestRouteHandler()
+		called := false
+		next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			called = true
+			w.WriteHeader(http.StatusNoContent)
+		})
+		guarded := route.RequireRole(authdomain.UserRole("admin"), authdomain.UserRole("subadmin"))(next)
+
+		Convey("When there is no user in the context, it responds 401 and does not call next", func() {
+			w, r := newTestRequest("/")
+
+			guarded.ServeHTTP(w, r)
+
+			So(called, ShouldBeFalse)
+			So(w.Code, ShouldEqual, http.StatusUnauthorized)
+		})
+
+		Convey("When the user's role is not allowed, it responds 403 and does not call next", func() {
+			w, r := newTestRequest("/")
+			r = r.WithContext(appcontext.WithUser(r.Context(), &authdomain.User{ID: "user-1", Role: authdomain.UserRole("student")}))
+
+			guarded.ServeHTTP(w, r)
+
+			So(called, ShouldBeFalse)
+			So(w.Code, ShouldEqual, http.StatusForbidden)
+		})
+
+		for _, role := range []string{"admin", "subadmin"} {
+			Convey("When the user's role is "+role+", it calls next", func() {
+				w, r := newTestRequest("/")
+				r = r.WithContext(appcontext.WithUser(r.Context(), &authdomain.User{ID: "user-1", Role: authdomain.UserRole(role)}))
+
+				guarded.ServeHTTP(w, r)
+
+				So(called, ShouldBeTrue)
+				So(w.Code, ShouldEqual, http.StatusNoContent)
+			})
+		}
+
+		Convey("When no roles are allowed, every user is rejected", func() {
+			w, r := newTestRequest("/")
+			r = r.WithContext(appcontext.WithUser(r.Context(), &authdomain.User{ID: "user-1", Role: authdomain.UserRole("admin")}))
+
+			route.RequireRole()(next).ServeHTTP(w, r)
+
+			So(called, ShouldBeFalse)
+			So(w.Code, ShouldEqual, http.StatusForbidden)
+		})
+	})
+}

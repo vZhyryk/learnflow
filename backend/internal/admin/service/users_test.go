@@ -14,6 +14,8 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
+var testEmail = "user@example.com"
+
 const (
 	validUserID  = "11111111-1111-1111-1111-111111111111"
 	testAdminID  = "22222222-2222-2222-2222-222222222222"
@@ -230,7 +232,7 @@ func userLookup(actorRole, targetRole admindomain.UserRole) func(context.Context
 			role = actorRole
 		}
 
-		return &admindomain.UserData{UserID: id, Role: role, Status: admindomain.StatusActive}, nil
+		return &admindomain.UserData{UserID: id, Email: &testEmail, Role: role, Status: admindomain.StatusActive}, nil
 	}
 }
 
@@ -298,7 +300,7 @@ func actorLookup(actor admindomain.UserData) func(context.Context, string) (*adm
 			return &actor, nil
 		}
 
-		return &admindomain.UserData{UserID: id, Role: admindomain.RoleUser, Status: admindomain.StatusActive}, nil
+		return &admindomain.UserData{UserID: id, Email: &testEmail, Role: admindomain.RoleUser, Status: admindomain.StatusActive}, nil
 	}
 }
 
@@ -463,5 +465,201 @@ func TestChangeUserFieldSkipsBlocklistWhenAuditFails(t *testing.T) {
 		err := srv.ChangeUserField(context.Background(), "BlockUser", validUserID, testAdminID)
 		So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		So(*calls, ShouldBeEmpty)
+	})
+}
+
+func TestSendEmailEventTypes(t *testing.T) {
+	first := "John"
+	target := &admindomain.UserData{UserID: validUserID, Email: &testEmail, FirstName: &first}
+	cases := map[auditdomain.AdminActionType]string{
+		auditdomain.ActionBlockUser:   "user.blocked",
+		auditdomain.ActionUnblockUser: "user.unblocked",
+		auditdomain.ActionDeleteUser:  "user.deleted",
+		auditdomain.ActionRestoreUser: "user.restored",
+	}
+
+	Convey("Given an admin service with a capturing outbox", t, func() {
+		for action, wantEvent := range cases {
+			Convey("When the action is "+string(action), func() {
+				var args []any
+				srv := New(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewCapturingOutbox(&args), noopBlocklist())
+
+				err := srv.sendEmail(context.Background(), action, target)
+
+				So(err, ShouldBeNil)
+				So(args, ShouldHaveLength, 4)
+				So(args[1], ShouldEqual, validUserID)
+				So(args[2], ShouldEqual, wantEvent)
+				So(args[3], ShouldContainSubstring, `"email":"user@example.com"`)
+				So(args[3], ShouldContainSubstring, `"user_name":"John"`)
+				So(args[3], ShouldContainSubstring, `"event_id":"`)
+			})
+		}
+
+		Convey("When the action has no email notification", func() {
+			var args []any
+			srv := New(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewCapturingOutbox(&args), noopBlocklist())
+
+			err := srv.sendEmail(context.Background(), auditdomain.ActionAssignSubadmin, target)
+
+			So(err, ShouldBeNil)
+			So(args, ShouldBeNil)
+		})
+
+		Convey("When the outbox fails", func() {
+			srv := New(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewFailingOutbox(testutil.ErrDBUnexpected), noopBlocklist())
+
+			err := srv.sendEmail(context.Background(), auditdomain.ActionBlockUser, target)
+
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+	})
+}
+
+func TestSendEmailSkipsTargetWithoutEmail(t *testing.T) {
+	empty := ""
+	cases := map[string]*admindomain.UserData{
+		"nil target":  nil,
+		"nil email":   {UserID: validUserID},
+		"empty email": {UserID: validUserID, Email: &empty},
+	}
+
+	Convey("Given an admin service with a capturing outbox", t, func() {
+		for name, target := range cases {
+			Convey("When the target has "+name+", nothing is emitted and no error is returned", func() {
+				var args []any
+				srv := New(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewCapturingOutbox(&args), noopBlocklist())
+
+				err := srv.sendEmail(context.Background(), auditdomain.ActionBlockUser, target)
+
+				So(err, ShouldBeNil)
+				So(args, ShouldBeNil)
+			})
+		}
+	})
+}
+
+func TestChangeUserFieldTouchesRedisOnlyAfterTheOutboxEmit(t *testing.T) {
+	Convey("Given the outbox emit fails", t, func() {
+		var calls []blocklistCall
+		revoked := false
+		users := &mockUserRepo{
+			blockUser:       func(_ context.Context, _ string) error { return nil },
+			unBlockUser:     func(_ context.Context, _ string) error { return nil },
+			getUserDataByID: userLookup(admindomain.RoleAdmin, admindomain.RoleUser),
+		}
+		sessions := &mockSessionRepo{revokeAllUserSessionsAdmin: func(_ context.Context, _, _ string) error {
+			revoked = true
+			return nil
+		}}
+		srv := New(&mockAnnouncementRepo{}, users, noopAdminActions(), sessions, &testutil.NoopTransactor{},
+			testutil.NewFailingOutbox(testutil.ErrDBUnexpected), recordingBlocklist(&calls, nil, nil))
+
+		for _, operation := range []string{"BlockUser", "UnBlockUser"} {
+			Convey(operation+" fails without revoking sessions or touching the Redis mark", func() {
+				err := srv.ChangeUserField(context.Background(), operation, validUserID, testAdminID)
+
+				So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+				So(calls, ShouldBeEmpty)
+				So(revoked, ShouldBeFalse)
+			})
+		}
+	})
+
+	Convey("Given the target has no email", t, func() {
+		var calls []blocklistCall
+		lookup := userLookup(admindomain.RoleAdmin, admindomain.RoleUser)
+		users := &mockUserRepo{
+			blockUser: func(_ context.Context, _ string) error { return nil },
+			getUserDataByID: func(ctx context.Context, id string) (*admindomain.UserData, error) {
+				data, err := lookup(ctx, id)
+				if data != nil {
+					data.Email = nil
+				}
+
+				return data, err
+			},
+		}
+		srv := New(&mockAnnouncementRepo{}, users, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{},
+			testutil.NewNoopOutbox(), recordingBlocklist(&calls, nil, nil))
+
+		Convey("Blocking still succeeds and marks the user blocked in Redis", func() {
+			So(srv.ChangeUserField(context.Background(), "BlockUser", validUserID, testAdminID), ShouldBeNil)
+			So(calls, ShouldResemble, []blocklistCall{{op: "block", userID: validUserID, ttl: tokens.AccessTokenTTL}})
+		})
+	})
+}
+
+var userOperations = []string{"RevokeUserRole", "AssignUserRole", "DeleteUser", "RestoreUser", "BlockUser", "UnBlockUser"}
+
+func activeUserWithRole(role admindomain.UserRole) *admindomain.UserData {
+	return &admindomain.UserData{Role: role, Status: admindomain.StatusActive}
+}
+
+func isRoleChangeOperation(operation string) bool {
+	return operation == "RevokeUserRole" || operation == "AssignUserRole"
+}
+
+func TestCanChangeUserNobodyMayTouchAnAdmin(t *testing.T) {
+	Convey("Given an admin target", t, func() {
+		for _, op := range userOperations {
+			Convey(op+": no actor role may act on it", func() {
+				for _, actorRole := range []admindomain.UserRole{admindomain.RoleAdmin, admindomain.RoleSubAdmin, admindomain.RoleUser} {
+					So(canChangeUser(activeUserWithRole(actorRole), activeUserWithRole(admindomain.RoleAdmin), op), ShouldBeFalse)
+				}
+			})
+		}
+	})
+}
+
+func TestCanChangeUserAdminActor(t *testing.T) {
+	Convey("Given an active admin actor", t, func() {
+		for _, op := range userOperations {
+			Convey(op+": it may act on a subadmin and on a plain user", func() {
+				So(canChangeUser(activeUserWithRole(admindomain.RoleAdmin), activeUserWithRole(admindomain.RoleSubAdmin), op), ShouldBeTrue)
+				So(canChangeUser(activeUserWithRole(admindomain.RoleAdmin), activeUserWithRole(admindomain.RoleUser), op), ShouldBeTrue)
+			})
+		}
+	})
+}
+
+func TestCanChangeUserSubAdminActor(t *testing.T) {
+	Convey("Given an active subadmin actor", t, func() {
+		for _, op := range userOperations {
+			Convey(op+": it may act on a plain user only when it is not a role change", func() {
+				So(canChangeUser(activeUserWithRole(admindomain.RoleSubAdmin), activeUserWithRole(admindomain.RoleUser), op), ShouldEqual, !isRoleChangeOperation(op))
+			})
+
+			Convey(op+": it may not act on a peer subadmin", func() {
+				So(canChangeUser(activeUserWithRole(admindomain.RoleSubAdmin), activeUserWithRole(admindomain.RoleSubAdmin), op), ShouldBeFalse)
+			})
+		}
+	})
+}
+
+func TestCanChangeUserPlainUserActor(t *testing.T) {
+	Convey("Given an active plain user actor", t, func() {
+		for _, op := range userOperations {
+			Convey(op+": it may not act on anyone", func() {
+				So(canChangeUser(activeUserWithRole(admindomain.RoleUser), activeUserWithRole(admindomain.RoleUser), op), ShouldBeFalse)
+				So(canChangeUser(activeUserWithRole(admindomain.RoleUser), activeUserWithRole(admindomain.RoleSubAdmin), op), ShouldBeFalse)
+			})
+		}
+	})
+}
+
+func TestCanChangeUserInactiveActor(t *testing.T) {
+	deletedAt := time.Now()
+	inactive := map[string]*admindomain.UserData{
+		"blocked": {Role: admindomain.RoleAdmin, Status: admindomain.StatusBlocked},
+		"deleted": {Role: admindomain.RoleAdmin, Status: admindomain.StatusActive, DeletedAt: &deletedAt},
+	}
+
+	Convey("Given an actor that is not an active account", t, func() {
+		for name, actor := range inactive {
+			Convey("A "+name+" admin may not act on a plain user", func() {
+				So(canChangeUser(actor, activeUserWithRole(admindomain.RoleUser), "BlockUser"), ShouldBeFalse)
+			})
+		}
 	})
 }

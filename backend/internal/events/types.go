@@ -6,6 +6,10 @@ type EventType string
 // Domain event type constants.
 const (
 	EventUserRegistered                     EventType = "user.registered"
+	EventUserBlocked                        EventType = "user.blocked"
+	EventUserUnBlocked                      EventType = "user.unblocked"
+	EventUserDeleted                        EventType = "user.deleted"
+	EventUserRestored                       EventType = "user.restored"
 	EventEmailChange                        EventType = "email.change"
 	EventAccountRecovery                    EventType = "account.recovery"
 	EventPasswordReset                      EventType = "password.reset"
@@ -23,6 +27,10 @@ func IsKnownEventType(t EventType) bool {
 	switch t {
 	case
 		EventUserRegistered,
+		EventUserBlocked,
+		EventUserUnBlocked,
+		EventUserRestored,
+		EventUserDeleted,
 		EventEmailChange,
 		EventAccountRecovery,
 		EventPasswordReset,
