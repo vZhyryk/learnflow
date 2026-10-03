@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	redisinfra "learnflow_backend/internal/infrastructure/redis"
-
 	"github.com/redis/go-redis/v9"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -28,7 +26,7 @@ func publishAndAssertRaw(t *testing.T, eventTypeName, payloadRawCompare string, 
 		client.Close()
 	})
 
-	publisher := NewRedisPublisher(&redisinfra.Instance{Client: client})
+	publisher := NewRedisPublisher(client)
 
 	err := publisher.Publish(context.Background(), eventType, payload)
 	So(err, ShouldBeNil)
@@ -59,7 +57,7 @@ func TestRedisPublisherPublish_Integration(t *testing.T) {
 			})
 			t.Cleanup(func() { client.Close() })
 
-			publisher := NewRedisPublisher(&redisinfra.Instance{Client: client})
+			publisher := NewRedisPublisher(client)
 			eventType := uniqueEventType("publish-unreachable")
 
 			err := publisher.Publish(context.Background(), eventType, map[string]string{"id": "evt-2"})

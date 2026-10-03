@@ -16,6 +16,11 @@ type TokenBlocklist interface {
 	UnBlockUser(ctx context.Context, userID string) error
 }
 
+// Audit reads the admin audit trail.
+type Audit interface {
+	WasDeletedByAdmin(ctx context.Context, targetID string) (bool, error)
+}
+
 // Service defines all authentication use cases.
 type Service interface {
 	Login(ctx context.Context, req LoginRequest) (*AuthTokens, error)

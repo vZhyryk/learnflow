@@ -26,7 +26,7 @@ func newRealRedisRouteHandler(t *testing.T) *RouteHandler {
 	t.Cleanup(func() { client.Close() }) //nolint:errcheck // Close's error is never actionable in test cleanup
 
 	route := newTestRouteHandler()
-	route.App.Redis = &redisinfra.Instance{Client: client}
+	route.App.Redis = redisinfra.NewInstance(client)
 	route.App.Config.Limiter.Enabled = true
 
 	return route
@@ -59,16 +59,18 @@ func TestRateLimitedChains_Integration(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		})
 
-		Convey("When the same IP and email hit the password-reset chain twice in a row, the second is limited with 429", func() {
+		Convey("When the same IP and email hit the password-reset chain, 2 requests pass and the 3rd is limited with 429", func() {
 			body := fmt.Sprintf(`{"email":"ada-%d@example.com"}`, suffix)
 			handler := chains.PassReset.Then(echo)
 
 			first := postJSON(handler, ip, body)
 			second := postJSON(handler, ip, body)
+			third := postJSON(handler, ip, body)
 
 			So(first.Code, ShouldEqual, http.StatusOK)
 			So(gotBody, ShouldEqual, body)
-			So(second.Code, ShouldEqual, http.StatusTooManyRequests)
+			So(second.Code, ShouldEqual, http.StatusOK)
+			So(third.Code, ShouldEqual, http.StatusTooManyRequests)
 		})
 
 		Convey("When another email hits the same chain from the same IP, it has its own bucket", func() {
@@ -81,15 +83,26 @@ func TestRateLimitedChains_Integration(t *testing.T) {
 			So(b.Code, ShouldEqual, http.StatusOK)
 		})
 
-		Convey("When the email verify chain sees the same token twice, the second is limited", func() {
+		Convey("When the email verify chain sees the same token, 3 requests pass and the 4th is limited", func() {
 			body := fmt.Sprintf(`{"token":"tok-%d"}`, suffix)
 			handler := chains.EmailVerify.Then(echo)
 
-			first := postJSON(handler, ip, body)
-			second := postJSON(handler, ip, body)
+			for i := 0; i < 3; i++ {
+				So(postJSON(handler, ip, body).Code, ShouldEqual, http.StatusOK)
+			}
 
-			So(first.Code, ShouldEqual, http.StatusOK)
-			So(second.Code, ShouldEqual, http.StatusTooManyRequests)
+			So(postJSON(handler, ip, body).Code, ShouldEqual, http.StatusTooManyRequests)
+		})
+
+		Convey("When the login chain is hit with the same IP and email, 5 requests pass and the 6th is limited", func() {
+			body := fmt.Sprintf(`{"email":"login-%d@example.com"}`, suffix)
+			handler := chains.Login.Then(echo)
+
+			for i := 0; i < 5; i++ {
+				So(postJSON(handler, ip, body).Code, ShouldEqual, http.StatusOK)
+			}
+
+			So(postJSON(handler, ip, body).Code, ShouldEqual, http.StatusTooManyRequests)
 		})
 
 		Convey("When Redis is unreachable, the limiter fails closed with 500", func() {

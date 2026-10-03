@@ -80,12 +80,16 @@ func (s *Service) UpdateCourseReviewAdmin(ctx context.Context, req reviewdomain.
 		if err := s.courseRepo.UpdateCourseReview(ctx, currentReview); err != nil {
 			return fmt.Errorf("service.UpdateCourseReviewAdmin: %w", err)
 		}
-		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+		if err := s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
 			AdminUserID: req.UserID,
 			ActionType:  auditdomain.ActionUpdateItem,
 			TargetType:  auditdomain.TargetReview,
 			TargetID:    req.ReviewID,
-		})
+		}); err != nil {
+			return fmt.Errorf("service.UpdateCourseReviewAdmin: audit: %w", err)
+		}
+
+		return nil
 	})
 }
 
@@ -102,12 +106,16 @@ func (s *Service) UpdateContentReviewAdmin(ctx context.Context, req reviewdomain
 		if err := s.contentRepo.UpdateContentReview(ctx, currentReview); err != nil {
 			return fmt.Errorf("service.UpdateContentReviewAdmin: %w", err)
 		}
-		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+		if err := s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
 			AdminUserID: req.UserID,
 			ActionType:  auditdomain.ActionUpdateItem,
 			TargetType:  auditdomain.TargetReview,
 			TargetID:    req.ReviewID,
-		})
+		}); err != nil {
+			return fmt.Errorf("service.UpdateContentReviewAdmin: audit: %w", err)
+		}
+
+		return nil
 	})
 }
 
@@ -144,11 +152,15 @@ func (s *Service) UpdateArticleReviewAdmin(ctx context.Context, req reviewdomain
 		if err := s.articleRepo.UpdateArticleReview(ctx, currentReview); err != nil {
 			return fmt.Errorf("service.UpdateArticleReviewAdmin: %w", err)
 		}
-		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+		if err := s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
 			AdminUserID: req.UserID,
 			ActionType:  auditdomain.ActionUpdateItem,
 			TargetType:  auditdomain.TargetReview,
 			TargetID:    req.ReviewID,
-		})
+		}); err != nil {
+			return fmt.Errorf("service.UpdateArticleReviewAdmin: audit: %w", err)
+		}
+
+		return nil
 	})
 }

@@ -60,7 +60,7 @@ func (s *Service) Refresh(ctx context.Context, req authdomain.RefreshRequest) (*
 		return nil, fmt.Errorf("refresh: transaction: %w", err)
 	}
 
-	accessToken, err := s.token.GenerateAccessToken(user, accessTokenTTL)
+	accessToken, err := s.token.GenerateAccessToken(user, tokens.AccessTokenTTL)
 	if err != nil {
 		return nil, fmt.Errorf("refresh: generate access token: %w", err)
 	}

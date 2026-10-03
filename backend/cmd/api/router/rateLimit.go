@@ -39,14 +39,24 @@ var rateLimitScript = redis.NewScript(`
 	return allowed
 `)
 
-// RedisRateLimit reports whether key may proceed under a token-bucket of rps/burst refilled over window, using the shared Redis.
-func (route *RouteHandler) RedisRateLimit(ctx context.Context, key string, rps float64, burst int, window time.Duration) (bool, error) {
+// refillRate converts "requests per window" into tokens per second, which is what the Lua script expects.
+func refillRate(requests float64, window time.Duration) float64 {
+	if window <= 0 {
+		return requests
+	}
+
+	return requests / window.Seconds()
+}
+
+// redisRateLimit reports whether key may proceed under a token bucket that refills ratePerSecond tokens per second
+// up to burst, using the shared Redis. window only bounds how long an idle bucket is kept.
+func (route *RouteHandler) redisRateLimit(ctx context.Context, key string, ratePerSecond float64, burst int, window time.Duration) (bool, error) {
 	now := time.Now().UnixNano()
 	ttl := max(int(window.Seconds())*2, 1)
 
-	result, err := rateLimitScript.Run(ctx, route.App.Redis, []string{key}, now, rps, burst, ttl).Int()
+	result, err := rateLimitScript.Run(ctx, route.App.Redis.Raw(), []string{key}, now, ratePerSecond, burst, ttl).Int()
 	if err != nil {
-		return false, fmt.Errorf("redisRateLimit: %w", err)
+		return false, fmt.Errorf("router.redisRateLimit: %w", err)
 	}
 
 	return result == 1, nil

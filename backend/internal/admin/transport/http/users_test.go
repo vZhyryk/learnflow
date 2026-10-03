@@ -2,6 +2,7 @@ package adminhttp_test
 
 import (
 	"context"
+	"fmt"
 	admindomain "learnflow_backend/internal/admin/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
@@ -83,30 +84,31 @@ func TestGetUserDataByID(t *testing.T) {
 }
 
 type userRoute struct {
-	operation string
+	operation admindomain.UserAdminOperation
 	method    string
 	suffix    string
 }
 
 var userRoutes = []userRoute{
-	{"DeleteUser", http.MethodDelete, ""},
-	{"RestoreUser", http.MethodPut, "/restore"},
-	{"BlockUser", http.MethodPut, "/block"},
-	{"UnBlockUser", http.MethodPut, "/unblock"},
-	{"AssignUserRole", http.MethodPut, "/subadmin"},
-	{"RevokeUserRole", http.MethodDelete, "/subadmin"},
+	{admindomain.DeleteUser, http.MethodDelete, ""},
+	{admindomain.RestoreUser, http.MethodPut, "/restore"},
+	{admindomain.BlockUser, http.MethodPut, "/block"},
+	{admindomain.UnBlockUser, http.MethodPut, "/unblock"},
+	{admindomain.AssignUserRole, http.MethodPut, "/subadmin"},
+	{admindomain.RevokeUserRole, http.MethodDelete, "/subadmin"},
 }
 
 type changeUserFixture struct {
 	*httpFixture
-	svcErr                       error
-	gotOp, gotUserID, gotAdminID string
+	svcErr                error
+	gotUserID, gotAdminID string
+	gotOp                 admindomain.UserAdminOperation
 }
 
 func newChangeUserFixture(route userRoute) *changeUserFixture {
 	cf := &changeUserFixture{}
 	svc := &mockService{
-		changeUserField: func(_ context.Context, op, userID, adminID string) error {
+		changeUserField: func(_ context.Context, userID, adminID string, op admindomain.UserAdminOperation) error {
 			cf.gotOp, cf.gotUserID, cf.gotAdminID = op, userID, adminID
 			return cf.svcErr
 		},
@@ -142,6 +144,12 @@ func TestChangeUserRoutesErrors(t *testing.T) {
 				cf.svcErr = admindomain.ErrInvalidID
 				w := testutil.ServeHTTP(cf.mux, withUser(cf.newReq("", nil)))
 				So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
+			})
+
+			Convey("Blocklist unavailable → 503", func() {
+				cf.svcErr = fmt.Errorf("set user_blocked: %w: %w", admindomain.ErrBlocklistUnavailable, testutil.ErrRedisUnavailable)
+				w := testutil.ServeHTTP(cf.mux, withUser(cf.newReq("", nil)))
+				So(w.Code, ShouldEqual, http.StatusServiceUnavailable)
 			})
 
 			Convey("Service returns an error → 500", func() {

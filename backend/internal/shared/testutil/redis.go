@@ -15,5 +15,5 @@ func UnreachableRedis() *redis.Client {
 
 // UnreachableRedisInstance is UnreachableRedis wrapped in the Instance the app and services are wired with.
 func UnreachableRedisInstance() *redisinfra.Instance {
-	return &redisinfra.Instance{Client: UnreachableRedis()}
+	return redisinfra.NewInstance(UnreachableRedis())
 }

@@ -50,14 +50,14 @@ func isActiveAccount(user *admindomain.UserData) bool {
 }
 
 // isRoleChange reports whether the operation assigns or revokes the subadmin role.
-func isRoleChange(operationName string) bool {
-	return operationName == "AssignUserRole" || operationName == "RevokeUserRole"
+func isRoleChange(operationName admindomain.UserAdminOperation) bool {
+	return operationName == admindomain.AssignUserRole || operationName == admindomain.RevokeUserRole
 }
 
 // canChangeUser reports whether actor may run the operation on target.
 // Nobody may touch an admin; an admin may do anything else; a subadmin may only act on plain users
 // and never change roles.
-func canChangeUser(actor, target *admindomain.UserData, operationName string) bool {
+func canChangeUser(actor, target *admindomain.UserData, operationName admindomain.UserAdminOperation) bool {
 	if !isActiveAccount(actor) {
 		return false
 	}
@@ -77,17 +77,8 @@ func canChangeUser(actor, target *admindomain.UserData, operationName string) bo
 }
 
 // ChangeUserField applies the named account operation and records it in admin_actions atomically.
-func (srv *Service) ChangeUserField(ctx context.Context, operationName, userID, adminID string) error {
-	operations := map[string]userOperation{
-		"RevokeUserRole": {srv.userRepo.RevokeUserRole, auditdomain.ActionRevokeSubadmin},
-		"AssignUserRole": {srv.userRepo.AssignUserRole, auditdomain.ActionAssignSubadmin},
-		"DeleteUser":     {srv.userRepo.DeleteUser, auditdomain.ActionDeleteUser},
-		"RestoreUser":    {srv.userRepo.RestoreUser, auditdomain.ActionRestoreUser},
-		"BlockUser":      {srv.userRepo.BlockUser, auditdomain.ActionBlockUser},
-		"UnBlockUser":    {srv.userRepo.UnBlockUser, auditdomain.ActionUnblockUser},
-	}
-
-	operation, ok := operations[operationName]
+func (srv *Service) ChangeUserField(ctx context.Context, userID, adminID string, operationName admindomain.UserAdminOperation) error {
+	operation, ok := srv.operations[operationName]
 	if !ok {
 		return fmt.Errorf("service.ChangeUserField: invalid operation name: %s", operationName)
 	}
@@ -105,18 +96,28 @@ func (srv *Service) ChangeUserField(ctx context.Context, operationName, userID, 
 	})
 }
 
-// inUserBlocked reports whether the action must also end the user's sessions and mark them blocked in Redis.
-func inUserBlocked(action auditdomain.AdminActionType) bool {
+// blocksUser reports whether the action must also end the user's sessions and mark them blocked in Redis.
+func blocksUser(action auditdomain.AdminActionType) bool {
 	return action == auditdomain.ActionBlockUser || action == auditdomain.ActionDeleteUser
 }
 
-// inUserUnBlocked reports whether the action must also clear the user's Redis block mark.
-func inUserUnBlocked(action auditdomain.AdminActionType) bool {
+// unblocksUser reports whether the action must also clear the user's Redis block mark.
+func unblocksUser(action auditdomain.AdminActionType) bool {
 	return action == auditdomain.ActionUnblockUser || action == auditdomain.ActionRestoreUser
 }
 
+// isUserRevokeOperation reports whether the action must also end the user's sessions and mark their role revoked.
+func isUserRevokeOperation(action auditdomain.AdminActionType) bool {
+	return action == auditdomain.ActionRevokeSubadmin
+}
+
+// isUserAssignOperation reports whether the action must also clear the user's role-revoked mark.
+func isUserAssignOperation(action auditdomain.AdminActionType) bool {
+	return action == auditdomain.ActionAssignSubadmin
+}
+
 // runUserOperation authorizes, applies and audits one account operation; it must run inside a transaction.
-func (srv *Service) runUserOperation(ctx context.Context, operationName string, operation userOperation, userID, adminID string) error {
+func (srv *Service) runUserOperation(ctx context.Context, operationName admindomain.UserAdminOperation, operation userOperation, userID, adminID string) error {
 	actor, err := srv.userRepo.GetUserDataByID(ctx, adminID)
 	if err != nil {
 		return fmt.Errorf("service.ChangeUserField: %s: load actor: %w", operationName, err)
@@ -124,7 +125,7 @@ func (srv *Service) runUserOperation(ctx context.Context, operationName string, 
 
 	target, err := srv.userRepo.GetUserDataByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("service.ChangeUserField: %s: %w", operationName, err)
+		return fmt.Errorf("service.ChangeUserField: %s: load target: %w", operationName, err)
 	}
 
 	if !canChangeUser(actor, target, operationName) {
@@ -132,7 +133,7 @@ func (srv *Service) runUserOperation(ctx context.Context, operationName string, 
 	}
 
 	if err = operation.apply(ctx, userID); err != nil {
-		return fmt.Errorf("service.ChangeUserField: %s: %w", operationName, err)
+		return fmt.Errorf("service.ChangeUserField: %s: apply: %w", operationName, err)
 	}
 
 	err = srv.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
@@ -142,46 +143,69 @@ func (srv *Service) runUserOperation(ctx context.Context, operationName string, 
 		TargetID:    userID,
 	})
 	if err != nil {
-		return fmt.Errorf("service.ChangeUserField: %s audit: %w", operationName, err)
+		return fmt.Errorf("service.ChangeUserField: %s: audit: %w", operationName, err)
 	}
 
 	if err = srv.sendEmail(ctx, operation.action, target); err != nil {
-		return fmt.Errorf("service.ChangeUserField: %s: %w", operationName, err)
+		return fmt.Errorf("service.ChangeUserField: %s: send email: %w", operationName, err)
 	}
 
-	if err = srv.applyRedisEffects(ctx, operation.action, userID, adminID); err != nil {
-		return fmt.Errorf("service.ChangeUserField: %s: %w", operationName, err)
-	}
-
-	return nil
-}
-
-// applyRedisEffects runs last, after every in-transaction write: Redis is not rolled back with the DB, so nothing
-// that can still fail may run after it.
-func (srv *Service) applyRedisEffects(ctx context.Context, action auditdomain.AdminActionType, userID, adminID string) error {
-	if inUserBlocked(action) {
-		return srv.blockUserRedis(ctx, userID, adminID)
-	}
-
-	if inUserUnBlocked(action) {
-		return srv.blocklist.UnBlockUser(ctx, userID)
+	if err = srv.applyChangeEffects(ctx, operation.action, userID, adminID); err != nil {
+		return fmt.Errorf("service.ChangeUserField: %s: apply effects: %w", operationName, err)
 	}
 
 	return nil
 }
 
-// blockUserRedis revokes the user's sessions and marks the user blocked in Redis for one access-token lifetime,
+// applyChangeEffects runs last, after every in-transaction write: Redis is not rolled back with the DB, so nothing
+// that can still fail may run after it. If COMMIT then fails, the mismatch lasts at most tokens.BlockMarkTTL.
+func (srv *Service) applyChangeEffects(ctx context.Context, action auditdomain.AdminActionType, userID, adminID string) error {
+	if blocksUser(action) {
+		return srv.blockUserAccess(ctx, userID, adminID)
+	}
+
+	if unblocksUser(action) {
+		return blocklistError("clear user_blocked", srv.blocklist.UnBlockUser(ctx, userID))
+	}
+
+	if isUserRevokeOperation(action) {
+		return srv.revokeSubAdminAccess(ctx, userID, adminID)
+	}
+
+	if isUserAssignOperation(action) {
+		return blocklistError("clear user_role_revoked", srv.blocklist.ClearUserRoleRevoked(ctx, userID))
+	}
+
+	return nil
+}
+
+// blockUserAccess revokes the user's sessions and marks the user blocked in Redis for one access-token lifetime,
 // which is enough to invalidate every already-issued token; the DB status keeps the user blocked afterwards.
-func (srv *Service) blockUserRedis(ctx context.Context, userID, adminID string) error {
+func (srv *Service) blockUserAccess(ctx context.Context, userID, adminID string) error {
 	if err := srv.sessionRepo.RevokeAllUserSessionsAdmin(ctx, userID, adminID); err != nil {
 		return fmt.Errorf("revoke sessions: %w", err)
 	}
 
-	if err := srv.blocklist.BlockUser(ctx, userID, tokens.AccessTokenTTL); err != nil {
-		return fmt.Errorf("set user_blocked: %w", err)
+	return blocklistError("set user_blocked", srv.blocklist.BlockUser(ctx, userID, tokens.BlockMarkTTL))
+}
+
+// revokeSubAdminAccess revokes the user's sessions and marks their role revoked for one access-token lifetime,
+// so tokens issued with the old role stop passing RequireRole.
+func (srv *Service) revokeSubAdminAccess(ctx context.Context, userID, adminID string) error {
+	if err := srv.sessionRepo.RevokeAllUserSessionsAdmin(ctx, userID, adminID); err != nil {
+		return fmt.Errorf("revoke sessions: %w", err)
 	}
 
-	return nil
+	return blocklistError("set user_role_revoked", srv.blocklist.RevokeUserRole(ctx, userID, tokens.BlockMarkTTL))
+}
+
+// blocklistError tags a failed blocklist write with ErrBlocklistUnavailable so the handler can answer 503; nil passes through.
+func blocklistError(step string, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("%s: %w: %w", step, admindomain.ErrBlocklistUnavailable, err)
 }
 
 // sendEmail emits the notification event for the action; a target without an email is skipped so a notification

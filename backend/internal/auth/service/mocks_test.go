@@ -333,6 +333,23 @@ func (m *mockTokenRepo) MarkAccountRecoveryTokenUsed(ctx context.Context, tokenH
 	return m.markAccountRecoveryTokenUsed(ctx, tokenHash)
 }
 
+// mockAudit implements authdomain.Audit via a function field.
+type mockAudit struct {
+	wasDeletedByAdmin func(ctx context.Context, targetID string) (bool, error)
+}
+
+func (m *mockAudit) WasDeletedByAdmin(ctx context.Context, targetID string) (bool, error) {
+	if m.wasDeletedByAdmin == nil {
+		panic("mockAudit.wasDeletedByAdmin not set")
+	}
+	return m.wasDeletedByAdmin(ctx, targetID)
+}
+
+// mockAuditDeletedByAdmin returns a mockAudit whose WasDeletedByAdmin always answers (deleted, err).
+func mockAuditDeletedByAdmin(deleted bool, err error) *mockAudit {
+	return &mockAudit{wasDeletedByAdmin: func(_ context.Context, _ string) (bool, error) { return deleted, err }}
+}
+
 // mockBlocklist implements authdomain.TokenBlocklist via function fields.
 type mockBlocklist struct {
 	blockToken  func(ctx context.Context, jti string, ttl time.Duration) error

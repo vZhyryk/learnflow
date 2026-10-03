@@ -35,18 +35,27 @@ func TestBlocklistUnreachableRedis(t *testing.T) {
 			So(err.Error(), ShouldContainSubstring, "redis.BlockToken")
 		})
 
-		Convey("IsUserBlocked reports false with the error, so callers can fail closed", func() {
-			blocked, err := ri.IsUserBlocked(ctx, "user-1")
-			So(blocked, ShouldBeFalse)
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "redis.IsUserBlocked")
+		Convey("A non-positive ttl is rejected before touching Redis", func() {
+			for _, ttl := range []time.Duration{0, -time.Second} {
+				err := ri.BlockUser(ctx, "user-1", ttl)
+				So(err, ShouldNotBeNil)
+				So(err.Error(), ShouldContainSubstring, "redis.BlockUser: ttl must be positive")
+
+				err = ri.BlockToken(ctx, "jti-1", ttl)
+				So(err, ShouldNotBeNil)
+				So(err.Error(), ShouldContainSubstring, "redis.BlockToken: ttl must be positive")
+
+				err = ri.RevokeUserRole(ctx, "user-1", ttl)
+				So(err, ShouldNotBeNil)
+				So(err.Error(), ShouldContainSubstring, "redis.RevokeUserRole: ttl must be positive")
+			}
 		})
 
-		Convey("IsTokenBlocked reports false with the error, so callers can fail closed", func() {
-			blocked, err := ri.IsTokenBlocked(ctx, "jti-1")
+		Convey("IsBlocked reports false with the error, so callers can fail closed", func() {
+			blocked, err := ri.IsBlocked(ctx, "user-1", "jti-1")
 			So(blocked, ShouldBeFalse)
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "redis.IsTokenBlocked")
+			So(err.Error(), ShouldContainSubstring, "redis.IsBlocked")
 		})
 	})
 }

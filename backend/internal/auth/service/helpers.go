@@ -3,6 +3,7 @@ package authservice
 import (
 	"context"
 	"fmt"
+	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/tokens"
 	"time"
@@ -13,12 +14,11 @@ func (s *Service) revokeUserSessions(ctx context.Context, caller, jti string, ac
 		return fmt.Errorf("%s: revoke sessions: %w", caller, err)
 	}
 
-	// Redis SetNX stays inside the tx closure so a Redis failure rolls back the DB change too —
-	// no state divergence, at the cost of Redis outages also blocking the DB change.
+	// BlockToken stays inside the tx closure: a Redis failure rolls the DB change back too.
 	remaining := time.Until(accessTokenExpiresAt)
 	if remaining > 0 && jti != "" {
 		if err := s.blocklist.BlockToken(ctx, jti, remaining); err != nil {
-			return fmt.Errorf("%s: session blocklist: %w", caller, err)
+			return fmt.Errorf("%s: session blocklist: %w: %w", caller, authdomain.ErrBlocklistUnavailable, err)
 		}
 	}
 
@@ -42,7 +42,7 @@ func (s *Service) emitTokenEvent(
 
 	payload, err := fn(ctx, rawToken, hashToken, expiresAt)
 	if err != nil {
-		return fmt.Errorf("emitTokenEvent: %w", err)
+		return err
 	}
 
 	return s.outbox.Emit(ctx, aggregation, userID, eventType, payload)

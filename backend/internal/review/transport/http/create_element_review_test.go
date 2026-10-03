@@ -140,7 +140,7 @@ func TestCreateCourseReviewAdmin(t *testing.T) {
 
 		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/admin/courses/reviews")
 		mux, newReq := f.mux, f.newReq
-		validBody := `{"course_id":"` + validCourseID + `","user_id":"` + validUserID + `","rating":5}`
+		validBody := `{"course_id":"` + validCourseID + `","rating":5}`
 
 		Convey("No user in context → panics (middleware invariant violated)", func() {
 			So(func() {
@@ -148,10 +148,10 @@ func TestCreateCourseReviewAdmin(t *testing.T) {
 			}, ShouldPanic)
 		})
 
-		Convey("user_id in the body is ignored — the authenticated admin is used", func() {
+		Convey("user_id in the body is rejected — the admin id comes only from the session", func() {
 			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(`{"course_id":"`+validCourseID+`","user_id":"---","rating":5}`, nil)))
-			So(w.Code, ShouldEqual, http.StatusCreated)
-			So(gotAdminID, ShouldEqual, validUserID)
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+			So(gotAdminID, ShouldBeEmpty)
 		})
 
 		Convey("already reviewed → 422", func() {
@@ -200,7 +200,7 @@ func TestCreateContentReviewAdmin(t *testing.T) {
 
 		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/admin/content/reviews")
 		mux, newReq := f.mux, f.newReq
-		validBody := `{"content_id":"` + validContentID + `","user_id":"` + validUserID + `","rating":4}`
+		validBody := `{"content_id":"` + validContentID + `","rating":4}`
 
 		Convey("No user in context → panics (middleware invariant violated)", func() {
 			So(func() {
@@ -208,10 +208,10 @@ func TestCreateContentReviewAdmin(t *testing.T) {
 			}, ShouldPanic)
 		})
 
-		Convey("user_id in the body is ignored — the authenticated admin is used", func() {
+		Convey("user_id in the body is rejected — the admin id comes only from the session", func() {
 			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(`{"content_id":"`+validContentID+`","user_id":"---","rating":5}`, nil)))
-			So(w.Code, ShouldEqual, http.StatusCreated)
-			So(gotAdminID, ShouldEqual, validUserID)
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+			So(gotAdminID, ShouldBeEmpty)
 		})
 
 		Convey("unexpected service error → 500", func() {

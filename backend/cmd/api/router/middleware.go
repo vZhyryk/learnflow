@@ -78,8 +78,11 @@ func (routes *RouteHandler) SetSecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-// NewRouteRateLimiter creates a Redis-backed token-bucket rate limiter middleware.
-func (route *RouteHandler) NewRouteRateLimiter(rps float64, duration time.Duration, burst int, getKeyFunc func(*http.Request) string) func(next http.Handler) http.Handler {
+// NewRouteRateLimiter creates a Redis-backed token-bucket rate limiter middleware that allows `requests` per
+// `duration` on average, with up to `burst` requests accepted back to back.
+func (route *RouteHandler) NewRouteRateLimiter(requests float64, duration time.Duration, burst int, getKeyFunc func(*http.Request) string) func(next http.Handler) http.Handler {
+	rate := refillRate(requests, duration)
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !route.App.Config.Limiter.Enabled {
@@ -88,7 +91,7 @@ func (route *RouteHandler) NewRouteRateLimiter(rps float64, duration time.Durati
 			}
 
 			key := getKeyFunc(r)
-			allowed, err := route.RedisRateLimit(r.Context(), key, rps, burst, duration)
+			allowed, err := route.redisRateLimit(r.Context(), key, rate, burst, duration)
 			if err != nil {
 				route.respondRateLimiterError(w, r, key, err)
 				return
@@ -122,7 +125,7 @@ func (route *RouteHandler) respondRateLimitExceeded(w http.ResponseWriter, r *ht
 	})
 }
 
-// Timeout enforces a 30-second request timeout by wrapping the context.
+// Timeout enforces Config.Timeouts.RequestTimeout by wrapping the request context.
 func (route *RouteHandler) Timeout(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), route.App.Config.Timeouts.RequestTimeout)
@@ -187,16 +190,8 @@ func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 		}
 
 		jti := claims.ID
-		err = route.authUserRedis(w, r, func() (bool, string, error) {
-			exists, blockErr := route.App.Redis.IsTokenBlocked(r.Context(), jti)
-			return exists, rediskeys.JTIBlocklistPrefix, blockErr
-		})
-		if err != nil {
-			return
-		}
-
-		err = route.authUserRedis(w, r, func() (bool, string, error) {
-			exists, blockErr := route.App.Redis.IsUserBlocked(r.Context(), claims.Subject)
+		err = route.authUserRedis(w, r, map[string]any{"user_id": claims.Subject, "jti": jti}, func() (bool, string, error) {
+			exists, blockErr := route.App.Redis.IsBlocked(r.Context(), claims.Subject, jti)
 			return exists, rediskeys.UserBlockedPrefix, blockErr
 		})
 		if err != nil {
@@ -216,15 +211,29 @@ func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 	})
 }
 
-func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request, fn func() (bool, string, error)) error {
+// authRejectProps builds the log properties for a request rejected by the Redis checks; subject carries user_id/jti.
+func authRejectProps(r *http.Request, subject map[string]any, key string) map[string]any {
+	props := map[string]any{
+		"method":        r.Method,
+		"path":          r.URL.Path,
+		"ip":            appcontext.IPAddressFromContext(r.Context()),
+		"request_id":    appcontext.RequestIDFromContext(r.Context()),
+		"blocklist_key": key,
+	}
+	for k, v := range subject {
+		props[k] = v
+	}
+
+	return props
+}
+
+// authUserRedis runs one Redis check and answers 401 (blocked) or 500 (check failed, fail closed); a non-nil
+// error means the request was already answered. subject (user_id/jti) is added to the rejection log.
+func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request, subject map[string]any, fn func() (bool, string, error)) error {
 	blocked, key, err := fn()
 	if err != nil {
 		wrapped := fmt.Errorf("AuthenticateUser: %s: %w", key, err)
-		route.App.Logger.Error(wrapped, map[string]any{
-			"method":     r.Method,
-			"path":       r.URL.Path,
-			"request_id": appcontext.RequestIDFromContext(r.Context()),
-		})
+		route.App.Logger.Error(wrapped, authRejectProps(r, subject, key))
 		helpers.LogRespondError(route.App.Logger, r, "auth_redis_error_response_write", map[string]any{
 			"method":     r.Method,
 			"request_id": appcontext.RequestIDFromContext(r.Context()),
@@ -234,6 +243,7 @@ func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request,
 		return wrapped
 	}
 	if blocked {
+		route.App.Logger.Info("auth_rejected_blocked", authRejectProps(r, subject, key))
 		helpers.LogRespondError(route.App.Logger, r, "auth_blocked_response_write", map[string]any{"method": r.Method}, func() error {
 			return helpers.InvalidCredentialsResponse(w)
 		})
@@ -314,14 +324,29 @@ func (route *RouteHandler) RequireRole(allowed ...authdomain.UserRole) func(http
 				return
 			}
 
-			if !slices.Contains(allowed, user.Role) {
-				helpers.LogRespondError(route.App.Logger, r, "require_role_forbidden", map[string]any{"user_id": user.ID, "role": user.Role}, func() error {
-					return helpers.ForbiddenResponse(w, helpers.Envelope{"error": "forbidden", "code": "forbidden"})
-				})
+			if !route.roleAllowed(w, r, user, allowed) {
 				return
 			}
 
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// roleAllowed reports whether the user's role is allowed and not revoked; otherwise it has already answered the request.
+func (route *RouteHandler) roleAllowed(w http.ResponseWriter, r *http.Request, user *authdomain.User, allowed []authdomain.UserRole) bool {
+	if !slices.Contains(allowed, user.Role) {
+		helpers.LogRespondError(route.App.Logger, r, "require_role_forbidden", map[string]any{"user_id": user.ID, "role": user.Role}, func() error {
+			return helpers.ForbiddenResponse(w, helpers.Envelope{"error": "forbidden", "code": "forbidden"})
+		})
+
+		return false
+	}
+
+	err := route.authUserRedis(w, r, map[string]any{"user_id": user.ID}, func() (bool, string, error) {
+		exists, redisErr := route.App.Redis.IsUserRoleRevoked(r.Context(), user.ID)
+		return exists, rediskeys.UserRoleRevokedPrefix, redisErr
+	})
+
+	return err == nil
 }

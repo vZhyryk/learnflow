@@ -59,6 +59,67 @@ func fakeRecoverAccountDeletedUser() *authdomain.User {
 	return &authdomain.User{ID: TestUserID, Email: "user@example.com", Status: authdomain.StatusDeleted}
 }
 
+func TestInitRecoverAccountDeletedByAdmin(t *testing.T) {
+	deletedUser := fakeRecoverAccountDeletedUser()
+
+	Convey("Given a soft-deleted user", t, func() {
+		// getUserProfileByUserID is left unset: reaching it would panic, proving the check short-circuits.
+		uRepo := &mockUserRepo{
+			getDeletedUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
+				return deletedUser, nil
+			},
+		}
+		req := authdomain.RequestRecoverAccountRequest{Email: "user@example.com"}
+
+		Convey("When an admin deleted the account, recovery is refused before any token is issued", func() {
+			srv := newTestService(uRepo, nil, nil, nil, nil)
+			srv.audit = mockAuditDeletedByAdmin(true, nil)
+
+			err := srv.InitRecoverAccount(context.Background(), req)
+
+			So(errors.Is(err, authdomain.ErrDeletedByAdmin), ShouldBeTrue)
+		})
+
+		Convey("When the audit lookup fails, the error is wrapped", func() {
+			srv := newTestService(uRepo, nil, nil, nil, nil)
+			srv.audit = mockAuditDeletedByAdmin(false, testutil.ErrDBUnexpected)
+
+			err := srv.InitRecoverAccount(context.Background(), req)
+
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "check deleted by admin")
+		})
+	})
+}
+
+func TestRecoverAccountDeletedByAdmin(t *testing.T) {
+	Convey("Given a valid token for a soft-deleted user", t, func() {
+		tRepo := &mockTokenRepo{getAccountRecoveryToken: validRecoverAccountToken}
+		// restoreUser is left unset: reaching it would panic, proving the account is not restored.
+		uRepo := &mockUserRepo{getDeletedUserByID: recoverAccountGetDeletedUserByID}
+		req := authdomain.RecoverAccountRequest{Token: "tok"}
+
+		Convey("When an admin deleted the account, it is not restored", func() {
+			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+			srv.audit = mockAuditDeletedByAdmin(true, nil)
+
+			err := srv.RecoverAccount(context.Background(), req)
+
+			So(errors.Is(err, authdomain.ErrDeletedByAdmin), ShouldBeTrue)
+		})
+
+		Convey("When the audit lookup fails, the error is wrapped", func() {
+			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+			srv.audit = mockAuditDeletedByAdmin(false, testutil.ErrDBUnexpected)
+
+			err := srv.RecoverAccount(context.Background(), req)
+
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "check deleted by admin")
+		})
+	})
+}
+
 func TestInitRecoverAccountProfileLookup(t *testing.T) {
 	deletedUser := fakeRecoverAccountDeletedUser()
 
@@ -236,16 +297,21 @@ func TestRecoverAccountRestoreFailures(t *testing.T) {
 				getDeletedUserByID: recoverAccountGetDeletedUserByID,
 				restoreUser:        testutil.AlwaysNil,
 			}
-			srv := newTestService(uRepo, nil, tRepo, nil, mockBlocklistUnBlockUser(nil, nil))
+			var unblocked []string
+			srv := newTestService(uRepo, nil, tRepo, nil, mockBlocklistUnBlockUser(&unblocked, nil))
 
 			err := srv.RecoverAccount(context.Background(), authdomain.RecoverAccountRequest{Token: "tok"})
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "mark token used")
+			So(unblocked, ShouldBeEmpty)
 		})
 
 		Convey("When clearing the Redis block mark fails", func() {
-			tRepo := &mockTokenRepo{getAccountRecoveryToken: validRecoverAccountToken}
+			tRepo := &mockTokenRepo{
+				getAccountRecoveryToken:      validRecoverAccountToken,
+				markAccountRecoveryTokenUsed: testutil.AlwaysNil,
+			}
 			uRepo := &mockUserRepo{
 				getDeletedUserByID: recoverAccountGetDeletedUserByID,
 				restoreUser:        testutil.AlwaysNil,
@@ -255,6 +321,7 @@ func TestRecoverAccountRestoreFailures(t *testing.T) {
 			err := srv.RecoverAccount(context.Background(), authdomain.RecoverAccountRequest{Token: "tok"})
 
 			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)
+			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
 			So(err.Error(), ShouldContainSubstring, "clear user_blocked")
 		})
 	})

@@ -38,6 +38,12 @@ func TestInitRecoverAccount(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusOK)
 		})
 
+		Convey("Service ErrDeletedByAdmin → 200 (same answer, no account enumeration)", func() {
+			svcErr = authdomain.ErrDeletedByAdmin
+			w := testutil.ServeHTTP(mux, newReq(`{"email":"user@example.com"}`))
+			So(w.Code, ShouldEqual, http.StatusOK)
+		})
+
 		Convey("Unexpected service error → 500", func() {
 			svcErr = testutil.ErrDBUnexpected
 			w := testutil.ServeHTTP(mux, newReq(`{"email":"user@example.com"}`))
@@ -113,6 +119,18 @@ func TestRecoverAccountServiceOutcomes(t *testing.T) {
 
 		Convey("Service ErrInvalidAccountState → 200 (deleted account guard)", func() {
 			f.svcErr = authdomain.ErrInvalidAccountState
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
+			So(w.Code, ShouldEqual, http.StatusOK)
+		})
+
+		Convey("Service ErrBlocklistUnavailable → 503", func() {
+			f.svcErr = authdomain.ErrBlocklistUnavailable
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
+			So(w.Code, ShouldEqual, http.StatusServiceUnavailable)
+		})
+
+		Convey("Service ErrDeletedByAdmin → 200 (deleted account guard)", func() {
+			f.svcErr = authdomain.ErrDeletedByAdmin
 			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
 			So(w.Code, ShouldEqual, http.StatusOK)
 		})

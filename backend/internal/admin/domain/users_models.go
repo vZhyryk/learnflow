@@ -1,6 +1,8 @@
 package admindomain
 
-import "time"
+import (
+	"time"
+)
 
 // UserRole represents the permission level of a user account.
 type UserRole string
@@ -52,3 +54,16 @@ func (u *UserData) DisplayName() string {
 
 	return "User"
 }
+
+// UserAdminOperation names an account operation an admin can run through Service.ChangeUserField.
+type UserAdminOperation string
+
+// Account operations accepted by Service.ChangeUserField.
+const (
+	RevokeUserRole UserAdminOperation = "RevokeUserRole"
+	AssignUserRole UserAdminOperation = "AssignUserRole"
+	DeleteUser     UserAdminOperation = "DeleteUser"
+	RestoreUser    UserAdminOperation = "RestoreUser"
+	BlockUser      UserAdminOperation = "BlockUser"
+	UnBlockUser    UserAdminOperation = "UnBlockUser"
+)

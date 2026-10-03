@@ -6,8 +6,8 @@ import (
 	"context"
 	"errors"
 	admindomain "learnflow_backend/internal/admin/domain"
-	"learnflow_backend/internal/audit"
 	auditdomain "learnflow_backend/internal/audit/domain"
+	auditrepository "learnflow_backend/internal/audit/repository"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/repository"
 	"learnflow_backend/internal/shared/testutil"
@@ -174,9 +174,41 @@ func TestAdminProtectionAndAudit_Integration(t *testing.T) {
 			})
 		})
 
+		Convey("WasDeletedByAdmin follows the latest admin delete/restore action", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &auditrepository.Audit{BaseRepository: repository.BaseRepository{DB: tx}}
+				adminID := testutil.InsertRandomTestUser(t, tx)
+				targetID := testutil.InsertRandomTestUser(t, tx)
+				record := func(action string, minutesAgo int) {
+					_, err := tx.Exec(ctx, `INSERT INTO admin_actions (admin_user_id, action_type, target_type, target_id, created_at)
+						VALUES ($1, $2, 'user', $3, now() - make_interval(mins => $4))`, adminID, action, targetID, minutesAgo)
+					So(err, ShouldBeNil)
+				}
+
+				got, err := repo.WasDeletedByAdmin(ctx, targetID)
+				So(err, ShouldBeNil)
+				So(got, ShouldBeFalse)
+
+				record("delete_user", 10)
+				got, err = repo.WasDeletedByAdmin(ctx, targetID)
+				So(err, ShouldBeNil)
+				So(got, ShouldBeTrue)
+
+				record("restore_user", 5)
+				got, err = repo.WasDeletedByAdmin(ctx, targetID)
+				So(err, ShouldBeNil)
+				So(got, ShouldBeFalse)
+
+				record("delete_user", 1)
+				got, err = repo.WasDeletedByAdmin(ctx, targetID)
+				So(err, ShouldBeNil)
+				So(got, ShouldBeTrue)
+			})
+		})
+
 		Convey("Admin audit entries are persisted", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &audit.Audit{BaseRepository: repository.BaseRepository{DB: tx}}
+				repo := &auditrepository.Audit{BaseRepository: repository.BaseRepository{DB: tx}}
 				adminID := testutil.InsertRandomTestUser(t, tx)
 				targetID := testutil.InsertRandomTestUser(t, tx)
 

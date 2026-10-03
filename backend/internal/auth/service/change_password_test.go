@@ -182,6 +182,7 @@ func TestChangePasswordSessionBlocklistFails(t *testing.T) {
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "session blocklist")
+			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
 		})
 	})
 }

@@ -358,39 +358,6 @@ func TestUpdateSessionToken(t *testing.T) {
 	})
 }
 
-func TestUpdateFailedLoginAttempts(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
-	userSession := fakeUserSession(now)
-
-	Convey("Given a users repository", t, func() {
-		var fakeErr error
-		var execTag pgconn.CommandTag
-		repo := newTestRepo(&testutil.MockQueryRunner{
-			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-				return execTag, fakeErr
-			},
-		})
-
-		Convey("When the database returns an unexpected error", func() {
-			fakeErr = testutil.ErrDBUnexpected
-			err := repo.UpdateFailedLoginAttempts(context.Background(), userSession.ID, "15 minutes", 5)
-			testutil.AssertUnexpectedDBError(err, "db connection lost")
-		})
-
-		Convey("When the session is not found", func() {
-			err := repo.UpdateFailedLoginAttempts(context.Background(), userSession.ID, "15 minutes", 5)
-			So(err, ShouldNotBeNil)
-			So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
-		})
-
-		Convey("When the update succeeds", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.UpdateFailedLoginAttempts(context.Background(), userSession.ID, "15 minutes", 5)
-			So(err, ShouldBeNil)
-		})
-	})
-}
-
 // user_sessions has no deleted_at column and is not in the soft-deletable
 // table list (.claude/rules/db-conventions.md). Its own analog of a
 // soft-delete filter is revoked_at IS NULL. These tests are a regression

@@ -22,10 +22,11 @@ type CourseReview struct {
 
 // CreateCourseReviewRequest is the input for creating a CourseReview.
 type CreateCourseReviewRequest struct {
-	CourseID string  `json:"course_id"`
-	UserID   string  `json:"user_id"`
-	Rating   int     `json:"rating"`
-	Comment  *string `json:"comment"`
+	CourseID string `json:"course_id"`
+	// UserID comes from the session, never the body: the review owner on user routes, the acting admin on *Admin methods.
+	UserID  string  `json:"-"`
+	Rating  int     `json:"rating"`
+	Comment *string `json:"comment"`
 }
 
 // Validate checks that all fields of the request are valid.
@@ -80,10 +81,11 @@ func (req *CreateCourseReviewRequest) validateUserID() error {
 
 // UpdateCourseReviewRequest is the input for updating a CourseReview.
 type UpdateCourseReviewRequest struct {
-	ReviewID string  `json:"review_id"`
-	UserID   string  `json:"user_id"`
-	Rating   *int    `json:"rating"`
-	Comment  *string `json:"comment"`
+	ReviewID string `json:"review_id"`
+	// UserID comes from the session, never the body: the review owner on user routes, the acting admin on *Admin methods.
+	UserID  string  `json:"-"`
+	Rating  *int    `json:"rating"`
+	Comment *string `json:"comment"`
 }
 
 // Validate checks that all fields of the request are valid.
@@ -167,10 +169,11 @@ type ContentReview struct {
 
 // CreateContentReviewRequest is the input for creating a ContentReview.
 type CreateContentReviewRequest struct {
-	ContentID string  `json:"content_id"`
-	UserID    string  `json:"user_id"`
-	Rating    int     `json:"rating"`
-	Comment   *string `json:"comment"`
+	ContentID string `json:"content_id"`
+	// UserID comes from the session, never the body: the review owner on user routes, the acting admin on *Admin methods.
+	UserID  string  `json:"-"`
+	Rating  int     `json:"rating"`
+	Comment *string `json:"comment"`
 }
 
 // Validate checks that all fields of the request are valid.
@@ -225,10 +228,11 @@ func (req *CreateContentReviewRequest) validateUserID() error {
 
 // UpdateContentReviewRequest is the input for updating a ContentReview.
 type UpdateContentReviewRequest struct {
-	ReviewID string  `json:"review_id"`
-	UserID   string  `json:"user_id"`
-	Rating   *int    `json:"rating"`
-	Comment  *string `json:"comment"`
+	ReviewID string `json:"review_id"`
+	// UserID comes from the session, never the body: the review owner on user routes, the acting admin on *Admin methods.
+	UserID  string  `json:"-"`
+	Rating  *int    `json:"rating"`
+	Comment *string `json:"comment"`
 }
 
 // Validate checks that all fields of the request are valid.
@@ -312,10 +316,11 @@ type ArticleReview struct {
 
 // CreateArticleReviewRequest is the input for creating a ArticleReview.
 type CreateArticleReviewRequest struct {
-	ArticleID string  `json:"article_id"`
-	UserID    string  `json:"user_id"`
-	Rating    int     `json:"rating"`
-	Comment   *string `json:"comment"`
+	ArticleID string `json:"article_id"`
+	// UserID comes from the session, never the body: the review owner on user routes, the acting admin on *Admin methods.
+	UserID  string  `json:"-"`
+	Rating  int     `json:"rating"`
+	Comment *string `json:"comment"`
 }
 
 // Validate checks that all fields of the request are valid.
@@ -370,10 +375,11 @@ func (req *CreateArticleReviewRequest) validateUserID() error {
 
 // UpdateArticleReviewRequest is the input for updating a ArticleReview.
 type UpdateArticleReviewRequest struct {
-	ReviewID string  `json:"review_id"`
-	UserID   string  `json:"user_id"`
-	Rating   *int    `json:"rating"`
-	Comment  *string `json:"comment"`
+	ReviewID string `json:"review_id"`
+	// UserID comes from the session, never the body: the review owner on user routes, the acting admin on *Admin methods.
+	UserID  string  `json:"-"`
+	Rating  *int    `json:"rating"`
+	Comment *string `json:"comment"`
 }
 
 // Validate checks that all fields of the request are valid.

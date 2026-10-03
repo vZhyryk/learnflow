@@ -196,10 +196,28 @@ func newTestUserServiceFull(users *mockUserRepo, actions *mockAdminActionRepo, s
 	return New(&mockAnnouncementRepo{}, users, actions, sessions, &testutil.NoopTransactor{}, testutil.NewNoopOutbox(), blocklist)
 }
 
-// mockBlocklist implements admindomain.UserBlocklist via function fields.
+// mockBlocklist implements admindomain.UserBlockList via function fields.
 type mockBlocklist struct {
-	blockUser   func(ctx context.Context, userID string, ttl time.Duration) error
-	unBlockUser func(ctx context.Context, userID string) error
+	blockUser            func(ctx context.Context, userID string, ttl time.Duration) error
+	unBlockUser          func(ctx context.Context, userID string) error
+	revokeUserRole       func(ctx context.Context, userID string, ttl time.Duration) error
+	clearUserRoleRevoked func(ctx context.Context, userID string) error
+}
+
+func (m *mockBlocklist) RevokeUserRole(ctx context.Context, userID string, ttl time.Duration) error {
+	if m.revokeUserRole == nil {
+		panic("mockBlocklist.RevokeUserRole not set")
+	}
+
+	return m.revokeUserRole(ctx, userID, ttl)
+}
+
+func (m *mockBlocklist) ClearUserRoleRevoked(ctx context.Context, userID string) error {
+	if m.clearUserRoleRevoked == nil {
+		panic("mockBlocklist.ClearUserRoleRevoked not set")
+	}
+
+	return m.clearUserRoleRevoked(ctx, userID)
 }
 
 func (m *mockBlocklist) BlockUser(ctx context.Context, userID string, ttl time.Duration) error {
@@ -228,9 +246,24 @@ type blocklistCall struct {
 	ttl    time.Duration
 }
 
-// recordingBlocklist appends every call to calls (when non-nil) and fails BlockUser/UnBlockUser with blockErr/unBlockErr.
+// recordingBlocklist appends every call to calls (when non-nil) and fails BlockUser/UnBlockUser with blockErr/unBlockErr;
+// the role-revoked calls are recorded too and never fail (override the field to inject an error).
 func recordingBlocklist(calls *[]blocklistCall, blockErr, unBlockErr error) *mockBlocklist {
 	return &mockBlocklist{
+		revokeUserRole: func(_ context.Context, userID string, ttl time.Duration) error {
+			if calls != nil {
+				*calls = append(*calls, blocklistCall{op: "revoke_role", userID: userID, ttl: ttl})
+			}
+
+			return nil
+		},
+		clearUserRoleRevoked: func(_ context.Context, userID string) error {
+			if calls != nil {
+				*calls = append(*calls, blocklistCall{op: "clear_role", userID: userID})
+			}
+
+			return nil
+		},
 		blockUser: func(_ context.Context, userID string, ttl time.Duration) error {
 			if calls != nil {
 				*calls = append(*calls, blocklistCall{op: "block", userID: userID, ttl: ttl})

@@ -26,6 +26,16 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 			return helpers.ErrorResponse(w, http.StatusConflict, err.Error())
 		})
 
+	case errors.Is(err, admindomain.ErrBlocklistUnavailable):
+		h.jsonLogger.Error(err, map[string]any{
+			"path":       r.URL.Path,
+			"ip":         appcontext.IPAddressFromContext(r.Context()),
+			"request_id": appcontext.RequestIDFromContext(r.Context()),
+		})
+		h.handleErrorRespond(r, "blocklist_unavailable", func() error {
+			return helpers.ErrorResponse(w, http.StatusServiceUnavailable, "service temporarily unavailable, try again")
+		})
+
 	case errors.Is(err, admindomain.ErrUserNotFound):
 		h.handleErrorRespond(r, "user_not_found", func() error {
 			return helpers.NotFoundResponse(w)

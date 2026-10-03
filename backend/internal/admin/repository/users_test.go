@@ -2,6 +2,7 @@ package adminrepository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	admindomain "learnflow_backend/internal/admin/domain"
 	"learnflow_backend/internal/shared/pagination"
@@ -60,6 +61,19 @@ func TestGetUsersData(t *testing.T) {
 			_, _, err := repo.GetUsersData(context.Background(), params)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "rows")
+		})
+
+		Convey("When the page is empty, it returns a non-nil empty slice that serializes as []", func() {
+			rows = &testutil.MockRows{}
+
+			got, gotTotal, err := repo.GetUsersData(context.Background(), params)
+			So(err, ShouldBeNil)
+			So(gotTotal, ShouldEqual, 42)
+			So(got, ShouldNotBeNil)
+			So(got, ShouldBeEmpty)
+			encoded, marshalErr := json.Marshal(got)
+			So(marshalErr, ShouldBeNil)
+			So(string(encoded), ShouldEqual, "[]")
 		})
 
 		Convey("When rows return 2 users", func() {

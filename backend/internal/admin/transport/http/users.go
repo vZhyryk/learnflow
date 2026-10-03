@@ -1,6 +1,7 @@
 package adminhttp
 
 import (
+	admindomain "learnflow_backend/internal/admin/domain"
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
 	"learnflow_backend/internal/shared/pagination"
@@ -12,7 +13,7 @@ func (h *Handler) revokeUserRole(w http.ResponseWriter, r *http.Request) {
 	user := appcontext.MustUserFromContext(ctx)
 	revokeUserID := r.PathValue("id")
 
-	err := h.svc.ChangeUserField(ctx, "RevokeUserRole", revokeUserID, user.ID)
+	err := h.svc.ChangeUserField(ctx, revokeUserID, user.ID, admindomain.RevokeUserRole)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
@@ -29,7 +30,7 @@ func (h *Handler) assignUserRole(w http.ResponseWriter, r *http.Request) {
 	user := appcontext.MustUserFromContext(ctx)
 	assignUserID := r.PathValue("id")
 
-	err := h.svc.ChangeUserField(ctx, "AssignUserRole", assignUserID, user.ID)
+	err := h.svc.ChangeUserField(ctx, assignUserID, user.ID, admindomain.AssignUserRole)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
@@ -46,7 +47,7 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	user := appcontext.MustUserFromContext(ctx)
 	deleteUserID := r.PathValue("id")
 
-	err := h.svc.ChangeUserField(ctx, "DeleteUser", deleteUserID, user.ID)
+	err := h.svc.ChangeUserField(ctx, deleteUserID, user.ID, admindomain.DeleteUser)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
@@ -63,7 +64,7 @@ func (h *Handler) restoreUser(w http.ResponseWriter, r *http.Request) {
 	user := appcontext.MustUserFromContext(ctx)
 	restoreUserID := r.PathValue("id")
 
-	err := h.svc.ChangeUserField(ctx, "RestoreUser", restoreUserID, user.ID)
+	err := h.svc.ChangeUserField(ctx, restoreUserID, user.ID, admindomain.RestoreUser)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
@@ -80,7 +81,7 @@ func (h *Handler) blockUser(w http.ResponseWriter, r *http.Request) {
 	user := appcontext.MustUserFromContext(ctx)
 	blockUserID := r.PathValue("id")
 
-	err := h.svc.ChangeUserField(ctx, "BlockUser", blockUserID, user.ID)
+	err := h.svc.ChangeUserField(ctx, blockUserID, user.ID, admindomain.BlockUser)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
@@ -97,7 +98,7 @@ func (h *Handler) unBlockUser(w http.ResponseWriter, r *http.Request) {
 	user := appcontext.MustUserFromContext(ctx)
 	unBlockUserID := r.PathValue("id")
 
-	err := h.svc.ChangeUserField(ctx, "UnBlockUser", unBlockUserID, user.ID)
+	err := h.svc.ChangeUserField(ctx, unBlockUserID, user.ID, admindomain.UnBlockUser)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return

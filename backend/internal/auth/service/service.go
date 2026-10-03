@@ -11,10 +11,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// accessTokenTTL/refreshTokenTTL drive JWT expiry; the rest bound single-use action
-// tokens (verify/reset/change/recover) emailed to the user before they expire.
+// refreshTokenTTL drives refresh-token expiry (access tokens use tokens.AccessTokenTTL); the rest bound
+// single-use action tokens (verify/reset/change/recover) emailed to the user before they expire.
 const (
-	accessTokenTTL            = tokens.AccessTokenTTL
 	refreshTokenTTL           = 7 * 24 * time.Hour
 	emailVerificationTokenTTL = 24 * time.Hour
 	passwordResetTokenTTL     = 1 * time.Hour
@@ -35,6 +34,7 @@ type Service struct {
 	cost              int
 	token             *tokens.Tokens
 	blocklist         authdomain.TokenBlocklist
+	audit             authdomain.Audit
 }
 
 // Repos groups the repository dependencies required by the auth Service.
@@ -50,6 +50,7 @@ type Utils struct {
 	Outbox    *events.OutboxWriter
 	Token     *tokens.Tokens
 	Blocklist authdomain.TokenBlocklist
+	Audit     authdomain.Audit
 }
 
 // New returns a new auth Service with the given repositories and configuration.
@@ -79,6 +80,7 @@ func New(
 		blocklist:         utils.Blocklist,
 		cost:              cost,
 		dummyPasswordHash: dummyPasswordHash,
+		audit:             utils.Audit,
 	}
 
 	return service, nil

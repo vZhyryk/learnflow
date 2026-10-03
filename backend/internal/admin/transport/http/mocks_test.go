@@ -46,7 +46,7 @@ type mockService struct {
 	getExpiredAnnouncements    func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
 	getUsersData               func(ctx context.Context, params pagination.Params) ([]*admindomain.UserData, int, error)
 	getUserDataByID            func(ctx context.Context, userID string) (*admindomain.UserData, error)
-	changeUserField            func(ctx context.Context, operationName, userID, adminID string) error
+	changeUserField            func(ctx context.Context, userID, adminID string, operationName admindomain.UserAdminOperation) error
 }
 
 func (m *mockService) CreateAnnouncement(ctx context.Context, req admindomain.CreateAnnouncementRequest) (string, error) {
@@ -119,9 +119,9 @@ func (m *mockService) GetUserDataByID(ctx context.Context, userID string) (*admi
 	return m.getUserDataByID(ctx, userID)
 }
 
-func (m *mockService) ChangeUserField(ctx context.Context, operationName, userID, adminID string) error {
+func (m *mockService) ChangeUserField(ctx context.Context, userID, adminID string, operationName admindomain.UserAdminOperation) error {
 	if m.changeUserField == nil {
 		panic("mockService.changeUserField not set")
 	}
-	return m.changeUserField(ctx, operationName, userID, adminID)
+	return m.changeUserField(ctx, userID, adminID, operationName)
 }

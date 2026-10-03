@@ -33,26 +33,26 @@ func TestBlockUser_Integration(t *testing.T) {
 	ri := newBlocklistInstance(t)
 	ctx := context.Background()
 
-	Convey("BlockUser / UnBlockUser / IsUserBlocked against real Redis", t, func() {
+	Convey("BlockUser / UnBlockUser / IsBlocked against real Redis", t, func() {
 		userID := uniqueID("user")
 
-		blocked, err := ri.IsUserBlocked(ctx, userID)
+		blocked, err := ri.IsBlocked(ctx, userID, "unused-jti")
 		So(err, ShouldBeNil)
 		So(blocked, ShouldBeFalse)
 
 		So(ri.BlockUser(ctx, userID, time.Minute), ShouldBeNil)
 
-		blocked, err = ri.IsUserBlocked(ctx, userID)
+		blocked, err = ri.IsBlocked(ctx, userID, "unused-jti")
 		So(err, ShouldBeNil)
 		So(blocked, ShouldBeTrue)
 
-		ttl, err := ri.TTL(ctx, "user_blocked:"+userID).Result()
+		ttl, err := ri.Raw().TTL(ctx, "user_blocked:"+userID).Result()
 		So(err, ShouldBeNil)
 		So(ttl, ShouldBeBetween, time.Duration(0), time.Minute+time.Second)
 
 		So(ri.UnBlockUser(ctx, userID), ShouldBeNil)
 
-		blocked, err = ri.IsUserBlocked(ctx, userID)
+		blocked, err = ri.IsBlocked(ctx, userID, "unused-jti")
 		So(err, ShouldBeNil)
 		So(blocked, ShouldBeFalse)
 	})
@@ -66,16 +66,16 @@ func TestBlockToken_Integration(t *testing.T) {
 	ri := newBlocklistInstance(t)
 	ctx := context.Background()
 
-	Convey("BlockToken / IsTokenBlocked against real Redis", t, func() {
+	Convey("BlockToken / IsBlocked against real Redis", t, func() {
 		jti := uniqueID("jti")
 
-		blocked, err := ri.IsTokenBlocked(ctx, jti)
+		blocked, err := ri.IsBlocked(ctx, "unused-user", jti)
 		So(err, ShouldBeNil)
 		So(blocked, ShouldBeFalse)
 
 		So(ri.BlockToken(ctx, jti, time.Minute), ShouldBeNil)
 
-		blocked, err = ri.IsTokenBlocked(ctx, jti)
+		blocked, err = ri.IsBlocked(ctx, "unused-user", jti)
 		So(err, ShouldBeNil)
 		So(blocked, ShouldBeTrue)
 	})
@@ -85,8 +85,32 @@ func TestBlockToken_Integration(t *testing.T) {
 
 		So(ri.BlockToken(ctx, id, time.Minute), ShouldBeNil)
 
-		userBlocked, err := ri.IsUserBlocked(ctx, id)
+		userBlocked, err := ri.IsBlocked(ctx, id, "unused-jti")
 		So(err, ShouldBeNil)
 		So(userBlocked, ShouldBeFalse)
+	})
+}
+
+func TestIsBlocked_Integration(t *testing.T) {
+	ri := newBlocklistInstance(t)
+	ctx := context.Background()
+
+	Convey("IsBlocked checks the user and the token in one call", t, func() {
+		userID, jti := uniqueID("user"), uniqueID("jti")
+
+		blocked, err := ri.IsBlocked(ctx, userID, jti)
+		So(err, ShouldBeNil)
+		So(blocked, ShouldBeFalse)
+
+		So(ri.BlockUser(ctx, userID, time.Minute), ShouldBeNil)
+		blocked, err = ri.IsBlocked(ctx, userID, jti)
+		So(err, ShouldBeNil)
+		So(blocked, ShouldBeTrue)
+
+		So(ri.UnBlockUser(ctx, userID), ShouldBeNil)
+		So(ri.BlockToken(ctx, jti, time.Minute), ShouldBeNil)
+		blocked, err = ri.IsBlocked(ctx, userID, jti)
+		So(err, ShouldBeNil)
+		So(blocked, ShouldBeTrue)
 	})
 }

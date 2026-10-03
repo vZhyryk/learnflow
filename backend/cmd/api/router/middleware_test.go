@@ -385,7 +385,7 @@ func TestAuthUserRedis(t *testing.T) {
 		Convey("When the check reports not blocked, it writes nothing and returns nil", func() {
 			w, r := newTestRequest("/")
 
-			err := route.authUserRedis(w, r, func() (bool, string, error) { return false, "user_blocked:", nil })
+			err := route.authUserRedis(w, r, nil, func() (bool, string, error) { return false, "user_blocked:", nil })
 
 			So(err, ShouldBeNil)
 			So(w.Code, ShouldEqual, http.StatusOK)
@@ -395,7 +395,7 @@ func TestAuthUserRedis(t *testing.T) {
 		Convey("When the check reports blocked, it responds 401 and returns an error naming the key", func() {
 			w, r := newTestRequest("/")
 
-			err := route.authUserRedis(w, r, func() (bool, string, error) { return true, "user_blocked:", nil })
+			err := route.authUserRedis(w, r, nil, func() (bool, string, error) { return true, "user_blocked:", nil })
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "user_blocked:")
@@ -406,7 +406,7 @@ func TestAuthUserRedis(t *testing.T) {
 		Convey("When the check fails, it fails closed with 500 and wraps the cause", func() {
 			w, r := newTestRequest("/")
 
-			err := route.authUserRedis(w, r, func() (bool, string, error) {
+			err := route.authUserRedis(w, r, nil, func() (bool, string, error) {
 				return false, "blocklist:", testutil.ErrRedisUnavailable
 			})
 
@@ -418,7 +418,7 @@ func TestAuthUserRedis(t *testing.T) {
 		Convey("When the check fails and reports blocked, the error wins over the blocked flag", func() {
 			w, r := newTestRequest("/")
 
-			err := route.authUserRedis(w, r, func() (bool, string, error) {
+			err := route.authUserRedis(w, r, nil, func() (bool, string, error) {
 				return true, "blocklist:", testutil.ErrRedisUnavailable
 			})
 
@@ -460,14 +460,14 @@ func TestRequireRole(t *testing.T) {
 		})
 
 		for _, role := range []string{"admin", "subadmin"} {
-			Convey("When the user's role is "+role+", it calls next", func() {
+			Convey("When the user's role is "+role+" but Redis is unreachable, it fails closed with 500 and does not call next", func() {
 				w, r := newTestRequest("/")
 				r = r.WithContext(appcontext.WithUser(r.Context(), &authdomain.User{ID: "user-1", Role: authdomain.UserRole(role)}))
 
 				guarded.ServeHTTP(w, r)
 
-				So(called, ShouldBeTrue)
-				So(w.Code, ShouldEqual, http.StatusNoContent)
+				So(called, ShouldBeFalse)
+				So(w.Code, ShouldEqual, http.StatusInternalServerError)
 			})
 		}
 

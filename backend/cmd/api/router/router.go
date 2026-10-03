@@ -15,7 +15,7 @@ import (
 	"learnflow_backend/internal/article"
 	articlerepository "learnflow_backend/internal/article/repository"
 	articleservice "learnflow_backend/internal/article/service"
-	"learnflow_backend/internal/audit"
+	auditrepository "learnflow_backend/internal/audit/repository"
 	"learnflow_backend/internal/auth"
 	authdomain "learnflow_backend/internal/auth/domain"
 	authrepository "learnflow_backend/internal/auth/repository"
@@ -67,7 +67,7 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 		})
 	}))
 
-	adminAction := audit.New(a.DB)
+	adminAction := auditrepository.New(a.DB)
 
 	transactor := db.NewTransactor(a.DB)
 	outbox := events.NewOutboxWriter(a.DB)
@@ -89,6 +89,7 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 			Outbox:    outbox,
 			Token:     route.token,
 			Blocklist: a.Redis,
+			Audit:     adminAction,
 		},
 		authservice.Options{})
 	if err != nil {
@@ -196,19 +197,19 @@ func (route *RouteHandler) buildChains() authhttp.AuthRouteChains {
 
 	staticChain := route.SetChain(staticLimiter)
 
-	loginLimiter := route.NewRouteRateLimiter(5, time.Minute, 1, func(r *http.Request) string {
+	loginLimiter := route.NewRouteRateLimiter(5, time.Minute, 5, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getEmailFromBody(r)
 	})
 
-	registerLimiter := route.NewRouteRateLimiter(3, time.Hour, 1, func(r *http.Request) string {
+	registerLimiter := route.NewRouteRateLimiter(3, time.Hour, 3, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context())
 	})
 
-	passResetLimiter := route.NewRouteRateLimiter(2, time.Hour, 1, func(r *http.Request) string {
+	passResetLimiter := route.NewRouteRateLimiter(2, time.Hour, 2, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getEmailFromBody(r)
 	})
 
-	emailVerifyLimiter := route.NewRouteRateLimiter(3, time.Hour, 1, func(r *http.Request) string {
+	emailVerifyLimiter := route.NewRouteRateLimiter(3, time.Hour, 3, func(r *http.Request) string {
 		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getTokenFromBody(r)
 	})
 
@@ -236,7 +237,7 @@ func (h *RouteHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if err := h.App.Redis.Ping(ctx).Err(); err != nil {
+	if err := h.App.Redis.Raw().Ping(ctx).Err(); err != nil {
 		if respErr := helpers.WriteJSON(w, http.StatusServiceUnavailable, helpers.Envelope{"status": "unavailable", "reason": "redis"}, nil); respErr != nil {
 			h.App.Logger.Error(respErr, map[string]any{
 				"status":   http.StatusServiceUnavailable,

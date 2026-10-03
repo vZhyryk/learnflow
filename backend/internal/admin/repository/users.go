@@ -24,7 +24,7 @@ func (rep *Repository) GetUsersData(ctx context.Context, params pagination.Param
 
 	defer rows.Close()
 
-	var users []*admindomain.UserData
+	users := make([]*admindomain.UserData, 0)
 	for rows.Next() {
 		user, err := scanUserData(rows)
 		if err != nil {
@@ -56,37 +56,37 @@ func (rep *Repository) GetUserDataByID(ctx context.Context, userID string) (*adm
 
 // RevokeUserRole demotes a subadmin to a regular user.
 func (rep *Repository) RevokeUserRole(ctx context.Context, userID string) error {
-	return rep.ChangeUserField(ctx, revokeUserRoleSQL, "RevokeUserRole", userID)
+	return rep.changeUserField(ctx, revokeUserRoleSQL, "RevokeUserRole", userID)
 }
 
 // AssignUserRole promotes a regular user to subadmin.
 func (rep *Repository) AssignUserRole(ctx context.Context, userID string) error {
-	return rep.ChangeUserField(ctx, assignUserRoleSQL, "AssignUserRole", userID)
+	return rep.changeUserField(ctx, assignUserRoleSQL, "AssignUserRole", userID)
 }
 
 // DeleteUser soft-deletes a user account.
 func (rep *Repository) DeleteUser(ctx context.Context, userID string) error {
-	return rep.ChangeUserField(ctx, deleteUserSQL, "DeleteUser", userID)
+	return rep.changeUserField(ctx, deleteUserSQL, "DeleteUser", userID)
 }
 
 // RestoreUser reactivates a soft-deleted user account.
 func (rep *Repository) RestoreUser(ctx context.Context, userID string) error {
-	return rep.ChangeUserField(ctx, restoreUserSQL, "RestoreUser", userID)
+	return rep.changeUserField(ctx, restoreUserSQL, "RestoreUser", userID)
 }
 
 // BlockUser blocks an active user account.
 func (rep *Repository) BlockUser(ctx context.Context, userID string) error {
-	return rep.ChangeUserField(ctx, blockUserSQL, "BlockUser", userID)
+	return rep.changeUserField(ctx, blockUserSQL, "BlockUser", userID)
 }
 
 // UnBlockUser reactivates a blocked user account.
 func (rep *Repository) UnBlockUser(ctx context.Context, userID string) error {
-	return rep.ChangeUserField(ctx, unblockUserSQL, "UnBlockUser", userID)
+	return rep.changeUserField(ctx, unblockUserSQL, "UnBlockUser", userID)
 }
 
-// ChangeUserField executes a single-row account mutation. 0 rows affected maps to ErrUserNotFound
+// changeUserField executes a single-row account mutation. 0 rows affected maps to ErrUserNotFound
 // when the user does not exist, or ErrInvalidUserState when the state/role guard in the query rejected it.
-func (rep *Repository) ChangeUserField(ctx context.Context, sql, methodName, userID string) error {
+func (rep *Repository) changeUserField(ctx context.Context, sql, methodName, userID string) error {
 	tag, err := rep.QueryRunner(ctx).Exec(ctx, sql, userID)
 	if err != nil {
 		return fmt.Errorf("repository.%s: %w", methodName, err)

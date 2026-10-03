@@ -3,6 +3,7 @@ package authservice
 import (
 	"context"
 	"errors"
+	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
@@ -72,6 +73,7 @@ func TestRevokeUserSessions(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "test_caller: session blocklist")
 			So(errors.Is(err, redisErr), ShouldBeTrue)
+			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
 		})
 	})
 }

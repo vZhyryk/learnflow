@@ -32,26 +32,24 @@ type SMTP struct {
 // App is the shared application container injected into every handler and worker.
 // App must not be copied after first use — always pass as *App.
 type App struct {
-	_           noCopy
-	Config      Config
-	Logger      *logger.Logger
-	Wg          sync.WaitGroup
-	Outbox      *events.OutboxWriter
-	Publisher   *events.RedisPublisher
-	Mailer      *mailer.Mailer
-	RedisClient *redis.Instance
+	_         noCopy
+	Config    Config
+	Logger    *logger.Logger
+	Wg        sync.WaitGroup
+	Outbox    *events.OutboxWriter
+	Publisher *events.RedisPublisher
+	Mailer    *mailer.Mailer
 }
 
 // NewApp wraps raw infra dependencies into the App container, mirroring how
 // cmd/api/router.NewRouter wraps cmd/api/app.App's DB/Redis into services.
 func NewApp(cfg Config, log *logger.Logger, dbInstance *pgxpool.Pool, redisClient *redis.Instance) *App {
 	return &App{
-		Config:      cfg,
-		Logger:      log,
-		Outbox:      events.NewOutboxWriter(dbInstance),
-		Publisher:   events.NewRedisPublisher(redisClient),
-		RedisClient: redisClient,
-		Mailer:      mailer.New(cfg.SMTP.Port, cfg.SMTP.Host, cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.Sender),
+		Config:    cfg,
+		Logger:    log,
+		Outbox:    events.NewOutboxWriter(dbInstance),
+		Publisher: events.NewRedisPublisher(redisClient.Raw()),
+		Mailer:    mailer.New(cfg.SMTP.Port, cfg.SMTP.Host, cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.Sender),
 	}
 }
 

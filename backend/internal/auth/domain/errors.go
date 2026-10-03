@@ -62,6 +62,10 @@ var (
 	ErrInvalidDateOfBirth = errors.New("invalid date of birth")
 	// ErrInvalidUILanguage is returned when UI language is not a supported language code.
 	ErrInvalidUILanguage = errors.New("invalid UI language")
+	// ErrBlocklistUnavailable is returned when the Redis blocklist cannot be updated; the DB change is rolled back.
+	ErrBlocklistUnavailable = errors.New("blocklist unavailable")
+	// ErrDeletedByAdmin is returned when account recovery is requested for an account an admin deleted.
+	ErrDeletedByAdmin = errors.New("account deleted by admin")
 )
 
 // ErrAccountLockedError carries the unlock time when a brute-force lockout is in effect.

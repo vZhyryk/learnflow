@@ -55,8 +55,8 @@ func main() {
 		worker.NewAnnouncementDeliveryPoller(dbInstance, app.Publisher, app.Logger, transactor),
 		worker.NewOutboxCleanupWorker(dbInstance, app.Logger, cleanUpPollInterval),
 		worker.NewAnnouncementCleanUpWorker(dbInstance, app.Logger, cleanUpPollInterval),
-		worker.NewAnnouncementFanOutWorker(dbInstance, redisClient.Client, app.Logger, adminRepo, contentRepo, courseRepo, articleRepo),
-	}, worker.NewEmailWorkers(dbInstance, redisClient.Client, app.Logger, app.Mailer, baseURL)...)
+		worker.NewAnnouncementFanOutWorker(dbInstance, redisClient.Raw(), app.Logger, adminRepo, contentRepo, courseRepo, articleRepo),
+	}, worker.NewEmailWorkers(dbInstance, redisClient.Raw(), app.Logger, app.Mailer, baseURL)...)
 
 	for _, w := range workers {
 		app.Wg.Add(1)

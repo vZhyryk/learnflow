@@ -6,8 +6,8 @@ import (
 	"context"
 	admindomain "learnflow_backend/internal/admin/domain"
 	adminrepository "learnflow_backend/internal/admin/repository"
-	"learnflow_backend/internal/audit"
 	auditdomain "learnflow_backend/internal/audit/domain"
+	auditrepository "learnflow_backend/internal/audit/repository"
 	authrepository "learnflow_backend/internal/auth/repository"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
@@ -35,7 +35,7 @@ func newUserOpFixture(t *testing.T, blocklist *redisinfra.Instance) *userOpFixtu
 	t.Helper()
 
 	pool := testutil.NewTestPool(t)
-	realRedis := &redisinfra.Instance{Client: redis.NewClient(&redis.Options{Addr: "localhost:6379"})}
+	realRedis := redisinfra.NewInstance(redis.NewClient(&redis.Options{Addr: "localhost:6379"}))
 	t.Cleanup(func() { realRedis.Close() }) //nolint:errcheck // Close's error is never actionable in test cleanup
 
 	if blocklist == nil {
@@ -66,7 +66,7 @@ func newUserOpFixture(t *testing.T, blocklist *redisinfra.Instance) *userOpFixtu
 
 	adminRepo := adminrepository.NewRepository(pool)
 	authRepo := authrepository.NewRepository(pool)
-	srv := New(adminRepo, adminRepo, audit.New(pool), authRepo, db.NewTransactor(pool), events.NewOutboxWriter(pool), blocklist)
+	srv := New(adminRepo, adminRepo, auditrepository.New(pool), authRepo, db.NewTransactor(pool), events.NewOutboxWriter(pool), blocklist)
 
 	return &userOpFixture{srv: srv, pool: pool, authRepo: authRepo, redis: realRedis, adminID: adminID, targetID: targetID}
 }
@@ -117,7 +117,7 @@ func TestBlockUserEndToEnd_Integration(t *testing.T) {
 		ctx := context.Background()
 
 		Convey("When an admin blocks a user, the status, audit, outbox event, sessions and Redis mark all change together", func() {
-			So(f.srv.ChangeUserField(ctx, "BlockUser", f.targetID, f.adminID), ShouldBeNil)
+			So(f.srv.ChangeUserField(ctx, f.targetID, f.adminID, "BlockUser"), ShouldBeNil)
 
 			data, err := adminrepository.NewRepository(f.pool).GetUserDataByID(ctx, f.targetID)
 			So(err, ShouldBeNil)
@@ -140,15 +140,15 @@ func TestBlockUserEndToEnd_Integration(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(active, ShouldBeEmpty)
 
-			blocked, err := f.redis.IsUserBlocked(ctx, f.targetID)
+			blocked, err := f.redis.IsBlocked(ctx, f.targetID, "unused-jti")
 			So(err, ShouldBeNil)
 			So(blocked, ShouldBeTrue)
 		})
 
 		Convey("When the same user is blocked, unblocked and blocked again, every action gets its own event id", func() {
-			So(f.srv.ChangeUserField(ctx, "BlockUser", f.targetID, f.adminID), ShouldBeNil)
-			So(f.srv.ChangeUserField(ctx, "UnBlockUser", f.targetID, f.adminID), ShouldBeNil)
-			So(f.srv.ChangeUserField(ctx, "BlockUser", f.targetID, f.adminID), ShouldBeNil)
+			So(f.srv.ChangeUserField(ctx, f.targetID, f.adminID, "BlockUser"), ShouldBeNil)
+			So(f.srv.ChangeUserField(ctx, f.targetID, f.adminID, "UnBlockUser"), ShouldBeNil)
+			So(f.srv.ChangeUserField(ctx, f.targetID, f.adminID, "BlockUser"), ShouldBeNil)
 
 			eventTypes, eventIDs := f.outboxEvents(t)
 			So(eventTypes, ShouldResemble, []string{"user.blocked", "user.unblocked", "user.blocked"})
@@ -156,15 +156,15 @@ func TestBlockUserEndToEnd_Integration(t *testing.T) {
 		})
 
 		Convey("When the user is deleted and restored, the events follow and the Redis mark is cleared", func() {
-			So(f.srv.ChangeUserField(ctx, "DeleteUser", f.targetID, f.adminID), ShouldBeNil)
+			So(f.srv.ChangeUserField(ctx, f.targetID, f.adminID, "DeleteUser"), ShouldBeNil)
 
-			blocked, err := f.redis.IsUserBlocked(ctx, f.targetID)
+			blocked, err := f.redis.IsBlocked(ctx, f.targetID, "unused-jti")
 			So(err, ShouldBeNil)
 			So(blocked, ShouldBeTrue)
 
-			So(f.srv.ChangeUserField(ctx, "RestoreUser", f.targetID, f.adminID), ShouldBeNil)
+			So(f.srv.ChangeUserField(ctx, f.targetID, f.adminID, "RestoreUser"), ShouldBeNil)
 
-			blocked, err = f.redis.IsUserBlocked(ctx, f.targetID)
+			blocked, err = f.redis.IsBlocked(ctx, f.targetID, "unused-jti")
 			So(err, ShouldBeNil)
 			So(blocked, ShouldBeFalse)
 
@@ -180,7 +180,7 @@ func TestBlockUserRollsBackWhenRedisFails_Integration(t *testing.T) {
 		ctx := context.Background()
 
 		Convey("When blocking fails after the DB writes, the transaction rolls back", func() {
-			err := f.srv.ChangeUserField(ctx, "BlockUser", f.targetID, f.adminID)
+			err := f.srv.ChangeUserField(ctx, f.targetID, f.adminID, "BlockUser")
 
 			So(err, ShouldNotBeNil)
 

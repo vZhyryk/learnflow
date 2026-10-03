@@ -32,13 +32,15 @@ type AdminActionRepository interface {
 
 // SessionRepository revokes user sessions on behalf of an admin.
 type SessionRepository interface {
-	RevokeAllUserSessionsAdmin(ctx context.Context, userID string, revokedByUserID string) error
+	RevokeAllUserSessionsAdmin(ctx context.Context, userID, revokedByUserID string) error
 }
 
-// UserBlocklist marks users as blocked (or clears the mark) so their already-issued access tokens are rejected.
-type UserBlocklist interface {
+// UserBlockList marks users as blocked (or clears the mark) so their already-issued access tokens are rejected.
+type UserBlockList interface {
 	BlockUser(ctx context.Context, userID string, ttl time.Duration) error
 	UnBlockUser(ctx context.Context, userID string) error
+	RevokeUserRole(ctx context.Context, userID string, ttl time.Duration) error
+	ClearUserRoleRevoked(ctx context.Context, userID string) error
 }
 
 // UserRepository defines admin persistence operations for user accounts.
@@ -53,7 +55,7 @@ type UserRepository interface {
 	GetUserDataByID(ctx context.Context, userID string) (*UserData, error)
 }
 
-// Service defines the admin module's announcement business logic.
+// Service defines the admin module's business logic: announcements and user management.
 type Service interface {
 	CreateAnnouncement(ctx context.Context, req CreateAnnouncementRequest) (string, error)
 	UpdateAnnouncement(ctx context.Context, req UpdateAnnouncementRequest) error
@@ -66,5 +68,5 @@ type Service interface {
 
 	GetUsersData(ctx context.Context, params pagination.Params) ([]*UserData, int, error)
 	GetUserDataByID(ctx context.Context, userID string) (*UserData, error)
-	ChangeUserField(ctx context.Context, operationName, userID, adminID string) error
+	ChangeUserField(ctx context.Context, userID, adminID string, operationName UserAdminOperation) error
 }

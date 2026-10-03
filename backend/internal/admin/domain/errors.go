@@ -20,4 +20,6 @@ var (
 	ErrUserNotFound        = errors.New("user not found")
 	ErrForbiddenUserAction = errors.New("action on this user is not allowed")
 	ErrInvalidUserState    = errors.New("user is not in a valid state for this action")
+	// ErrBlocklistUnavailable is returned when the Redis blocklist cannot be updated; the DB change is rolled back.
+	ErrBlocklistUnavailable = errors.New("blocklist unavailable")
 )

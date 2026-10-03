@@ -1,4 +1,4 @@
-package audit
+package auditrepository
 
 import (
 	"learnflow_backend/internal/shared/repository"

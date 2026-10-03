@@ -207,7 +207,7 @@ Table course_reviews {
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   deleted_at timestamptz
-  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000011; who deleted — self or admin (REVW-03); not covered by admin_actions today']
+  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000011; who deleted — self or admin (REVW-03); admin deletes are also audited in admin_actions (delete_item, target review)']
 
   indexes {
     (user_id, course_id) [name: 'idx_course_reviews_user_id_course_id_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL — allows re-review after soft-delete']
@@ -224,7 +224,7 @@ Table content_reviews {
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   deleted_at timestamptz
-  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000011; who deleted — self or admin (REVW-03); not covered by admin_actions today']
+  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000011; who deleted — self or admin (REVW-03); admin deletes are also audited in admin_actions (delete_item, target review)']
 
   indexes {
     (user_id, content_item_id) [name: 'idx_content_reviews_user_id_content_item_id_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL']

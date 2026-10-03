@@ -65,21 +65,34 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 			return helpers.ErrorResponse(w, http.StatusUnprocessableEntity, "new password must differ from current")
 		})
 
-	case errors.Is(err, authdomain.ErrInvalidAccountState):
+	case errors.Is(err, authdomain.ErrInvalidAccountState), errors.Is(err, authdomain.ErrDeletedByAdmin):
 		h.handleErrorRespond(r, "invalid_account_state", func() error {
 			return helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "if your account is eligible, you will receive an email"}, nil)
 		})
 
 	default:
-		h.jsonLogger.Error(err, map[string]any{
-			"path":       r.URL.Path,
-			"ip":         appcontext.IPAddressFromContext(r.Context()),
-			"error_type": fmt.Sprintf("%T", err),
-		})
-		h.handleErrorRespond(r, "server_error_response_write", func() error {
-			return helpers.ServerErrorResponse(w)
-		})
+		h.handleServerError(w, r, err)
 	}
+}
+
+// handleServerError logs err and answers 503 when the Redis blocklist could not be updated, 500 otherwise.
+func (h *Handler) handleServerError(w http.ResponseWriter, r *http.Request, err error) {
+	h.jsonLogger.Error(err, map[string]any{
+		"path":       r.URL.Path,
+		"ip":         appcontext.IPAddressFromContext(r.Context()),
+		"error_type": fmt.Sprintf("%T", err),
+	})
+
+	if errors.Is(err, authdomain.ErrBlocklistUnavailable) {
+		h.handleErrorRespond(r, "blocklist_unavailable", func() error {
+			return helpers.ErrorResponse(w, http.StatusServiceUnavailable, "service temporarily unavailable, try again")
+		})
+		return
+	}
+
+	h.handleErrorRespond(r, "server_error_response_write", func() error {
+		return helpers.ServerErrorResponse(w)
+	})
 }
 
 func setAccountLockHeader(err error) string {

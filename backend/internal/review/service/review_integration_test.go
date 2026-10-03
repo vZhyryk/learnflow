@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"learnflow_backend/internal/access"
-	"learnflow_backend/internal/audit"
+	auditrepository "learnflow_backend/internal/audit/repository"
 	reviewdomain "learnflow_backend/internal/review/domain"
 	reviewrepository "learnflow_backend/internal/review/repository"
 	sharedrepository "learnflow_backend/internal/shared/repository"
@@ -33,7 +33,7 @@ import (
 // both backed by tx, with a NoopTransactor (see package doc comment above for why).
 func newIntegrationService(tx pgx.Tx) (*Service, *reviewrepository.Repository) {
 	repo := &reviewrepository.Repository{BaseRepository: sharedrepository.BaseRepository{DB: tx}}
-	actions := &audit.Audit{BaseRepository: sharedrepository.BaseRepository{DB: tx}}
+	actions := &auditrepository.Audit{BaseRepository: sharedrepository.BaseRepository{DB: tx}}
 	return New(repo, repo, repo, testutil.NoopTransactor{}, access.New(tx), actions), repo
 }
 

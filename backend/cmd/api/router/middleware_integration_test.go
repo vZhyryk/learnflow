@@ -22,7 +22,7 @@ func TestAuthenticateUserBlocklist_Integration(t *testing.T) {
 
 	Convey("AuthenticateUser against real Redis", t, func() {
 		route := newTestRouteHandler()
-		route.App.Redis = &redisinfra.Instance{Client: client}
+		route.App.Redis = redisinfra.NewInstance(client)
 
 		userID := "auth-blocklist-" + time.Now().Format("150405.000000000")
 		signed, err := route.token.GenerateAccessToken(&authdomain.User{ID: userID, Role: authdomain.UserRole("student")}, time.Minute)

@@ -29,7 +29,7 @@ func newSmokeRouter(t *testing.T) (*RouteHandler, *redisinfra.Instance) {
 
 	client := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
 	t.Cleanup(func() { client.Close() }) //nolint:errcheck // Close's error is never actionable in test cleanup
-	redisInstance := &redisinfra.Instance{Client: client}
+	redisInstance := redisinfra.NewInstance(client)
 
 	a := &app.App{Logger: testutil.NewTestLogger(), DB: testutil.NewTestPool(t), Redis: redisInstance}
 	a.Config.Secret.JWTSecret = smokeSecret

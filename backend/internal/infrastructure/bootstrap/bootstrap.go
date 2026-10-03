@@ -10,7 +10,7 @@ import (
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
-	redis "learnflow_backend/internal/infrastructure/redis"
+	"learnflow_backend/internal/infrastructure/redis"
 	"learnflow_backend/internal/infrastructure/sanitizer"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -86,7 +86,7 @@ func MustInitInfra(dbCfg DatabaseConfig, jsonLogger *logger.Logger) (*pgxpool.Po
 	}
 
 	cleanup := func() {
-		if closeErr := redisClient.Close(); closeErr != nil {
+		if closeErr := redisClient.Raw().Close(); closeErr != nil {
 			jsonLogger.Error(closeErr, nil)
 		}
 		dbInstance.Close()

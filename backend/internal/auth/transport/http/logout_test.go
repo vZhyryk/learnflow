@@ -82,6 +82,12 @@ func TestLogoutServiceOutcomes(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusForbidden)
 		})
 
+		Convey("Blocklist unavailable returns 503", func() {
+			f.svcErr = authdomain.ErrBlocklistUnavailable
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token": "ref"}`))
+			So(w.Code, ShouldEqual, http.StatusServiceUnavailable)
+		})
+
 		Convey("Unexpected service error returns 500", func() {
 			f.svcErr = testutil.ErrDBUnexpected
 			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token": "ref"}`))

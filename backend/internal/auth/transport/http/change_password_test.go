@@ -89,6 +89,12 @@ func TestChangePasswordServiceOutcomes(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
+		Convey("Blocklist unavailable → 503", func() {
+			f.svcErr = authdomain.ErrBlocklistUnavailable
+			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(validChangePasswordBody)))
+			So(w.Code, ShouldEqual, http.StatusServiceUnavailable)
+		})
+
 		Convey("Unexpected service error → 500", func() {
 			f.svcErr = testutil.ErrDBUnexpected
 			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(validChangePasswordBody)))

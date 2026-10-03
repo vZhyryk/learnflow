@@ -23,7 +23,7 @@ const (
 		SELECT ` + selectColumns + `
 		FROM users u
 		LEFT JOIN user_profiles up ON up.user_id = u.id
-		ORDER BY u.created_at DESC
+		ORDER BY u.created_at DESC, u.id DESC
 		LIMIT $1 OFFSET $2
 	`
 	existsUserSQL = `
@@ -42,7 +42,7 @@ const (
 		UPDATE users
 		SET role  = 'subadmin',
 		updated_at = now()
-		WHERE id = $1 AND role = 'user'
+		WHERE id = $1 AND role = 'user' AND status='active' AND deleted_at IS NULL
 	`
 
 	restoreUserSQL = `

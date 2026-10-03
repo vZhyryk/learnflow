@@ -52,6 +52,7 @@ func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockToke
 			Token:     tokens.NewTokens("test-secret", "", "learnflow", "learnflow-users"),
 			Outbox:    outbox,
 			Blocklist: blocklist,
+			Audit:     mockAuditDeletedByAdmin(false, nil),
 		},
 		Options{BcryptCost: 4},
 	)

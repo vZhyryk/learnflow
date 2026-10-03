@@ -2,6 +2,7 @@ package adminservice
 
 import (
 	admindomain "learnflow_backend/internal/admin/domain"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/events"
 )
 
@@ -13,12 +14,13 @@ type Service struct {
 	sessionRepo admindomain.SessionRepository
 	transactor  admindomain.Transactor
 	outbox      *events.OutboxWriter
-	blocklist   admindomain.UserBlocklist
+	blocklist   admindomain.UserBlockList
+	operations  map[admindomain.UserAdminOperation]userOperation
 }
 
 var _ admindomain.Service = (*Service)(nil)
 
-// New returns a new Service wired to the given repository.
+// New returns a new Service wired to its repositories, transactor, outbox and blocklist.
 func New(
 	announRepo admindomain.AnnouncementRepository,
 	userRepo admindomain.UserRepository,
@@ -26,7 +28,17 @@ func New(
 	sessionRepo admindomain.SessionRepository,
 	transactor admindomain.Transactor,
 	outbox *events.OutboxWriter,
-	blocklist admindomain.UserBlocklist,
+	blocklist admindomain.UserBlockList,
 ) *Service {
-	return &Service{announRepo: announRepo, userRepo: userRepo, actionRepo: actionRepo, sessionRepo: sessionRepo, transactor: transactor, outbox: outbox, blocklist: blocklist}
+	srv := &Service{announRepo: announRepo, userRepo: userRepo, actionRepo: actionRepo, sessionRepo: sessionRepo, transactor: transactor, outbox: outbox, blocklist: blocklist}
+	srv.operations = map[admindomain.UserAdminOperation]userOperation{
+		admindomain.RevokeUserRole: {srv.userRepo.RevokeUserRole, auditdomain.ActionRevokeSubadmin},
+		admindomain.AssignUserRole: {srv.userRepo.AssignUserRole, auditdomain.ActionAssignSubadmin},
+		admindomain.DeleteUser:     {srv.userRepo.DeleteUser, auditdomain.ActionDeleteUser},
+		admindomain.RestoreUser:    {srv.userRepo.RestoreUser, auditdomain.ActionRestoreUser},
+		admindomain.BlockUser:      {srv.userRepo.BlockUser, auditdomain.ActionBlockUser},
+		admindomain.UnBlockUser:    {srv.userRepo.UnBlockUser, auditdomain.ActionUnblockUser},
+	}
+
+	return srv
 }

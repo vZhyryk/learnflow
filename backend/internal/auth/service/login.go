@@ -77,7 +77,7 @@ func (s *Service) loginHandleSession(ctx context.Context, req authdomain.LoginRe
 		return nil, fmt.Errorf("login: generate token: %w", err)
 	}
 
-	accessToken, err := s.token.GenerateAccessToken(user, accessTokenTTL)
+	accessToken, err := s.token.GenerateAccessToken(user, tokens.AccessTokenTTL)
 	if err != nil {
 		return nil, fmt.Errorf("login: generate access token: %w", err)
 	}
