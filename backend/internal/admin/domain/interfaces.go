@@ -28,6 +28,8 @@ type AnnouncementRepository interface {
 // AdminActionRepository persists the admin audit trail.
 type AdminActionRepository interface {
 	CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error
+	GetInstanceAdminActions(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
+	GetFailedJobs(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error)
 }
 
 // SessionRepository revokes user sessions on behalf of an admin.
@@ -82,4 +84,6 @@ type Service interface {
 	ChangeUserField(ctx context.Context, userID, adminID string, operationName UserAdminOperation) error
 	GrantUserCourseAccess(ctx context.Context, userID, courseID, adminID string, operationName auditdomain.AdminActionType) error
 	GrantUserContentAccess(ctx context.Context, userID, contentItemID, adminID string, operationName auditdomain.AdminActionType) error
+	GetInstanceAdminActions(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) (actions []*auditdomain.AdminAction, count int, err error)
+	GetFailedJobs(ctx context.Context, params pagination.Params) (failedJobs []*auditdomain.FailedJob, count int, err error)
 }

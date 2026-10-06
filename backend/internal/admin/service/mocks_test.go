@@ -227,7 +227,23 @@ func (m *mockUserRepo) GetUserDataByID(ctx context.Context, userID string) (*adm
 
 // mockAdminActionRepo implements admindomain.AdminActionRepository via function fields.
 type mockAdminActionRepo struct {
-	createAdminAction func(ctx context.Context, action *auditdomain.AdminAction) error
+	createAdminAction       func(ctx context.Context, action *auditdomain.AdminAction) error
+	getInstanceAdminActions func(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
+	getFailedJobs           func(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error)
+}
+
+func (m *mockAdminActionRepo) GetFailedJobs(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error) {
+	if m.getFailedJobs == nil {
+		panic("mockAdminActionRepo.GetFailedJobs not set")
+	}
+	return m.getFailedJobs(ctx, params)
+}
+
+func (m *mockAdminActionRepo) GetInstanceAdminActions(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
+	if m.getInstanceAdminActions == nil {
+		panic("mockAdminActionRepo.GetInstanceAdminActions not set")
+	}
+	return m.getInstanceAdminActions(ctx, targetType, targetID, params)
 }
 
 func (m *mockAdminActionRepo) CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error {
