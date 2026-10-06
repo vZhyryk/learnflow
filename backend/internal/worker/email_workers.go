@@ -26,5 +26,6 @@ func NewEmailWorkers(
 		NewEmailUserUnBlockWorker(queryRunner, redisClient, jsonLogger, m, baseURL),
 		NewEmailUserDeleteWorker(queryRunner, redisClient, jsonLogger, m, baseURL),
 		NewEmailUserRestoreWorker(queryRunner, redisClient, jsonLogger, m, baseURL),
+		NewEmailGrantAccessWorker(queryRunner, redisClient, jsonLogger, m, baseURL),
 	}
 }

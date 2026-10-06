@@ -21,6 +21,16 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 			return helpers.ForbiddenResponse(w, helpers.Envelope{"error": err.Error(), "code": "forbidden_user_action"})
 		})
 
+	case errors.Is(err, admindomain.ErrItemNotFound):
+		h.handleErrorRespond(r, "item_not_found", func() error {
+			return helpers.NotFoundResponse(w)
+		})
+
+	case errors.Is(err, admindomain.ErrAccessAlreadyGranted):
+		h.handleErrorRespond(r, "access_already_granted", func() error {
+			return helpers.ErrorResponse(w, http.StatusConflict, err.Error())
+		})
+
 	case errors.Is(err, admindomain.ErrInvalidUserState):
 		h.handleErrorRespond(r, "invalid_user_state", func() error {
 			return helpers.ErrorResponse(w, http.StatusConflict, err.Error())

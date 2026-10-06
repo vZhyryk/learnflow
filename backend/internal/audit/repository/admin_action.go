@@ -14,8 +14,8 @@ import (
 
 const (
 	createAdminActionSQL = `
-		INSERT INTO admin_actions (admin_user_id, action_type, target_type, target_id)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO admin_actions (admin_user_id, action_type, target_type, target_id, details_json)
+		VALUES ($1, $2, $3, $4, $5::jsonb)
 	`
 
 	wasDeletedByAdminSQL = `
@@ -39,7 +39,7 @@ func New(pool *pgxpool.Pool) *Audit {
 
 // CreateAdminAction appends an entry to the admin audit trail.
 func (r *Audit) CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error {
-	_, err := r.QueryRunner(ctx).Exec(ctx, createAdminActionSQL, action.AdminUserID, action.ActionType, action.TargetType, action.TargetID)
+	_, err := r.QueryRunner(ctx).Exec(ctx, createAdminActionSQL, action.AdminUserID, action.ActionType, action.TargetType, action.TargetID, action.Details)
 	if err != nil {
 		return fmt.Errorf("audit.CreateAdminAction: %w", err)
 	}

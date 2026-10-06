@@ -22,4 +22,10 @@ var (
 	ErrInvalidUserState    = errors.New("user is not in a valid state for this action")
 	// ErrBlocklistUnavailable is returned when the Redis blocklist cannot be updated; the DB change is rolled back.
 	ErrBlocklistUnavailable = errors.New("blocklist unavailable")
+
+	ErrInvalidItemID   = errors.New("invalid item ID")
+	ErrItemNotFound    = errors.New("item not found")
+	ErrInvalidItemType = errors.New("invalid item type")
+
+	ErrAccessAlreadyGranted = errors.New("access already granted")
 )

@@ -16,7 +16,7 @@ func TestNewEmailWorkersRegistration(t *testing.T) {
 	Convey("Given every email worker returned by NewEmailWorkers", t, func() {
 		workers := NewEmailWorkers(nil, nil, testutil.NewTestLogger(), nil, testBaseURL)
 
-		So(workers, ShouldHaveLength, 10)
+		So(workers, ShouldHaveLength, 11)
 
 		eventTypes := map[string]bool{}
 		names := map[string]bool{}

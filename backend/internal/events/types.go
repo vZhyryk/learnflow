@@ -20,6 +20,7 @@ const (
 	EventAnnouncementApprove                EventType = "announcement.approved"
 	EventRegistrationAttemptOnExistingEmail EventType = "user.existed.register"
 	EventAnnouncementDeliver                EventType = "announcement.deliver"
+	EventGrantAccess                        EventType = "user.grant.access"
 )
 
 // IsKnownEventType reports whether t is a registered event type.
@@ -40,7 +41,8 @@ func IsKnownEventType(t EventType) bool {
 		EventNotificationSend,
 		EventAnnouncementApprove,
 		EventRegistrationAttemptOnExistingEmail,
-		EventAnnouncementDeliver:
+		EventAnnouncementDeliver,
+		EventGrantAccess:
 		return true
 	}
 	return false

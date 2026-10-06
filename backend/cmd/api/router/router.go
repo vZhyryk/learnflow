@@ -125,7 +125,19 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 
 	// Admin Routes
 	adminRepo := adminrepository.NewRepository(a.DB)
-	adminSvc := adminservice.New(adminRepo, adminRepo, adminAction, authRepo, transactor, outbox, a.Redis)
+	adminSvc := adminservice.New(
+		adminservice.Repos{
+			AnnounRepo:      adminRepo,
+			UserRepo:        adminRepo,
+			ActionRepo:      adminAction,
+			SessionRepo:     authRepo,
+			CourseRepo:      courseRepo,
+			ContentItemRepo: contentRepo,
+		}, adminservice.Utils{
+			Transactor: transactor,
+			Outbox:     outbox,
+			Blocklist:  a.Redis,
+		})
 	admin.RegisterAdminRoutes(router, adminSvc, adminStaticWithAuth, chains.StaticWithAuth, a.Logger)
 
 	// Helper routes

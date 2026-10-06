@@ -117,3 +117,13 @@ func (rep *Repository) CheckIfContentItemExistsByID(ctx context.Context, content
 
 	return exists, nil
 }
+
+// GetContentItemTitleByID returns the title of a non-deleted content item; pgx.ErrNoRows (wrapped) if it does not exist.
+func (rep *Repository) GetContentItemTitleByID(ctx context.Context, contentItemID string) (string, error) {
+	contentItem, err := scanContentItem(rep.QueryRunner(ctx).QueryRow(ctx, getContentItemByIDSQL, contentItemID))
+	if err != nil {
+		return "", fmt.Errorf("repository.GetContentItemByID: %w", err)
+	}
+
+	return contentItem.Title, nil
+}

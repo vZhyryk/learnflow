@@ -79,4 +79,14 @@ const (
 		LEFT JOIN user_profiles up ON up.user_id = u.id
 		WHERE u.id = $1
 	`
+
+	grantUserCourseAccessSQL = `
+		INSERT INTO user_course_access (user_id, course_id, access_type, status, granted_at)
+		VALUES ($1, $2, 'admin_granted', 'active', now())
+	`
+
+	grantUserContentAccessSQL = `
+		INSERT INTO user_content_access (user_id, content_item_id, access_type, status, granted_at)
+		VALUES ($1, $2, 'admin_granted', 'active', now())
+	`
 )

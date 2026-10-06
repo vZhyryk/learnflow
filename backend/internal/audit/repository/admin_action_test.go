@@ -38,7 +38,13 @@ func TestCreateAdminAction(t *testing.T) {
 
 		Convey("When it succeeds", func() {
 			So(repo.CreateAdminAction(context.Background(), action), ShouldBeNil)
-			So(gotArgs, ShouldResemble, []any{"admin-1", auditdomain.ActionBlockUser, auditdomain.TargetUser, "user-1"})
+			So(gotArgs, ShouldResemble, []any{"admin-1", auditdomain.ActionBlockUser, auditdomain.TargetUser, "user-1", map[string]any(nil)})
+		})
+
+		Convey("When the action carries details", func() {
+			action.Details = map[string]any{"course_id": "course-1"}
+			So(repo.CreateAdminAction(context.Background(), action), ShouldBeNil)
+			So(gotArgs[4], ShouldResemble, map[string]any{"course_id": "course-1"})
 		})
 	})
 }

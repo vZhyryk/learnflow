@@ -2,6 +2,7 @@ package adminhttp
 
 import (
 	admindomain "learnflow_backend/internal/admin/domain"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
 	"learnflow_backend/internal/shared/pagination"
@@ -138,6 +139,38 @@ func (h *Handler) getUserDataByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"user": userByID}, nil)
+	if err != nil {
+		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
+	}
+}
+
+func (h *Handler) grantUserAccess(w http.ResponseWriter, r *http.Request) {
+	var req admindomain.GrantAccessRequest
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
+		return
+	}
+
+	ctx := r.Context()
+	user := appcontext.MustUserFromContext(ctx)
+	userID := r.PathValue("id")
+	var err error
+
+	switch req.ItemType {
+	case admindomain.CourseItemType:
+		err = h.svc.GrantUserCourseAccess(ctx, userID, req.ItemID, user.ID, auditdomain.ActionGrantItemAccess)
+	case admindomain.ContentItemType:
+		err = h.svc.GrantUserContentAccess(ctx, userID, req.ItemID, user.ID, auditdomain.ActionGrantItemAccess)
+	default:
+		h.handleErrorResponse(w, r, admindomain.ErrInvalidItemType)
+		return
+	}
+
+	if err != nil {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
+
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "user access granted"}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}

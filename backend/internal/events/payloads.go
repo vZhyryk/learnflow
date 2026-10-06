@@ -36,7 +36,6 @@ func (p TokenPayload) RequiredFields() []Field {
 // GetIdempotencyKey returns the parts of the dedupe key: user and the token's SHA-256, never the raw token.
 func (p TokenPayload) GetIdempotencyKey() []string {
 	sum := sha256.Sum256([]byte(p.RawToken))
-
 	return []string{p.UserID, hex.EncodeToString(sum[:])}
 }
 
@@ -121,5 +120,33 @@ func (p UserNotificationPayload) GetIdempotencyKey() []string {
 
 // GetEmail returns the recipient address.
 func (p UserNotificationPayload) GetEmail() string {
+	return p.Email
+}
+
+type GrantAccessPayload struct {
+	UserID   string `json:"user_id"`
+	ItemName string `json:"item_name"`
+	ItemID   string `json:"item_id"`
+	ItemType string `json:"item_type"`
+	UserName string `json:"user_name"`
+	Email    string `json:"email"`
+}
+
+func (p GrantAccessPayload) RequiredFields() []Field {
+	return []Field{
+		{Name: "UserID", IsValid: func() bool { return p.UserID != "" }},
+		{Name: "ItemID", IsValid: func() bool { return p.ItemID != "" }},
+		{Name: "ItemType", IsValid: func() bool { return p.ItemType != "" }},
+		{Name: "ItemName", IsValid: func() bool { return p.ItemName != "" }},
+		{Name: "UserName", IsValid: func() bool { return p.UserName != "" }},
+		{Name: "Email", IsValid: func() bool { return p.Email != "" }},
+	}
+}
+
+func (p GrantAccessPayload) GetIdempotencyKey() []string {
+	return []string{p.UserID, p.ItemID, p.ItemType}
+}
+
+func (p GrantAccessPayload) GetEmail() string {
 	return p.Email
 }

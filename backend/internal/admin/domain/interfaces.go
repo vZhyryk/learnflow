@@ -35,6 +35,16 @@ type SessionRepository interface {
 	RevokeAllUserSessionsAdmin(ctx context.Context, userID, revokedByUserID string) error
 }
 
+// CourseRepository looks up courses for admin access grants.
+type CourseRepository interface {
+	GetCourseTitleByID(ctx context.Context, courseID string) (string, error)
+}
+
+// ContentItemRepository looks up content items for admin access grants.
+type ContentItemRepository interface {
+	GetContentItemTitleByID(ctx context.Context, contentItemID string) (string, error)
+}
+
 // UserBlockList marks users as blocked (or clears the mark) so their already-issued access tokens are rejected.
 type UserBlockList interface {
 	BlockUser(ctx context.Context, userID string, ttl time.Duration) error
@@ -53,6 +63,8 @@ type UserRepository interface {
 	UnBlockUser(ctx context.Context, userID string) error
 	GetUsersData(ctx context.Context, params pagination.Params) ([]*UserData, int, error)
 	GetUserDataByID(ctx context.Context, userID string) (*UserData, error)
+	GrantUserCourseAccess(ctx context.Context, userID, courseID string) error
+	GrantUserContentAccess(ctx context.Context, userID, contentItemID string) error
 }
 
 // Service defines the admin module's business logic: announcements and user management.
@@ -65,8 +77,9 @@ type Service interface {
 	GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
 	GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
 	GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*AnnouncementPublic, error)
-
 	GetUsersData(ctx context.Context, params pagination.Params) ([]*UserData, int, error)
 	GetUserDataByID(ctx context.Context, userID string) (*UserData, error)
 	ChangeUserField(ctx context.Context, userID, adminID string, operationName UserAdminOperation) error
+	GrantUserCourseAccess(ctx context.Context, userID, courseID, adminID string, operationName auditdomain.AdminActionType) error
+	GrantUserContentAccess(ctx context.Context, userID, contentItemID, adminID string, operationName auditdomain.AdminActionType) error
 }

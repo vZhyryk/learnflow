@@ -137,3 +137,20 @@ func TestRenderEmailUserStatusTemplates(t *testing.T) {
 		}
 	})
 }
+
+func TestRenderEmailGrantAccessTemplate(t *testing.T) {
+	Convey("email_grant_access.html", t, func() {
+		subject, plainBody, htmlBody, err := renderEmail("email_grant_access.html", map[string]string{
+			"name":      "Alice",
+			"item_name": "Go Basics",
+			"item_type": "course",
+		})
+
+		So(err, ShouldBeNil)
+		So(subject, ShouldContainSubstring, "access")
+		So(plainBody, ShouldContainSubstring, "Alice")
+		So(plainBody, ShouldContainSubstring, "Go Basics")
+		So(htmlBody, ShouldContainSubstring, "course")
+		So(htmlBody, ShouldContainSubstring, "Go Basics")
+	})
+}

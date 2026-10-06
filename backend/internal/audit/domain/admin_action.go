@@ -53,4 +53,5 @@ type AdminAction struct {
 	ActionType  AdminActionType
 	TargetType  AdminTargetType
 	TargetID    string
+	Details     map[string]any
 }

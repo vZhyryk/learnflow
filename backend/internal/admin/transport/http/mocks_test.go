@@ -6,6 +6,7 @@ import (
 
 	admindomain "learnflow_backend/internal/admin/domain"
 	adminhttp "learnflow_backend/internal/admin/transport/http"
+	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 
@@ -47,6 +48,22 @@ type mockService struct {
 	getUsersData               func(ctx context.Context, params pagination.Params) ([]*admindomain.UserData, int, error)
 	getUserDataByID            func(ctx context.Context, userID string) (*admindomain.UserData, error)
 	changeUserField            func(ctx context.Context, userID, adminID string, operationName admindomain.UserAdminOperation) error
+	grantUserCourseAccess      func(ctx context.Context, userID, courseID, adminID string, action auditdomain.AdminActionType) error
+	grantUserContentAccess     func(ctx context.Context, userID, contentItemID, adminID string, action auditdomain.AdminActionType) error
+}
+
+func (m *mockService) GrantUserCourseAccess(ctx context.Context, userID, courseID, adminID string, action auditdomain.AdminActionType) error {
+	if m.grantUserCourseAccess == nil {
+		panic("mockService.grantUserCourseAccess not set")
+	}
+	return m.grantUserCourseAccess(ctx, userID, courseID, adminID, action)
+}
+
+func (m *mockService) GrantUserContentAccess(ctx context.Context, userID, contentItemID, adminID string, action auditdomain.AdminActionType) error {
+	if m.grantUserContentAccess == nil {
+		panic("mockService.grantUserContentAccess not set")
+	}
+	return m.grantUserContentAccess(ctx, userID, contentItemID, adminID, action)
 }
 
 func (m *mockService) CreateAnnouncement(ctx context.Context, req admindomain.CreateAnnouncementRequest) (string, error) {

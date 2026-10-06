@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	admindomain "learnflow_backend/internal/admin/domain"
+	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/shared/pagination"
 
 	"github.com/jackc/pgx/v5"
@@ -106,4 +107,35 @@ func (rep *Repository) changeUserField(ctx context.Context, sql, methodName, use
 	}
 
 	return admindomain.ErrInvalidUserState
+}
+
+const (
+	courseAccessActiveUniqueIndex  = "idx_user_course_access_user_id_course_id_active_unique"
+	contentAccessActiveUniqueIndex = "idx_user_content_access_user_id_content_item_id_active_unique"
+)
+
+// GrantUserCourseAccess inserts an admin-granted course access; ErrAccessAlreadyGranted if the user already has an active one.
+func (rep *Repository) GrantUserCourseAccess(ctx context.Context, userID, courseID string) error {
+	_, err := rep.QueryRunner(ctx).Exec(ctx, grantUserCourseAccessSQL, userID, courseID)
+	if db.IsUniqueViolation(err, courseAccessActiveUniqueIndex) {
+		return admindomain.ErrAccessAlreadyGranted
+	}
+	if err != nil {
+		return fmt.Errorf("repository.GrantUserCourseAccess: %w", err)
+	}
+
+	return nil
+}
+
+// GrantUserContentAccess inserts an admin-granted content access; ErrAccessAlreadyGranted if the user already has an active one.
+func (rep *Repository) GrantUserContentAccess(ctx context.Context, userID, contentItemID string) error {
+	_, err := rep.QueryRunner(ctx).Exec(ctx, grantUserContentAccessSQL, userID, contentItemID)
+	if db.IsUniqueViolation(err, contentAccessActiveUniqueIndex) {
+		return admindomain.ErrAccessAlreadyGranted
+	}
+	if err != nil {
+		return fmt.Errorf("repository.GrantUserContentAccess: %w", err)
+	}
+
+	return nil
 }

@@ -2,6 +2,7 @@ package adminservice
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	admindomain "learnflow_backend/internal/admin/domain"
 	auditdomain "learnflow_backend/internal/audit/domain"
@@ -9,6 +10,8 @@ import (
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/tokens"
 	"learnflow_backend/internal/shared/validator"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type userOperation struct {
@@ -239,5 +242,86 @@ func (srv *Service) sendEmail(ctx context.Context, action auditdomain.AdminActio
 		Email:    *target.Email,
 		UserName: target.DisplayName(),
 		EventID:  hash,
+	})
+}
+
+type grantSpec struct {
+	method     string
+	itemType   admindomain.ItemType
+	itemID     string
+	detailsKey string
+	lookup     func(ctx context.Context, id string) (string, error)
+	grant      func(ctx context.Context, userID, itemID string) error
+}
+
+// GrantUserCourseAccess gives a user free access to a course, audits it and queues the notification email.
+func (srv *Service) GrantUserCourseAccess(ctx context.Context, userID, courseID, adminID string, operationName auditdomain.AdminActionType) error {
+	return srv.grantAccess(ctx, userID, adminID, operationName, grantSpec{
+		method:     "GrantUserCourseAccess",
+		itemType:   admindomain.CourseItemType,
+		itemID:     courseID,
+		detailsKey: "course_id",
+		lookup:     srv.courseRepo.GetCourseTitleByID,
+		grant:      srv.userRepo.GrantUserCourseAccess,
+	})
+}
+
+// GrantUserContentAccess gives a user free access to a content item, audits it and queues the notification email.
+func (srv *Service) GrantUserContentAccess(ctx context.Context, userID, contentItemID, adminID string, operationName auditdomain.AdminActionType) error {
+	return srv.grantAccess(ctx, userID, adminID, operationName, grantSpec{
+		method:     "GrantUserContentAccess",
+		itemType:   admindomain.ContentItemType,
+		itemID:     contentItemID,
+		detailsKey: "content_item_id",
+		lookup:     srv.contentItemRepo.GetContentItemTitleByID,
+		grant:      srv.userRepo.GrantUserContentAccess,
+	})
+}
+
+func (srv *Service) grantAccess(ctx context.Context, userID, adminID string, action auditdomain.AdminActionType, spec grantSpec) error {
+	if !validator.IsValidUUID(userID) {
+		return admindomain.ErrInvalidID
+	}
+
+	return srv.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		title, err := spec.lookup(ctx, spec.itemID)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return admindomain.ErrItemNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("service.%s: lookup item: %w", spec.method, err)
+		}
+
+		user, err := srv.userRepo.GetUserDataByID(ctx, userID)
+		if err != nil {
+			return fmt.Errorf("service.%s: get user: %w", spec.method, err)
+		}
+		if user.DeletedAt != nil || user.Email == nil {
+			return admindomain.ErrInvalidUserState
+		}
+
+		if err := spec.grant(ctx, userID, spec.itemID); err != nil {
+			return fmt.Errorf("service.%s: %w", spec.method, err)
+		}
+
+		err = srv.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: adminID,
+			ActionType:  action,
+			TargetType:  auditdomain.TargetUser,
+			TargetID:    userID,
+			Details:     map[string]any{spec.detailsKey: spec.itemID},
+		})
+		if err != nil {
+			return fmt.Errorf("service.%s: %s: audit: %w", spec.method, action, err)
+		}
+
+		return srv.outbox.Emit(ctx, events.AggregationTypeUser, userID, events.EventGrantAccess, events.GrantAccessPayload{
+			UserID:   userID,
+			ItemName: title,
+			ItemID:   spec.itemID,
+			ItemType: string(spec.itemType),
+			UserName: user.DisplayName(),
+			Email:    *user.Email,
+		})
 	})
 }

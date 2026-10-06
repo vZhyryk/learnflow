@@ -534,7 +534,7 @@ func TestSendEmailEventTypes(t *testing.T) {
 		for action, wantEvent := range cases {
 			Convey("When the action is "+string(action), func() {
 				var args []any
-				srv := New(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewCapturingOutbox(&args), noopBlocklist())
+				srv := newService(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewCapturingOutbox(&args), noopBlocklist())
 
 				err := srv.sendEmail(context.Background(), action, target)
 
@@ -550,7 +550,7 @@ func TestSendEmailEventTypes(t *testing.T) {
 
 		Convey("When the action has no email notification", func() {
 			var args []any
-			srv := New(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewCapturingOutbox(&args), noopBlocklist())
+			srv := newService(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewCapturingOutbox(&args), noopBlocklist())
 
 			err := srv.sendEmail(context.Background(), auditdomain.ActionAssignSubadmin, target)
 
@@ -559,7 +559,7 @@ func TestSendEmailEventTypes(t *testing.T) {
 		})
 
 		Convey("When the outbox fails", func() {
-			srv := New(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewFailingOutbox(testutil.ErrDBUnexpected), noopBlocklist())
+			srv := newService(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewFailingOutbox(testutil.ErrDBUnexpected), noopBlocklist())
 
 			err := srv.sendEmail(context.Background(), auditdomain.ActionBlockUser, target)
 
@@ -580,7 +580,7 @@ func TestSendEmailSkipsTargetWithoutEmail(t *testing.T) {
 		for name, target := range cases {
 			Convey("When the target has "+name+", nothing is emitted and no error is returned", func() {
 				var args []any
-				srv := New(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewCapturingOutbox(&args), noopBlocklist())
+				srv := newService(&mockAnnouncementRepo{}, &mockUserRepo{}, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{}, testutil.NewCapturingOutbox(&args), noopBlocklist())
 
 				err := srv.sendEmail(context.Background(), auditdomain.ActionBlockUser, target)
 
@@ -604,7 +604,7 @@ func TestChangeUserFieldTouchesRedisOnlyAfterTheOutboxEmit(t *testing.T) {
 			revoked = true
 			return nil
 		}}
-		srv := New(&mockAnnouncementRepo{}, users, noopAdminActions(), sessions, &testutil.NoopTransactor{},
+		srv := newService(&mockAnnouncementRepo{}, users, noopAdminActions(), sessions, &testutil.NoopTransactor{},
 			testutil.NewFailingOutbox(testutil.ErrDBUnexpected), recordingBlocklist(&calls, nil, nil))
 
 		for _, operation := range []admindomain.UserAdminOperation{admindomain.BlockUser, admindomain.UnBlockUser} {
@@ -632,7 +632,7 @@ func TestChangeUserFieldTouchesRedisOnlyAfterTheOutboxEmit(t *testing.T) {
 				return data, err
 			},
 		}
-		srv := New(&mockAnnouncementRepo{}, users, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{},
+		srv := newService(&mockAnnouncementRepo{}, users, noopAdminActions(), noopSessions(), &testutil.NoopTransactor{},
 			testutil.NewNoopOutbox(), recordingBlocklist(&calls, nil, nil))
 
 		Convey("Blocking still succeeds and marks the user blocked in Redis", func() {

@@ -66,7 +66,10 @@ func newUserOpFixture(t *testing.T, blocklist *redisinfra.Instance) *userOpFixtu
 
 	adminRepo := adminrepository.NewRepository(pool)
 	authRepo := authrepository.NewRepository(pool)
-	srv := New(adminRepo, adminRepo, auditrepository.New(pool), authRepo, db.NewTransactor(pool), events.NewOutboxWriter(pool), blocklist)
+	srv := New(
+		Repos{AnnounRepo: adminRepo, UserRepo: adminRepo, ActionRepo: auditrepository.New(pool), SessionRepo: authRepo},
+		Utils{Transactor: db.NewTransactor(pool), Outbox: events.NewOutboxWriter(pool), Blocklist: blocklist},
+	)
 
 	return &userOpFixture{srv: srv, pool: pool, authRepo: authRepo, redis: realRedis, adminID: adminID, targetID: targetID}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	admindomain "learnflow_backend/internal/admin/domain"
 	auditdomain "learnflow_backend/internal/audit/domain"
+	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 	"time"
@@ -90,7 +91,7 @@ func newTestService(repo *mockAnnouncementRepo) *Service {
 }
 
 func newTestServiceWithActions(repo *mockAnnouncementRepo, actions *mockAdminActionRepo) *Service {
-	return New(repo, &mockUserRepo{}, actions, noopSessions(), &testutil.NoopTransactor{}, testutil.NewNoopOutbox(), noopBlocklist())
+	return newService(repo, &mockUserRepo{}, actions, noopSessions(), &testutil.NoopTransactor{}, testutil.NewNoopOutbox(), noopBlocklist())
 }
 
 // mockUserRepo implements admindomain.UserRepository via function fields.
@@ -103,6 +104,69 @@ type mockUserRepo struct {
 	unBlockUser     func(ctx context.Context, userID string) error
 	getUsersData    func(ctx context.Context, params pagination.Params) ([]*admindomain.UserData, int, error)
 	getUserDataByID func(ctx context.Context, userID string) (*admindomain.UserData, error)
+
+	grantUserCourseAccess  func(ctx context.Context, userID, courseID string) error
+	grantUserContentAccess func(ctx context.Context, userID, contentItemID string) error
+}
+
+func (m *mockUserRepo) GrantUserCourseAccess(ctx context.Context, userID, courseID string) error {
+	if m.grantUserCourseAccess == nil {
+		panic("mockUserRepo.GrantUserCourseAccess not set")
+	}
+	return m.grantUserCourseAccess(ctx, userID, courseID)
+}
+
+func (m *mockUserRepo) GrantUserContentAccess(ctx context.Context, userID, contentItemID string) error {
+	if m.grantUserContentAccess == nil {
+		panic("mockUserRepo.GrantUserContentAccess not set")
+	}
+	return m.grantUserContentAccess(ctx, userID, contentItemID)
+}
+
+// mockCourseRepo implements admindomain.CourseRepository via a function field.
+type mockCourseRepo struct {
+	getCourseTitleByID func(ctx context.Context, courseID string) (string, error)
+}
+
+func (m *mockCourseRepo) GetCourseTitleByID(ctx context.Context, courseID string) (string, error) {
+	if m.getCourseTitleByID == nil {
+		panic("mockCourseRepo.GetCourseTitleByID not set")
+	}
+	return m.getCourseTitleByID(ctx, courseID)
+}
+
+// mockContentItemRepo implements admindomain.ContentItemRepository via a function field.
+type mockContentItemRepo struct {
+	getContentItemTitleByID func(ctx context.Context, contentItemID string) (string, error)
+}
+
+func (m *mockContentItemRepo) GetContentItemTitleByID(ctx context.Context, contentItemID string) (string, error) {
+	if m.getContentItemTitleByID == nil {
+		panic("mockContentItemRepo.GetContentItemTitleByID not set")
+	}
+	return m.getContentItemTitleByID(ctx, contentItemID)
+}
+
+func newService(
+	announ admindomain.AnnouncementRepository,
+	users admindomain.UserRepository,
+	actions admindomain.AdminActionRepository,
+	sessions admindomain.SessionRepository,
+	transactor admindomain.Transactor,
+	outbox *events.OutboxWriter,
+	blocklist admindomain.UserBlockList,
+) *Service {
+	return New(
+		Repos{
+			AnnounRepo:      announ,
+			UserRepo:        users,
+			ActionRepo:      actions,
+			SessionRepo:     sessions,
+			CourseRepo:      &mockCourseRepo{},
+			ContentItemRepo: &mockContentItemRepo{},
+		},
+		Utils{Transactor: transactor, Outbox: outbox, Blocklist: blocklist},
+	)
 }
 
 func (m *mockUserRepo) RevokeUserRole(ctx context.Context, userID string) error {
@@ -193,7 +257,7 @@ func newTestUserServiceWithSessions(users *mockUserRepo, actions *mockAdminActio
 }
 
 func newTestUserServiceFull(users *mockUserRepo, actions *mockAdminActionRepo, sessions *mockSessionRepo, blocklist *mockBlocklist) *Service {
-	return New(&mockAnnouncementRepo{}, users, actions, sessions, &testutil.NoopTransactor{}, testutil.NewNoopOutbox(), blocklist)
+	return newService(&mockAnnouncementRepo{}, users, actions, sessions, &testutil.NoopTransactor{}, testutil.NewNoopOutbox(), blocklist)
 }
 
 // mockBlocklist implements admindomain.UserBlockList via function fields.

@@ -1,6 +1,7 @@
 package admindomain
 
 import (
+	"learnflow_backend/internal/shared/validator"
 	"time"
 )
 
@@ -9,6 +10,9 @@ type UserRole string
 
 // UserStatus represents the current state of a user account.
 type UserStatus string
+
+// ItemType names the kind of item an admin grants access to.
+type ItemType string
 
 // Role constants.
 const (
@@ -23,6 +27,11 @@ const (
 	StatusBlocked             UserStatus = "blocked"
 	StatusDeleted             UserStatus = "deleted"
 	StatusPendingVerification UserStatus = "pending_verification"
+)
+
+const (
+	ContentItemType ItemType = "content"
+	CourseItemType  ItemType = "course"
 )
 
 // UserData is the admin view of a user account joined with its profile.
@@ -67,3 +76,38 @@ const (
 	BlockUser      UserAdminOperation = "BlockUser"
 	UnBlockUser    UserAdminOperation = "UnBlockUser"
 )
+
+// GrantAccessRequest is the body of the admin grant-access endpoint.
+type GrantAccessRequest struct {
+	ItemID   string   `json:"item_id"`
+	ItemType ItemType `json:"item_type"`
+}
+
+// Validate checks that the item id is a UUID and the item type is known.
+func (req *GrantAccessRequest) Validate() error {
+	checks := []func() error{
+		req.validateID,
+		req.validateItemType,
+	}
+	for _, check := range checks {
+		if err := check(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (req *GrantAccessRequest) validateID() error {
+	if req.ItemID == "" || !validator.IsValidUUID(req.ItemID) {
+		return ErrInvalidItemID
+	}
+	return nil
+}
+
+func (req *GrantAccessRequest) validateItemType() error {
+	if req.ItemType != ContentItemType && req.ItemType != CourseItemType {
+		return ErrInvalidItemType
+	}
+	return nil
+}
