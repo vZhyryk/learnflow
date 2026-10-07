@@ -148,6 +148,34 @@ func TestApproveAnnouncement(t *testing.T) {
 		admindomain.ErrAnnouncementNotFound)
 }
 
+func TestSetExpiredNowAnnouncement(t *testing.T) {
+	testutil.TestExecMethod(t, "SetExpiredNowAnnouncement",
+		func(runner *testutil.MockQueryRunner) func(context.Context, string, string) error {
+			repo := newTestRepo(runner)
+			return func(ctx context.Context, id, _ string) error {
+				return repo.SetExpiredNowAnnouncement(ctx, id)
+			}
+		},
+		admindomain.ErrAnnouncementNotFound)
+
+	Convey("Given an admin repository", t, func() {
+		var gotQuery string
+		var gotArgs []any
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+				gotQuery, gotArgs = sql, args
+				return pgconn.NewCommandTag("UPDATE 1"), nil
+			},
+		})
+
+		Convey("It updates the announcement by id", func() {
+			So(repo.SetExpiredNowAnnouncement(context.Background(), "announcement-123"), ShouldBeNil)
+			So(gotQuery, ShouldEqual, setExpiredNowAnnouncementSQL)
+			So(gotArgs, ShouldResemble, []any{"announcement-123"})
+		})
+	})
+}
+
 func TestGetAnnouncementByID(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 

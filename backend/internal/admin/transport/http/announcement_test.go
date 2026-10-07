@@ -153,6 +153,55 @@ func TestApproveAnnouncement(t *testing.T) {
 	})
 }
 
+func TestSetExpiredAnnouncement(t *testing.T) {
+	Convey("PUT /api/v1/admin/announcements/{id}/expired", t, func() {
+		var svcErr error
+		var gotID, gotUserID string
+		svc := &mockService{
+			setExpiredNowAnnouncement: func(_ context.Context, announcementID, userID string) error {
+				gotID, gotUserID = announcementID, userID
+				return svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodPut, "/api/v1/admin/announcements/"+validAnnouncementID+"/expired")
+		mux, newReq := f.mux, f.newReq
+
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(mux, newReq("", nil))
+			}, ShouldPanic)
+		})
+
+		Convey("announcement not found → 404", func() {
+			svcErr = admindomain.ErrAnnouncementNotFound
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusNotFound)
+		})
+
+		Convey("Service returns an unexpected error → 500", func() {
+			svcErr = testutil.ErrDBUnexpected
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
+		Convey("Valid request → 200 with message, passing the id and the admin id", func() {
+			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			So(gotID, ShouldEqual, validAnnouncementID)
+			So(gotUserID, ShouldEqual, "user-123")
+			body := decodeBody(t, w.Body.Bytes())
+			So(body["message"], ShouldNotBeNil)
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withUser(newReq("", nil)))
+			}, ShouldNotPanic)
+		})
+	})
+}
+
 func TestGetAnnouncements(t *testing.T) {
 	Convey("GET /api/v1/admin/announcements/all", t, func() {
 		var svcErr error
@@ -215,6 +264,12 @@ func TestGetUnApprovedAnnouncements(t *testing.T) {
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["announcements"], ShouldNotBeNil)
 		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withUser(newReq("", nil)))
+			}, ShouldNotPanic)
+		})
 	})
 }
 
@@ -241,6 +296,12 @@ func TestGetApprovedAnnouncements(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["announcements"], ShouldNotBeNil)
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withUser(newReq("", nil)))
+			}, ShouldNotPanic)
 		})
 	})
 }
@@ -310,6 +371,12 @@ func TestGetExpiredAnnouncements(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["announcements"], ShouldNotBeNil)
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				mux.ServeHTTP(&errWriter{}, withUser(newReq("", nil)))
+			}, ShouldNotPanic)
 		})
 	})
 }

@@ -180,21 +180,28 @@ func TestUpdateAnnouncementPersistence(t *testing.T) {
 	})
 }
 
+const testAnnouncementID = "44444444-4444-4444-4444-444444444444"
+
 func TestApproveAnnouncement(t *testing.T) {
 	Convey("Given an admin service", t, func() {
 		repo := &mockAnnouncementRepo{}
 		srv := newTestService(repo)
 
+		Convey("When the announcement id is not a UUID", func() {
+			err := srv.ApproveAnnouncement(context.Background(), "not-a-uuid", "user-1")
+			So(errors.Is(err, admindomain.ErrInvalidID), ShouldBeTrue)
+		})
+
 		Convey("When the repository returns an error", func() {
 			repo.approveAnnouncement = testutil.AlwaysFailsDB2
-			err := srv.ApproveAnnouncement(context.Background(), "announcement-123", "user-1")
+			err := srv.ApproveAnnouncement(context.Background(), testAnnouncementID, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
 
 		Convey("When it succeeds", func() {
 			repo.approveAnnouncement = testutil.AlwaysNil2
-			err := srv.ApproveAnnouncement(context.Background(), "announcement-123", "user-1")
+			err := srv.ApproveAnnouncement(context.Background(), testAnnouncementID, "user-1")
 			So(err, ShouldBeNil)
 		})
 
@@ -203,13 +210,13 @@ func TestApproveAnnouncement(t *testing.T) {
 			srv = newTestServiceWithActions(repo, capturingAdminActions(&actions, nil))
 			repo.approveAnnouncement = testutil.AlwaysNil2
 
-			err := srv.ApproveAnnouncement(context.Background(), "announcement-123", "user-1")
+			err := srv.ApproveAnnouncement(context.Background(), testAnnouncementID, "user-1")
 			So(err, ShouldBeNil)
 			So(actions, ShouldResemble, []*auditdomain.AdminAction{{
 				AdminUserID: "user-1",
 				ActionType:  auditdomain.ActionApproveItem,
 				TargetType:  auditdomain.TargetAnnouncement,
-				TargetID:    "announcement-123",
+				TargetID:    testAnnouncementID,
 			}})
 		})
 
@@ -218,7 +225,69 @@ func TestApproveAnnouncement(t *testing.T) {
 			srv = newTestServiceWithActions(repo, capturingAdminActions(&actions, testutil.ErrDBUnexpected))
 			repo.approveAnnouncement = testutil.AlwaysNil2
 
-			err := srv.ApproveAnnouncement(context.Background(), "announcement-123", "user-1")
+			err := srv.ApproveAnnouncement(context.Background(), testAnnouncementID, "user-1")
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		})
+	})
+}
+
+func TestSetExpiredNowAnnouncement(t *testing.T) {
+	Convey("Given an admin service", t, func() {
+		repo := &mockAnnouncementRepo{}
+		var actions []*auditdomain.AdminAction
+		srv := newTestServiceWithActions(repo, capturingAdminActions(&actions, nil))
+
+		Convey("When the announcement id is not a UUID nothing is written", func() {
+			err := srv.SetExpiredNowAnnouncement(context.Background(), "not-a-uuid", "user-1")
+
+			So(errors.Is(err, admindomain.ErrInvalidID), ShouldBeTrue)
+			So(actions, ShouldBeEmpty)
+		})
+
+		Convey("When the repository returns an error no audit entry is written", func() {
+			repo.setExpiredNowAnnouncement = func(_ context.Context, _ string) error { return testutil.ErrDBUnexpected }
+
+			err := srv.SetExpiredNowAnnouncement(context.Background(), testAnnouncementID, "user-1")
+
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "service.SetExpiredNowAnnouncement")
+			So(actions, ShouldBeEmpty)
+		})
+
+		Convey("When the announcement does not exist the sentinel is preserved", func() {
+			repo.setExpiredNowAnnouncement = func(_ context.Context, _ string) error { return admindomain.ErrAnnouncementNotFound }
+
+			err := srv.SetExpiredNowAnnouncement(context.Background(), testAnnouncementID, "user-1")
+
+			So(errors.Is(err, admindomain.ErrAnnouncementNotFound), ShouldBeTrue)
+		})
+
+		Convey("When it succeeds the id is passed through and the update audit entry is written", func() {
+			var gotID string
+			repo.setExpiredNowAnnouncement = func(_ context.Context, id string) error {
+				gotID = id
+				return nil
+			}
+
+			err := srv.SetExpiredNowAnnouncement(context.Background(), testAnnouncementID, "user-1")
+
+			So(err, ShouldBeNil)
+			So(gotID, ShouldEqual, testAnnouncementID)
+			So(actions, ShouldResemble, []*auditdomain.AdminAction{{
+				AdminUserID: "user-1",
+				ActionType:  auditdomain.ActionUpdateItem,
+				TargetType:  auditdomain.TargetAnnouncement,
+				TargetID:    testAnnouncementID,
+				Details:     map[string]any{"expired_at": true},
+			}})
+		})
+
+		Convey("When the audit write fails the error is returned", func() {
+			srv = newTestServiceWithActions(repo, capturingAdminActions(&actions, testutil.ErrDBUnexpected))
+			repo.setExpiredNowAnnouncement = func(_ context.Context, _ string) error { return nil }
+
+			err := srv.SetExpiredNowAnnouncement(context.Background(), testAnnouncementID, "user-1")
+
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
 	})

@@ -35,6 +35,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminChain, staticChain ali
 	mux.Handle("GET /api/v1/admin/announcements/unapproved", adminChain.ThenFunc(h.getUnApprovedAnnouncements))
 	mux.Handle("GET /api/v1/admin/announcements/approved", adminChain.ThenFunc(h.getApprovedAnnouncements))
 	mux.Handle("GET /api/v1/admin/announcements/expired", adminChain.ThenFunc(h.getExpiredAnnouncements))
+	mux.Handle("PUT /api/v1/admin/announcements/{id}/expired", adminChain.ThenFunc(h.setExpiredAnnouncements))
 
 	mux.Handle("GET /api/v1/admin/users", adminChain.ThenFunc(h.getUsersData))
 	mux.Handle("GET /api/v1/admin/users/{id}", adminChain.ThenFunc(h.getUserDataByID))

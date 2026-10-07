@@ -40,6 +40,7 @@ type mockService struct {
 	createAnnouncement         func(ctx context.Context, req admindomain.CreateAnnouncementRequest) (string, error)
 	updateAnnouncement         func(ctx context.Context, req admindomain.UpdateAnnouncementRequest) error
 	approveAnnouncement        func(ctx context.Context, announcementID, userID string) error
+	setExpiredNowAnnouncement  func(ctx context.Context, announcementID, userID string) error
 	getAnnouncements           func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
 	getUnApprovedAnnouncements func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
 	getApprovedAnnouncements   func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
@@ -101,6 +102,13 @@ func (m *mockService) ApproveAnnouncement(ctx context.Context, announcementID, u
 		panic("mockService.approveAnnouncement not set")
 	}
 	return m.approveAnnouncement(ctx, announcementID, userID)
+}
+
+func (m *mockService) SetExpiredNowAnnouncement(ctx context.Context, announcementID, userID string) error {
+	if m.setExpiredNowAnnouncement == nil {
+		panic("mockService.setExpiredNowAnnouncement not set")
+	}
+	return m.setExpiredNowAnnouncement(ctx, announcementID, userID)
 }
 
 func (m *mockService) GetAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {

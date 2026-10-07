@@ -280,6 +280,8 @@ func realClientIP(r *http.Request, trustedProxies []net.IPNet) string {
 	return remoteIP
 }
 
+// ipFromProxyHeaders takes the leftmost X-Forwarded-For entry, so the trusted proxy must overwrite the header rather
+// than append to it: otherwise the leftmost value is whatever the client sent.
 func ipFromProxyHeaders(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		if ip := parseIP(strings.Split(xff, ",")[0]); ip != "" {

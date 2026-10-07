@@ -42,6 +42,12 @@ func TestGetUsersData(t *testing.T) {
 			So(body["total"], ShouldEqual, 7)
 			So(body["users"], ShouldHaveLength, 1)
 		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				f.mux.ServeHTTP(&errWriter{}, withUser(f.newReq("", nil)))
+			}, ShouldNotPanic)
+		})
 	})
 }
 
@@ -80,6 +86,12 @@ func TestGetUserDataByID(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(gotID, ShouldEqual, validUserID)
 			So(decodeBody(t, w.Body.Bytes())["user"], ShouldNotBeNil)
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				f.mux.ServeHTTP(&errWriter{}, withUser(f.newReq("", nil)))
+			}, ShouldNotPanic)
 		})
 	})
 }
@@ -178,6 +190,12 @@ func TestChangeUserRoutesSuccess(t *testing.T) {
 				So(cf.gotUserID, ShouldEqual, validUserID)
 				So(cf.gotAdminID, ShouldEqual, "user-123")
 			})
+
+			Convey("Valid request and the success response write fails → does not panic", func() {
+				So(func() {
+					cf.mux.ServeHTTP(&errWriter{}, withUser(cf.newReq("", nil)))
+				}, ShouldNotPanic)
+			})
 		})
 	}
 }
@@ -227,6 +245,12 @@ func TestGrantUserAccessSuccess(t *testing.T) {
 			So(gf.gotItemID, ShouldEqual, grantItemID)
 			So(gf.gotAdminID, ShouldEqual, "user-123")
 			So(gf.gotAction, ShouldEqual, auditdomain.ActionGrantItemAccess)
+
+			Convey("The success response write fails → does not panic", func() {
+				So(func() {
+					gf.mux.ServeHTTP(&errWriter{}, withUser(gf.newReq(grantBody(itemType), nil)))
+				}, ShouldNotPanic)
+			})
 		})
 	}
 }

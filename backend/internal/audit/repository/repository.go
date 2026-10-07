@@ -26,10 +26,20 @@ const (
 	`
 
 	getInstanceAdminActionsSQL = `
-		SELECT id, admin_user_id, action_type, target_type, target_id, details_json, created_at
-		FROM admin_actions
-		WHERE target_type = $1 AND target_id = $2
-		ORDER BY created_at DESC, id DESC
+		SELECT
+			a.id,
+			a.admin_user_id,
+			COALESCE(NULLIF(p.first_name, ''), u.email) AS admin_name,
+			a.action_type,
+			a.target_type,
+			a.target_id,
+			a.details_json,
+			a.created_at
+		FROM admin_actions a
+		JOIN users u ON u.id = a.admin_user_id
+		LEFT JOIN user_profiles p ON p.user_id = u.id
+		WHERE a.target_type = $1 AND a.target_id = $2
+		ORDER BY a.created_at DESC, a.id DESC
 		LIMIT $3 OFFSET $4
 	`
 

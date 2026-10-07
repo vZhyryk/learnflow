@@ -7,6 +7,7 @@ import (
 	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/pagination"
+	"learnflow_backend/internal/shared/validator"
 )
 
 // CreateAnnouncement creates a new announcement and returns its ID.
@@ -72,6 +73,10 @@ func (srv *Service) UpdateAnnouncement(ctx context.Context, req admindomain.Upda
 
 // ApproveAnnouncement marks an announcement as approved by the given user.
 func (srv *Service) ApproveAnnouncement(ctx context.Context, announcementID, userID string) error {
+	if !validator.IsValidUUID(announcementID) {
+		return admindomain.ErrInvalidID
+	}
+
 	return srv.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		err := srv.announRepo.ApproveAnnouncement(ctx, announcementID, userID)
 		if err != nil {
@@ -145,4 +150,32 @@ func (srv *Service) GetExpiredAnnouncements(ctx context.Context, params paginati
 	}
 
 	return list, nil
+}
+
+// SetExpiredNowAnnouncement ends an announcement early by setting expires_at to now and audits it as an update.
+func (srv *Service) SetExpiredNowAnnouncement(ctx context.Context, announcementID, userID string) error {
+	if !validator.IsValidUUID(announcementID) {
+		return admindomain.ErrInvalidID
+	}
+
+	return srv.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		err := srv.announRepo.SetExpiredNowAnnouncement(ctx, announcementID)
+		if err != nil {
+			return fmt.Errorf("service.SetExpiredNowAnnouncement: %w", err)
+		}
+
+		err = srv.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionUpdateItem,
+			TargetType:  auditdomain.TargetAnnouncement,
+			TargetID:    announcementID,
+			Details:     map[string]any{"expired_at": true},
+		})
+
+		if err != nil {
+			return fmt.Errorf("service.SetExpiredNowAnnouncement: %w", err)
+		}
+
+		return nil
+	})
 }

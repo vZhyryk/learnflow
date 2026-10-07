@@ -16,28 +16,20 @@ func (s *Service) Refresh(ctx context.Context, req authdomain.RefreshRequest) (*
 	var rawToken string
 	session := &authdomain.UserSession{}
 
-	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+	err := s.checkRefreshSessionPrevHash(ctx, refreshHashHex)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		uSession, err := s.sessionRepo.GetUserSessionByRefreshToken(ctx, refreshHashHex)
 		if err != nil {
-			// Not found as current — if it exists as previous_refresh_hash, it's a replayed
-			// rotated-out token (theft signal): revoke all sessions for that user.
-			checkErr := s.checkRefreshSessionPrevHash(ctx, refreshHashHex)
-			if checkErr != nil {
-				return checkErr
-			}
 			return err
 		}
 
 		user, err = s.getRefreshUserAndCheckStatusByID(ctx, uSession.UserID)
 		if err != nil {
 			return err
-		}
-
-		// Token is valid as current but also appears as previous_refresh_hash elsewhere —
-		// a race condition or duplication attack. Revoke all sessions.
-		checkErr := s.checkRefreshSessionPrevHash(ctx, refreshHashHex)
-		if checkErr != nil {
-			return checkErr
 		}
 
 		rToken, tokenHash, err := tokens.GenerateSecureToken()

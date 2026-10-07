@@ -106,6 +106,19 @@ func TestGetInstanceAdminActionsRoute(t *testing.T) {
 		Convey("Without a user in the context it panics (middleware invariant violated)", func() {
 			So(func() { testutil.ServeHTTP(af.mux, af.newReq("", auditQuery("user", validUserID))) }, ShouldPanic)
 		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				af.mux.ServeHTTP(&errWriter{}, withUser(af.newReq("", auditQuery("user", validUserID))))
+			}, ShouldNotPanic)
+		})
+
+		Convey("Invalid input and the 400 response write fails → does not panic", func() {
+			So(func() {
+				af.mux.ServeHTTP(&errWriter{}, withUser(af.newReq("", auditQuery("video", validUserID))))
+			}, ShouldNotPanic)
+			So(af.called, ShouldBeFalse)
+		})
 	})
 }
 
@@ -158,6 +171,12 @@ func TestGetFailedJobsRoute(t *testing.T) {
 
 		Convey("Without a user in the context it panics (middleware invariant violated)", func() {
 			So(func() { testutil.ServeHTTP(f.mux, f.newReq("", nil)) }, ShouldPanic)
+		})
+
+		Convey("Valid request and the success response write fails → does not panic", func() {
+			So(func() {
+				f.mux.ServeHTTP(&errWriter{}, withUser(f.newReq("", nil)))
+			}, ShouldNotPanic)
 		})
 	})
 }

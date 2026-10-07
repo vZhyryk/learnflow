@@ -141,3 +141,20 @@ func (h *Handler) getExpiredAnnouncements(w http.ResponseWriter, r *http.Request
 		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
 	}
 }
+
+func (h *Handler) setExpiredAnnouncements(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := appcontext.MustUserFromContext(ctx)
+	announcementID := r.PathValue("id")
+
+	err := h.svc.SetExpiredNowAnnouncement(ctx, announcementID, user.ID)
+	if err != nil {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
+
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "announcement was successfully set to expired"}, nil)
+	if err != nil {
+		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
+	}
+}

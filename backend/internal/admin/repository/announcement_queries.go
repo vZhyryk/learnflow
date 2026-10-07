@@ -24,6 +24,12 @@ const (
 		WHERE id = $1
 	`
 
+	setExpiredNowAnnouncementSQL = `
+		UPDATE announcements
+		SET expires_at = now()
+		WHERE id = $1 AND (expires_at IS NULL OR expires_at > now())
+	`
+
 	approveAnnouncementSQL = `
 		UPDATE announcements
 		SET approved_at = now(),

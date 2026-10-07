@@ -935,3 +935,37 @@ func TestGrantAccessOutboxFailure(t *testing.T) {
 		})
 	}
 }
+
+func TestApplyChangeEffectsIgnoresActionsWithoutEffects(t *testing.T) {
+	Convey("Given an action that neither blocks, unblocks nor changes the role", t, func() {
+		var calls []blocklistCall
+		revoked := false
+		sessions := &mockSessionRepo{revokeAllUserSessionsAdmin: func(_ context.Context, _, _ string) error {
+			revoked = true
+			return nil
+		}}
+		srv := newTestUserServiceFull(&mockUserRepo{}, noopAdminActions(), sessions, recordingBlocklist(&calls, nil, nil))
+
+		err := srv.applyChangeEffects(context.Background(), auditdomain.ActionGrantItemAccess, validUserID, testAdminID)
+
+		So(err, ShouldBeNil)
+		So(revoked, ShouldBeFalse)
+		So(calls, ShouldBeEmpty)
+	})
+}
+
+func TestRevokeSubAdminAccessSessionFailure(t *testing.T) {
+	Convey("Given the session revocation fails while revoking a subadmin", t, func() {
+		var calls []blocklistCall
+		sessions := &mockSessionRepo{revokeAllUserSessionsAdmin: func(_ context.Context, _, _ string) error {
+			return testutil.ErrDBUnexpected
+		}}
+		srv := newTestUserServiceFull(&mockUserRepo{}, noopAdminActions(), sessions, recordingBlocklist(&calls, nil, nil))
+
+		err := srv.revokeSubAdminAccess(context.Background(), validUserID, testAdminID)
+
+		So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+		So(err.Error(), ShouldContainSubstring, "revoke sessions")
+		So(calls, ShouldBeEmpty)
+	})
+}

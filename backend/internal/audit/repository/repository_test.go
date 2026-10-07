@@ -101,6 +101,7 @@ func fakeAdminAction(n int) *auditdomain.AdminAction {
 	return &auditdomain.AdminAction{
 		ID:          "action-" + id,
 		AdminUserID: "admin-" + id,
+		AdminName:   "Admin " + id,
 		ActionType:  auditdomain.ActionBlockUser,
 		TargetType:  auditdomain.TargetUser,
 		TargetID:    "user-1",
@@ -113,11 +114,12 @@ func fakeAdminActionScan(a *auditdomain.AdminAction) func(dest ...any) error {
 	return func(dest ...any) error {
 		*testutil.CastStr(dest[0], 0) = a.ID
 		*testutil.CastStr(dest[1], 1) = a.AdminUserID
-		*testutil.CastEnum[auditdomain.AdminActionType](dest[2], 2) = a.ActionType
-		*testutil.CastEnum[auditdomain.AdminTargetType](dest[3], 3) = a.TargetType
-		*testutil.CastStr(dest[4], 4) = a.TargetID
-		*testutil.CastEnum[map[string]any](dest[5], 5) = a.Details
-		*testutil.CastTime(dest[6], 6) = a.CreatedAt
+		*testutil.CastStr(dest[2], 2) = a.AdminName
+		*testutil.CastEnum[auditdomain.AdminActionType](dest[3], 3) = a.ActionType
+		*testutil.CastEnum[auditdomain.AdminTargetType](dest[4], 4) = a.TargetType
+		*testutil.CastStr(dest[5], 5) = a.TargetID
+		*testutil.CastEnum[map[string]any](dest[6], 6) = a.Details
+		*testutil.CastTime(dest[7], 7) = a.CreatedAt
 		return nil
 	}
 }

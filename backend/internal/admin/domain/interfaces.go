@@ -23,6 +23,7 @@ type AnnouncementRepository interface {
 	GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
 	GetAnnouncementByID(ctx context.Context, id string) (*Announcement, error)
 	GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*AnnouncementPublic, error)
+	SetExpiredNowAnnouncement(ctx context.Context, announcementID string) error
 }
 
 // AdminActionRepository persists the admin audit trail.
@@ -86,4 +87,5 @@ type Service interface {
 	GrantUserContentAccess(ctx context.Context, userID, contentItemID, adminID string, operationName auditdomain.AdminActionType) error
 	GetInstanceAdminActions(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) (actions []*auditdomain.AdminAction, count int, err error)
 	GetFailedJobs(ctx context.Context, params pagination.Params) (failedJobs []*auditdomain.FailedJob, count int, err error)
+	SetExpiredNowAnnouncement(ctx context.Context, announcementID, userID string) error
 }

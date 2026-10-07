@@ -49,7 +49,8 @@ func refillRate(requests float64, window time.Duration) float64 {
 }
 
 // redisRateLimit reports whether key may proceed under a token bucket that refills ratePerSecond tokens per second
-// up to burst, using the shared Redis. window only bounds how long an idle bucket is kept.
+// up to burst, using the shared Redis. window only bounds how long an idle bucket is kept (2×window): it should cover
+// burst/ratePerSecond, otherwise an idle bucket expires before it refills and the key restarts full.
 func (route *RouteHandler) redisRateLimit(ctx context.Context, key string, ratePerSecond float64, burst int, window time.Duration) (bool, error) {
 	now := time.Now().UnixNano()
 	ttl := max(int(window.Seconds())*2, 1)

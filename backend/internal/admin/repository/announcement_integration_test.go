@@ -283,6 +283,62 @@ func TestApproveAnnouncement_Integration(t *testing.T) {
 	})
 }
 
+func TestSetExpiredNowAnnouncement_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+
+	Convey("Given an admin repository backed by real Postgres", t, func() {
+		Convey("When expiring an approved, live announcement", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				created, err := repo.CreateAnnouncement(ctx, draftAnnouncement(t, tx))
+				So(err, ShouldBeNil)
+				So(repo.ApproveAnnouncement(ctx, created.ID, testutil.InsertRandomTestUser(t, tx)), ShouldBeNil)
+				live, err := repo.GetApprovedAnnouncements(ctx, pagination.NewParams(1, 100))
+				So(err, ShouldBeNil)
+				So(announcementIDs(live), ShouldContain, created.ID)
+
+				err = repo.SetExpiredNowAnnouncement(ctx, created.ID)
+
+				So(err, ShouldBeNil)
+				got, err := repo.GetAnnouncementByID(ctx, created.ID)
+				So(err, ShouldBeNil)
+				So(got.ExpiresAt.After(time.Now()), ShouldBeFalse)
+				So(got.ApprovedAt, ShouldNotBeNil)
+				stillLive, err := repo.GetApprovedAnnouncements(ctx, pagination.NewParams(1, 100))
+				So(err, ShouldBeNil)
+				So(announcementIDs(stillLive), ShouldNotContain, created.ID)
+			})
+		})
+
+		Convey("When the announcement has already expired its expires_at is left alone", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				seed := draftAnnouncement(t, tx)
+				seed.ExpiresAt = time.Now().Add(-1 * time.Hour).UTC().Truncate(time.Second)
+				created, err := repo.CreateAnnouncement(ctx, seed)
+				So(err, ShouldBeNil)
+
+				err = repo.SetExpiredNowAnnouncement(ctx, created.ID)
+
+				So(errors.Is(err, admindomain.ErrAnnouncementNotFound), ShouldBeTrue)
+				got, err := repo.GetAnnouncementByID(ctx, created.ID)
+				So(err, ShouldBeNil)
+				So(got.ExpiresAt.Equal(seed.ExpiresAt), ShouldBeTrue)
+			})
+		})
+
+		Convey("When the announcement does not exist", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+
+				err := repo.SetExpiredNowAnnouncement(ctx, "00000000-0000-0000-0000-000000000000")
+
+				So(errors.Is(err, admindomain.ErrAnnouncementNotFound), ShouldBeTrue)
+			})
+		})
+	})
+}
+
 func TestGetAnnouncementsByStatus_Integration(t *testing.T) {
 	pool := testutil.NewTestPool(t)
 

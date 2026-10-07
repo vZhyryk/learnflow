@@ -121,6 +121,57 @@ func TestRegisterExistingEmailNotifyGuard(t *testing.T) {
 	})
 }
 
+// TestRegisterConstantTimeUserEnumeration covers the timing mitigation on Register: an already
+// registered email must still pay for a bcrypt comparison, so the 202 response time does not reveal
+// whether the email exists. It spies on the bcryptCompareHashAndPassword hook instead of timing.
+func TestRegisterConstantTimeUserEnumeration(t *testing.T) {
+	Convey("Given an auth service", t, func() {
+		original := bcryptCompareHashAndPassword
+		Reset(func() { bcryptCompareHashAndPassword = original })
+
+		var calls int
+		var lastHash, lastPassword []byte
+		bcryptCompareHashAndPassword = func(hashedPassword, password []byte) error {
+			calls++
+			lastHash, lastPassword = hashedPassword, password
+			return original(hashedPassword, password)
+		}
+
+		Convey("When the email is already registered, the dummy bcrypt comparison still runs", func() {
+			uRepo := &mockUserRepo{
+				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
+					return registerExistingUser(), nil
+				},
+				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
+				},
+			}
+			srv := newTestService(uRepo, nil, nil, testutil.NewNoopOutbox(), nil)
+			req := fakeRegisterRequest()
+
+			_, err := srv.Register(context.Background(), req)
+
+			So(errors.Is(err, authdomain.ErrUserAlreadyExists), ShouldBeTrue)
+			So(calls, ShouldEqual, 1)
+			So(lastHash, ShouldResemble, srv.dummyPasswordHash)
+			So(string(lastPassword), ShouldEqual, req.Password)
+		})
+
+		Convey("When the email is new, the dummy comparison is not used (the real hashing pays the cost)", func() {
+			uRepo := newRegisterNewUserRepo()
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) {
+				return "", testutil.ErrDBUnexpected
+			}
+			srv := newTestService(uRepo, nil, nil, nil, nil)
+
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
+
+			So(err, ShouldNotBeNil)
+			So(calls, ShouldEqual, 0)
+		})
+	})
+}
+
 func newRegisterNewUserRepo() *mockUserRepo {
 	return &mockUserRepo{
 		getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {

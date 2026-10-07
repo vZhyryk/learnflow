@@ -80,18 +80,15 @@ func TestRefreshNoReuseWhenSessionNotFound(t *testing.T) {
 	})
 }
 
-func TestRefreshReuseBeforeUserFetch(t *testing.T) {
+func TestRefreshReplayedTokenRevokesAllSessions(t *testing.T) {
 	validReq, _, activeSession := newRefreshTestFixtures()
 
 	Convey("Given an auth service", t, func() {
-		Convey("When a rotated-out token is replayed (reuse before user fetch)", func() {
+		Convey("When a rotated-out token is replayed", func() {
 			var gotUserID string
 			var gotRevokedBy *string
 			var gotReason authdomain.RevokeReason
 			sRepo := &mockSessionRepo{
-				getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
-					return nil, authdomain.ErrSessionNotFound
-				},
 				getSessionByPrevHash: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
 					return activeSession, nil
 				},
@@ -108,39 +105,8 @@ func TestRefreshReuseBeforeUserFetch(t *testing.T) {
 			So(gotUserID, ShouldEqual, activeSession.UserID)
 			So(gotRevokedBy, ShouldBeNil)
 			So(gotReason, ShouldEqual, authdomain.RevokeReasonSuspiciousActivity)
-		})
-	})
-}
-
-func TestRefreshReuseAfterUserFetch(t *testing.T) {
-	validReq, activeUser, activeSession := newRefreshTestFixtures()
-
-	Convey("Given an auth service", t, func() {
-		Convey("When a rotated-out token is replayed and matches both current and previous hashes (reuse after user fetch)", func() {
-			revoked := false
-			sRepo := &mockSessionRepo{
-				getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
-					return activeSession, nil
-				},
-				getSessionByPrevHash: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
-					return activeSession, nil
-				},
-				revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error {
-					revoked = true
-					return nil
-				},
-			}
-			uRepo := &mockUserRepo{
-				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return activeUser, nil
-				},
-			}
-			srv := newTestService(uRepo, sRepo, nil, nil, nil)
-
-			_, err := srv.Refresh(context.Background(), validReq)
-
-			So(errors.Is(err, authdomain.ErrSessionRevoked), ShouldBeTrue)
-			So(revoked, ShouldBeTrue)
+			// getUserSessionByRefreshToken is unset on the mock and panics if called: the replay
+			// check must finish before the rotation transaction starts, or its revoke would be rolled back.
 		})
 	})
 }
@@ -192,6 +158,9 @@ func refreshActiveSessionRepo(session *authdomain.UserSession) *mockSessionRepo 
 	return &mockSessionRepo{
 		getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
 			return session, nil
+		},
+		getSessionByPrevHash: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
+			return nil, authdomain.ErrSessionNotFound
 		},
 	}
 }

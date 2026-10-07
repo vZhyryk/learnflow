@@ -20,6 +20,8 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 	}
 
 	if user != nil {
+		// Dummy bcrypt (same cost as hashing a new password) keeps this path as slow as a fresh registration.
+		bcryptCompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck,gosec // discarded intentionally, only used to consume constant time
 		return "", s.handleGetUserByEmailRegisterError(ctx, user)
 	}
 

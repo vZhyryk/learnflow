@@ -50,9 +50,8 @@ type UserData struct {
 	DeletedAt   *time.Time `json:"deleted_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 	LastLoginAt *time.Time `json:"last_login_at"`
-	// Purchases   []any      `json:"purchases"`
-	Status UserStatus `json:"status"`
-	Role   UserRole   `json:"role"`
+	Status      UserStatus `json:"status"`
+	Role        UserRole   `json:"role"`
 }
 
 // DisplayName returns the first name, or a generic "User" when it is unset.

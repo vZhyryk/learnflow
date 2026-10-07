@@ -71,6 +71,7 @@ var adminTargetTypes = map[AdminTargetType]struct{}{
 type AdminAction struct {
 	ID          string          `json:"id"`
 	AdminUserID string          `json:"admin_user_id"`
+	AdminName   string          `json:"admin_name"`
 	ActionType  AdminActionType `json:"action_type"`
 	TargetType  AdminTargetType `json:"target_type"`
 	TargetID    string          `json:"target_id"`

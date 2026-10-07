@@ -10,6 +10,7 @@ func scanAdminAction(row repository.RowScanner) (*auditdomain.AdminAction, error
 	err := row.Scan(
 		&action.ID,
 		&action.AdminUserID,
+		&action.AdminName,
 		&action.ActionType,
 		&action.TargetType,
 		&action.TargetID,

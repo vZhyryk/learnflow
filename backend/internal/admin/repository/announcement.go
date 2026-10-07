@@ -95,3 +95,17 @@ func (rep *Repository) GetAnnouncementByID(ctx context.Context, id string) (*adm
 
 	return result, nil
 }
+
+// SetExpiredNowAnnouncement ends an announcement early; an unknown or already expired one is ErrAnnouncementNotFound.
+func (rep *Repository) SetExpiredNowAnnouncement(ctx context.Context, announcementID string) error {
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, setExpiredNowAnnouncementSQL, announcementID)
+	if err != nil {
+		return fmt.Errorf("repository.SetExpiredNowAnnouncement: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return admindomain.ErrAnnouncementNotFound
+	}
+
+	return nil
+}
