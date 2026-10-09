@@ -40,16 +40,6 @@ func validChangePasswordRequest() authdomain.ChangePasswordRequest {
 	}
 }
 
-// changePasswordLogoutRequest builds a ChangePasswordRequest with IsAllSessionsLogout enabled.
-func changePasswordLogoutRequest() authdomain.ChangePasswordRequest {
-	return authdomain.ChangePasswordRequest{
-		UserID:              TestUserID,
-		OldPassword:         "correct-old-password",
-		NewPassword:         "new-password",
-		IsAllSessionsLogout: true,
-	}
-}
-
 func TestChangePasswordUserLookupFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When the user lookup fails", func() {
@@ -131,7 +121,7 @@ func TestChangePasswordLockedAccount(t *testing.T) {
 				return nil
 			},
 		}
-		srv := newTestService(uRepo, nil, nil, nil, nil)
+		srv := newTestService(uRepo, validChangePasswordSessionRepo(), nil, nil, newSuccessfulMockBlocklist())
 
 		Convey("A request with the correct old password is rejected with the lock and nothing is changed", func() {
 			err := srv.ChangePassword(context.Background(), validChangePasswordRequest())
@@ -170,7 +160,7 @@ func TestChangePasswordResetsFailedLogin(t *testing.T) {
 			resetUserID = userID
 			return resetErr
 		}
-		srv := newTestService(uRepo, nil, nil, nil, nil)
+		srv := newTestService(uRepo, validChangePasswordSessionRepo(), nil, nil, newSuccessfulMockBlocklist())
 
 		Convey("When the password is changed, the failed login counter and lock are cleared", func() {
 			So(srv.ChangePassword(context.Background(), validChangePasswordRequest()), ShouldBeNil)
@@ -205,30 +195,9 @@ func TestChangePasswordUpdateHashFails(t *testing.T) {
 	})
 }
 
-func TestChangePasswordWithoutSessionLogout(t *testing.T) {
-	Convey("Given an auth service", t, func() {
-		Convey("When IsAllSessionsLogout is false", func() {
-			var revokeCalled bool
-			uRepo := validChangePasswordUserRepo()
-			sRepo := &mockSessionRepo{
-				revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error {
-					revokeCalled = true
-					return nil
-				},
-			}
-			srv := newTestService(uRepo, sRepo, nil, nil, nil)
-
-			err := srv.ChangePassword(context.Background(), validChangePasswordRequest())
-
-			So(err, ShouldBeNil)
-			So(revokeCalled, ShouldBeFalse)
-		})
-	})
-}
-
 func TestChangePasswordWithSessionLogout(t *testing.T) {
 	Convey("Given an auth service", t, func() {
-		Convey("When IsAllSessionsLogout is true and revocation succeeds", func() {
+		Convey("When the change is applied, all sessions are revoked", func() {
 			var gotUserID string
 			var gotReason authdomain.RevokeReason
 			uRepo := validChangePasswordUserRepo()
@@ -240,14 +209,14 @@ func TestChangePasswordWithSessionLogout(t *testing.T) {
 			}
 			srv := newTestService(uRepo, sRepo, nil, nil, newSuccessfulMockBlocklist())
 
-			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest())
+			err := srv.ChangePassword(context.Background(), validChangePasswordRequest())
 
 			So(err, ShouldBeNil)
 			So(gotUserID, ShouldEqual, TestUserID)
 			So(gotReason, ShouldEqual, authdomain.RevokeReasonPasswordChanged)
 		})
 
-		Convey("When IsAllSessionsLogout is true and revocation fails", func() {
+		Convey("When session revocation fails", func() {
 			uRepo := validChangePasswordUserRepo()
 			sRepo := &mockSessionRepo{
 				revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error {
@@ -256,12 +225,7 @@ func TestChangePasswordWithSessionLogout(t *testing.T) {
 			}
 			srv := newTestService(uRepo, sRepo, nil, nil, newSuccessfulMockBlocklist())
 
-			err := srv.ChangePassword(context.Background(), authdomain.ChangePasswordRequest{
-				UserID:              TestUserID,
-				OldPassword:         "correct-old-password",
-				NewPassword:         "new-password",
-				IsAllSessionsLogout: true,
-			})
+			err := srv.ChangePassword(context.Background(), validChangePasswordRequest())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "revoke sessions")
@@ -281,25 +245,18 @@ func TestChangePasswordRevokesAllTokens(t *testing.T) {
 		}}
 		srv := newTestService(validChangePasswordUserRepo(), validChangePasswordSessionRepo(), nil, nil, blocklist)
 
-		Convey("When all sessions are logged out, every access token issued so far is revoked for one token lifetime", func() {
-			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest())
+		Convey("Every access token issued so far is revoked for one token lifetime", func() {
+			err := srv.ChangePassword(context.Background(), validChangePasswordRequest())
 
 			So(err, ShouldBeNil)
 			So(revokedUserID, ShouldEqual, TestUserID)
 			So(revokedTTL, ShouldEqual, tokens.BlockMarkTTL)
 		})
 
-		Convey("When the sessions stay, the user's other access tokens are not touched", func() {
-			err := srv.ChangePassword(context.Background(), validChangePasswordRequest())
-
-			So(err, ShouldBeNil)
-			So(revokedUserID, ShouldBeEmpty)
-		})
-
 		Convey("When the Redis revocation fails, the change fails with ErrBlocklistUnavailable", func() {
 			revokeErr = testutil.ErrRedisUnavailable
 
-			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest())
+			err := srv.ChangePassword(context.Background(), validChangePasswordRequest())
 
 			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
 			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)

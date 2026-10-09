@@ -437,7 +437,22 @@ func TestRequestEmailChangeRequestValidate(t *testing.T) {
 
 		Convey("valid request", func() {
 			email := "test@gmail.com"
-			So((&RequestEmailChangeRequest{NewEmail: email}).Validate(), ShouldBeNil)
+			So((&RequestEmailChangeRequest{NewEmail: email, Password: "password123"}).Validate(), ShouldBeNil)
+		})
+
+		Convey("missing password", func() {
+			err := (&RequestEmailChangeRequest{NewEmail: "test@gmail.com"}).Validate()
+			So(errors.Is(err, ErrInvalidCredentialFormat), ShouldBeTrue)
+		})
+
+		Convey("password too short", func() {
+			err := (&RequestEmailChangeRequest{NewEmail: "test@gmail.com", Password: "short"}).Validate()
+			So(errors.Is(err, ErrInvalidCredentialFormat), ShouldBeTrue)
+		})
+
+		Convey("password too long", func() {
+			err := (&RequestEmailChangeRequest{NewEmail: "test@gmail.com", Password: strings.Repeat("a", 73)}).Validate()
+			So(errors.Is(err, ErrInvalidCredentialFormat), ShouldBeTrue)
 		})
 	})
 }

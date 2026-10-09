@@ -345,10 +345,9 @@ func (r *ResetPasswordRequest) Validate() error {
 
 // ChangePasswordRequest carries the user ID, current password, and desired new password.
 type ChangePasswordRequest struct {
-	UserID              string `json:"user_id"`
-	OldPassword         string `json:"old_password"`
-	NewPassword         string `json:"new_password"`
-	IsAllSessionsLogout bool   `json:"is_all_sessions_logout"`
+	UserID      string `json:"user_id"`
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
 }
 
 // Validate checks that the change password fields are valid.
@@ -372,6 +371,7 @@ func (r *ChangePasswordRequest) Validate() error {
 type RequestEmailChangeRequest struct {
 	UserID   string `json:"-"`
 	NewEmail string `json:"new_email"`
+	Password string `json:"password"`
 }
 
 // Validate checks that the request email change fields are valid.
@@ -379,14 +379,18 @@ func (r *RequestEmailChangeRequest) Validate() error {
 	if len(r.NewEmail) < 3 || !validator.MatchesEmail(r.NewEmail) {
 		return ErrInvalidCredentialFormat
 	}
+
+	r.Password = validator.NormalizePassword(r.Password)
+	if len(r.Password) < 8 || len(r.Password) > 72 {
+		return ErrInvalidCredentialFormat
+	}
 	return nil
 }
 
 // EmailChangeRequest carries the token submitted to confirm an email address change.
 type EmailChangeRequest struct {
-	Token               string `json:"token"` // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
-	UserID              string `json:"-"`
-	IsAllSessionsLogout bool   `json:"is_all_sessions_logout"`
+	Token  string `json:"token"` // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
+	UserID string `json:"-"`
 }
 
 // Validate checks that the email change fields are valid.

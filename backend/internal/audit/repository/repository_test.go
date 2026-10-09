@@ -168,7 +168,7 @@ func TestGetInstanceAdminActions(t *testing.T) {
 			f.countErr = testutil.ErrDBUnexpected
 			_, _, err := call()
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "repository.GetInstanceAdminActionsCount")
+			So(err.Error(), ShouldContainSubstring, "repository.GetInstanceAdminActions count")
 		})
 
 		Convey("When the list query fails", func() {
@@ -270,7 +270,7 @@ func TestGetFailedJobs(t *testing.T) {
 			f.countErr = testutil.ErrDBUnexpected
 			_, _, err := call()
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "repository.GetFailedJobsCount")
+			So(err.Error(), ShouldContainSubstring, "repository.GetFailedJobs count")
 		})
 
 		Convey("When the list query fails", func() {
@@ -339,7 +339,7 @@ func TestGetAdminActions(t *testing.T) {
 			f.countErr = testutil.ErrDBUnexpected
 			_, _, err := call()
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "repository.GetAdminActionsCount")
+			So(err.Error(), ShouldContainSubstring, "repository.GetAdminActions count")
 		})
 
 		Convey("When the list query fails", func() {

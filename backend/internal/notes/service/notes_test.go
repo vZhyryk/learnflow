@@ -137,9 +137,9 @@ func TestGetUserNotes(t *testing.T) {
 				gotID, gotUserID = id, userID
 				return &notesdomain.UserNotes{ID: id}, repoErr
 			},
-			getUserAllNotesByUserID: func(_ context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, error) {
+			getUserAllNotesByUserID: func(_ context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, int, error) {
 				gotUserID, gotSearch, gotParams = userID, search, params
-				return []*notesdomain.UserNotes{{ID: "a"}, {ID: "b"}}, repoErr
+				return []*notesdomain.UserNotes{{ID: "a"}, {ID: "b"}}, 7, repoErr
 			},
 		}
 		srv := newTestService(notesRepo, &mockCourseRepo{}, &mockContentRepo{})
@@ -163,10 +163,11 @@ func TestGetUserNotes(t *testing.T) {
 		})
 
 		Convey("GetUserAllNotesByUserID passes the owner, the search term and the page to the repository", func() {
-			got, err := srv.GetUserAllNotesByUserID(context.Background(), testUserID, "alpha", pagination.NewParams(2, 5))
+			got, total, err := srv.GetUserAllNotesByUserID(context.Background(), testUserID, "alpha", pagination.NewParams(2, 5))
 
 			So(err, ShouldBeNil)
 			So(got, ShouldHaveLength, 2)
+			So(total, ShouldEqual, 7)
 			So(gotUserID, ShouldEqual, testUserID)
 			So(gotSearch, ShouldEqual, "alpha")
 			So(gotParams, ShouldResemble, pagination.NewParams(2, 5))
@@ -175,7 +176,7 @@ func TestGetUserNotes(t *testing.T) {
 		Convey("GetUserAllNotesByUserID wraps a repository error", func() {
 			repoErr = testutil.ErrDBUnexpected
 
-			_, err := srv.GetUserAllNotesByUserID(context.Background(), testUserID, "", pagination.NewParams(1, 10))
+			_, _, err := srv.GetUserAllNotesByUserID(context.Background(), testUserID, "", pagination.NewParams(1, 10))
 
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 			So(err.Error(), ShouldContainSubstring, "service.GetUserAllNotesByUserID")

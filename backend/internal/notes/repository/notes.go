@@ -53,9 +53,10 @@ func (rep *Repository) getUserNotesByID(ctx context.Context, query, method, id, 
 	return result, nil
 }
 
-// GetUserAllNotesByUserID returns a page of the user's notes; a non-empty search matches title or body case-insensitively.
-func (rep *Repository) GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, error) {
-	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getUserAllNotesByUserIDSQL, "GetUserAllNotesByUserID", &params, scanUserNotes, []any{userID, likeEscaper.Replace(search)})
+// GetUserAllNotesByUserID returns a page of the user's notes and the total matching count; a non-empty search
+// matches title or body case-insensitively.
+func (rep *Repository) GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, int, error) {
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getUserAllNotesByUserIDSQL, countUserNotesSQL, "GetUserAllNotesByUserID", params, scanUserNotes, []any{userID, likeEscaper.Replace(search)})
 }
 
 // UpdateUserNotes implements notesdomain.NotesRepository.

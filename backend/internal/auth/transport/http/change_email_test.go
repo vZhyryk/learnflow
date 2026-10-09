@@ -28,6 +28,11 @@ func TestInitiateEmailChange(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
+		Convey("Missing password → 400", func() {
+			w := testutil.ServeHTTP(mux, newReq(`{"new_email":"new@example.com"}`))
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		})
+
 		Convey("Invalid NewEmail format → 400", func() {
 			w := testutil.ServeHTTP(mux, newReq(`{"new_email":"notanemail"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
@@ -35,24 +40,30 @@ func TestInitiateEmailChange(t *testing.T) {
 
 		Convey("No user in context → panics (middleware invariant violated)", func() {
 			So(func() {
-				testutil.ServeHTTP(mux, newReq(`{"new_email":"new@example.com"}`))
+				testutil.ServeHTTP(mux, newReq(`{"new_email":"new@example.com","password":"password123"}`))
 			}, ShouldPanic)
 		})
 
 		Convey("Service ErrEmailAlreadyInUse → 401", func() {
 			svcErr = authdomain.ErrEmailAlreadyInUse
-			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com"}`)))
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com","password":"password123"}`)))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
+		})
+
+		Convey("Service ErrWrongPassword → 422", func() {
+			svcErr = authdomain.ErrWrongPassword
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com","password":"password123"}`)))
+			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
 		Convey("Unexpected service error → 500", func() {
 			svcErr = testutil.ErrDBUnexpected
-			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com"}`)))
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com","password":"password123"}`)))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid request → 200 with message", func() {
-			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com"}`)))
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com","password":"password123"}`)))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["message"], ShouldNotBeNil)
@@ -60,7 +71,7 @@ func TestInitiateEmailChange(t *testing.T) {
 
 		Convey("Valid request and the success response write fails → does not panic", func() {
 			So(func() {
-				mux.ServeHTTP(&errWriter{}, withUser(newReq(`{"new_email":"new@example.com"}`)))
+				mux.ServeHTTP(&errWriter{}, withUser(newReq(`{"new_email":"new@example.com","password":"password123"}`)))
 			}, ShouldNotPanic)
 		})
 	})

@@ -25,7 +25,7 @@ type NotesRepository interface {
 	CreateUserNotes(ctx context.Context, notes *UserNotes) (*UserNotes, error)
 	GetUserNotesByID(ctx context.Context, id, userID string) (*UserNotes, error)
 	GetUserNotesByIDForUpdate(ctx context.Context, id, userID string) (*UserNotes, error)
-	GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*UserNotes, error)
+	GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*UserNotes, int, error)
 	UpdateUserNotes(ctx context.Context, notes *UserNotes) error
 	DeleteUserNotes(ctx context.Context, id, userID string) error
 }
@@ -34,7 +34,7 @@ type NotesRepository interface {
 type Service interface {
 	CreateUserNotes(ctx context.Context, req CreateNotesRequest) (*UserNotes, error)
 	GetUserNotesByID(ctx context.Context, id, userID string) (*UserNotes, error)
-	GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*UserNotes, error)
+	GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*UserNotes, int, error)
 	UpdateUserNotes(ctx context.Context, req UpdateNotesRequest) error
 	DeleteUserNotes(ctx context.Context, id, userID string) error
 }

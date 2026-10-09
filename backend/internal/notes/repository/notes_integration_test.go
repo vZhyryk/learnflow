@@ -152,7 +152,7 @@ func TestUpdateAndDeleteUserNotes_Integration(t *testing.T) {
 				So(errors.Is(repo.DeleteUserNotes(ctx, note.ID, owner), notesdomain.ErrNoteNotFound), ShouldBeTrue)
 				So(errors.Is(repo.UpdateUserNotes(ctx, &notesdomain.UserNotes{ID: note.ID, UserID: owner, Title: "t", Body: "b"}), notesdomain.ErrNoteNotFound), ShouldBeTrue)
 
-				list, err := repo.GetUserAllNotesByUserID(ctx, owner, "", pagination.NewParams(1, 10))
+				list, _, err := repo.GetUserAllNotesByUserID(ctx, owner, "", pagination.NewParams(1, 10))
 				So(err, ShouldBeNil)
 				So(list, ShouldBeEmpty)
 			})
@@ -187,50 +187,53 @@ func TestGetUserAllNotesByUserID_Integration(t *testing.T) {
 			params := pagination.NewParams(1, 10)
 
 			Convey("Without a search it lists only the caller's notes, newest first", func() {
-				list, err := repo.GetUserAllNotesByUserID(ctx, owner, "", params)
+				list, total, err := repo.GetUserAllNotesByUserID(ctx, owner, "", params)
 
 				So(err, ShouldBeNil)
 				So(titles(list), ShouldResemble, []string{"100% done_ok", "Beta", "Alpha"})
+				So(total, ShouldEqual, 3)
 			})
 
 			Convey("A search matches title or body case-insensitively and never other users' notes", func() {
-				list, err := repo.GetUserAllNotesByUserID(ctx, owner, "alpha", params)
+				list, total, err := repo.GetUserAllNotesByUserID(ctx, owner, "alpha", params)
 
 				So(err, ShouldBeNil)
 				So(titles(list), ShouldResemble, []string{"Beta", "Alpha"})
+				So(total, ShouldEqual, 2)
 			})
 
 			Convey("A search with no match is an empty page", func() {
-				list, err := repo.GetUserAllNotesByUserID(ctx, owner, "zzz", params)
+				list, _, err := repo.GetUserAllNotesByUserID(ctx, owner, "zzz", params)
 
 				So(err, ShouldBeNil)
 				So(list, ShouldBeEmpty)
 			})
 
 			Convey("A % or _ in the search matches literally, not as a wildcard", func() {
-				percent, err := repo.GetUserAllNotesByUserID(ctx, owner, "%", params)
+				percent, _, err := repo.GetUserAllNotesByUserID(ctx, owner, "%", params)
 				So(err, ShouldBeNil)
 				So(titles(percent), ShouldResemble, []string{"100% done_ok"})
 
-				underscore, err := repo.GetUserAllNotesByUserID(ctx, owner, "done_ok", params)
+				underscore, _, err := repo.GetUserAllNotesByUserID(ctx, owner, "done_ok", params)
 				So(err, ShouldBeNil)
 				So(titles(underscore), ShouldResemble, []string{"100% done_ok"})
 
-				wildcard, err := repo.GetUserAllNotesByUserID(ctx, owner, "done_", params)
+				wildcard, _, err := repo.GetUserAllNotesByUserID(ctx, owner, "done_", params)
 				So(err, ShouldBeNil)
 				So(titles(wildcard), ShouldResemble, []string{"100% done_ok"})
 
-				noWildcard, err := repo.GetUserAllNotesByUserID(ctx, owner, "d_ne", params)
+				noWildcard, _, err := repo.GetUserAllNotesByUserID(ctx, owner, "d_ne", params)
 				So(err, ShouldBeNil)
 				So(noWildcard, ShouldBeEmpty)
 			})
 
 			Convey("Pagination slices the newest-first list", func() {
-				first, err := repo.GetUserAllNotesByUserID(ctx, owner, "", pagination.NewParams(1, 2))
+				first, total, err := repo.GetUserAllNotesByUserID(ctx, owner, "", pagination.NewParams(1, 2))
 				So(err, ShouldBeNil)
-				second, err := repo.GetUserAllNotesByUserID(ctx, owner, "", pagination.NewParams(2, 2))
+				second, _, err := repo.GetUserAllNotesByUserID(ctx, owner, "", pagination.NewParams(2, 2))
 				So(err, ShouldBeNil)
 
+				So(total, ShouldEqual, 3)
 				So(titles(first), ShouldResemble, []string{"100% done_ok", "Beta"})
 				So(titles(second), ShouldResemble, []string{"Alpha"})
 			})

@@ -126,35 +126,13 @@ func detailsArg(details map[string]any) any {
 
 // GetInstanceAdminActions returns one page of the audit trail for a target, newest first, and the total count.
 func (r *Audit) GetInstanceAdminActions(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
-	var count int
-	err := r.QueryRunner(ctx).QueryRow(ctx, getInstanceAdminActionsCountSQL, targetType, targetID).Scan(&count)
-	if err != nil {
-		return nil, 0, fmt.Errorf("repository.GetInstanceAdminActionsCount: %w", err)
-	}
-
-	actions, err := repository.GetAndParseListWithArgs(ctx, &r.BaseRepository, getInstanceAdminActionsSQL, "GetInstanceAdminActions", &params, scanAdminAction, []any{targetType, targetID})
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return actions, count, nil
+	return repository.GetCountAndParseListWithArgs(ctx, &r.BaseRepository, getInstanceAdminActionsSQL, getInstanceAdminActionsCountSQL, "GetInstanceAdminActions", params, scanAdminAction, []any{targetType, targetID})
 }
 
 // GetAdminActions returns one page of the general audit journal, newest first, and the total count of the filter.
 func (r *Audit) GetAdminActions(ctx context.Context, filter auditdomain.AdminActionFilter, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
 	filterArgs := []any{nilIfEmpty(filter.AdminUserID), nilIfEmpty(string(filter.ActionType)), filter.From, filter.To}
-
-	var count int
-	if err := r.QueryRunner(ctx).QueryRow(ctx, getAdminActionsCountSQL, filterArgs...).Scan(&count); err != nil {
-		return nil, 0, fmt.Errorf("repository.GetAdminActionsCount: %w", err)
-	}
-
-	actions, err := repository.GetAndParseListWithArgs(ctx, &r.BaseRepository, getAdminActionsSQL, "GetAdminActions", &params, scanAdminAction, filterArgs)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return actions, count, nil
+	return repository.GetCountAndParseListWithArgs(ctx, &r.BaseRepository, getAdminActionsSQL, getAdminActionsCountSQL, "GetAdminActions", params, scanAdminAction, filterArgs)
 }
 
 // nilIfEmpty passes an unset filter value as SQL NULL so its condition is skipped.
@@ -168,16 +146,5 @@ func nilIfEmpty(value string) any {
 
 // GetFailedJobs returns one page of dead-lettered jobs, newest first, and the total count.
 func (r *Audit) GetFailedJobs(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error) {
-	var count int
-	err := r.QueryRunner(ctx).QueryRow(ctx, getFailedJobsCountSQL).Scan(&count)
-	if err != nil {
-		return nil, 0, fmt.Errorf("repository.GetFailedJobsCount: %w", err)
-	}
-
-	jobs, err := repository.GetAndParseList(ctx, &r.BaseRepository, getFailedJobsSQL, "GetFailedJobs", &params, scanFailedJob)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return jobs, count, nil
+	return repository.GetCountAndParseListWithArgs(ctx, &r.BaseRepository, getFailedJobsSQL, getFailedJobsCountSQL, "GetFailedJobs", params, scanFailedJob, []any{})
 }

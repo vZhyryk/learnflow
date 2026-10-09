@@ -7,6 +7,7 @@ import (
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -112,7 +113,7 @@ func TestGetUserNotesByIDRoute(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(gotID, ShouldEqual, noteID)
 			So(gotUserID, ShouldEqual, testUserID)
-			So(testutil.DecodeBody(t, w.Body.Bytes()), ShouldContainKey, "notes")
+			So(testutil.DecodeBody(t, w.Body.Bytes()), ShouldContainKey, "note")
 		})
 
 		Convey("A note of another user or a missing note → 404", func() {
@@ -140,9 +141,9 @@ func TestGetUserAllNotesRoute(t *testing.T) {
 		var gotUserID, gotSearch string
 		var gotParams pagination.Params
 		var svcErr error
-		svc := &mockService{getUserAllNotesByUserID: func(_ context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, error) {
+		svc := &mockService{getUserAllNotesByUserID: func(_ context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, int, error) {
 			gotUserID, gotSearch, gotParams = userID, search, params
-			return []*notesdomain.UserNotes{{ID: "a"}, {ID: "b"}}, svcErr
+			return []*notesdomain.UserNotes{{ID: "a"}, {ID: "b"}}, 7, svcErr
 		}}
 		f := newHTTPFixture(svc, http.MethodGet, notesPath)
 
@@ -153,9 +154,24 @@ func TestGetUserAllNotesRoute(t *testing.T) {
 			So(gotUserID, ShouldEqual, testUserID)
 			So(gotSearch, ShouldEqual, "alpha")
 			So(gotParams, ShouldResemble, pagination.NewParams(2, 5))
-			list, ok := testutil.DecodeBody(t, w.Body.Bytes())["note_list"].([]any)
+			body := testutil.DecodeBody(t, w.Body.Bytes())
+			list, ok := body["notes"].([]any)
 			So(ok, ShouldBeTrue)
 			So(list, ShouldHaveLength, 2)
+			So(body["total"], ShouldEqual, 7)
+		})
+
+		Convey("A filter of exactly 100 characters is accepted", func() {
+			w := testutil.ServeHTTP(f.Mux, withUser(f.NewReq("", map[string]string{"filter": strings.Repeat("я", 100)})))
+
+			So(w.Code, ShouldEqual, http.StatusOK)
+		})
+
+		Convey("A filter longer than 100 characters → 422 and the service is not called", func() {
+			w := testutil.ServeHTTP(f.Mux, withUser(f.NewReq("", map[string]string{"filter": strings.Repeat("я", 101)})))
+
+			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
+			So(gotUserID, ShouldBeEmpty)
 		})
 
 		Convey("Without a query the search is empty", func() {

@@ -10,6 +10,7 @@ var (
 	ErrInvalidResourceType  = errors.New("invalid resource type")
 	ErrInvalidResourceID    = errors.New("invalid resource ID")
 	ErrInvalidUserID        = errors.New("invalid user ID")
+	ErrInvalidSearch        = errors.New("invalid search filter")
 	ErrResourceDataMisMatch = errors.New("resource type and resource ID must be provided together")
 
 	ErrNoteNotFound = errors.New("note not found")

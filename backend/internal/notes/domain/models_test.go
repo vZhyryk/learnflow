@@ -131,3 +131,21 @@ func TestUpdateNotesRequestApply(t *testing.T) {
 		})
 	})
 }
+
+func TestValidateSearch(t *testing.T) {
+	Convey("Given a search filter", t, func() {
+		Convey("An empty filter is valid", func() {
+			So(ValidateSearch(""), ShouldBeNil)
+		})
+
+		Convey("A filter of exactly MaxSearchLength characters is valid, counted in characters not bytes", func() {
+			So(ValidateSearch(strings.Repeat("я", MaxSearchLength)), ShouldBeNil)
+		})
+
+		Convey("A filter longer than MaxSearchLength characters is rejected", func() {
+			err := ValidateSearch(strings.Repeat("я", MaxSearchLength+1))
+
+			So(errors.Is(err, ErrInvalidSearch), ShouldBeTrue)
+		})
+	})
+}

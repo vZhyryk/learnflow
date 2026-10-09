@@ -134,11 +134,59 @@ func TestGetUserNotesByID(t *testing.T) {
 func TestGetUserAllNotesByUserID(t *testing.T) {
 	testutil.TestListMethod(t, "GetUserAllNotesByUserID",
 		func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*notesdomain.UserNotes, error) {
+			runner.QueryRowFn = countRowFn(2, nil)
 			repo := newTestRepo(runner)
 			return func(ctx context.Context, params pagination.Params) ([]*notesdomain.UserNotes, error) {
-				return repo.GetUserAllNotesByUserID(ctx, "user-1", "", params)
+				list, _, err := repo.GetUserAllNotesByUserID(ctx, "user-1", "", params)
+				return list, err
 			}
 		}, fakeNote, fakeNoteScan)
+}
+
+func countRowFn(total int, scanErr error) func(context.Context, string, ...any) pgx.Row {
+	return func(_ context.Context, _ string, _ ...any) pgx.Row {
+		return &testutil.MockRow{ScanFn: func(dest ...any) error {
+			*testutil.CastInt(dest[0], 0) = total
+			return scanErr
+		}}
+	}
+}
+
+func TestGetUserAllNotesByUserIDCount(t *testing.T) {
+	Convey("Given a notes repository", t, func() {
+		var countQuery string
+		var countArgs []any
+		var scanErr error
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(ctx context.Context, sql string, args ...any) pgx.Row {
+				countQuery, countArgs = sql, args
+				return countRowFn(9, scanErr)(ctx, sql, args...)
+			},
+			QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
+				return &testutil.MockRows{}, nil
+			},
+		})
+
+		Convey("When listing, the total comes from a count with the same owner and escaped search filter", func() {
+			_, total, err := repo.GetUserAllNotesByUserID(context.Background(), "user-1", `50%`, pagination.NewParams(1, 10))
+
+			So(err, ShouldBeNil)
+			So(total, ShouldEqual, 9)
+			So(countQuery, ShouldContainSubstring, "COUNT(*)")
+			So(countQuery, ShouldContainSubstring, "deleted_at IS NULL")
+			So(countArgs, ShouldResemble, []any{"user-1", `50\%`})
+		})
+
+		Convey("When the count fails, the error mentions count and no list is returned", func() {
+			scanErr = testutil.ErrDBUnexpected
+
+			list, total, err := repo.GetUserAllNotesByUserID(context.Background(), "user-1", "", pagination.NewParams(1, 10))
+
+			testutil.AssertUnexpectedDBError(err, "repository.GetUserAllNotesByUserID count")
+			So(list, ShouldBeNil)
+			So(total, ShouldEqual, 0)
+		})
+	})
 }
 
 func TestGetUserAllNotesByUserIDArgs(t *testing.T) {
@@ -150,10 +198,11 @@ func TestGetUserAllNotesByUserIDArgs(t *testing.T) {
 				gotQuery, gotArgs = sql, args
 				return &testutil.MockRows{}, nil
 			},
+			QueryRowFn: countRowFn(0, nil),
 		})
 
 		Convey("When listing, the query is scoped to the owner and newest-first, with the page limit and offset", func() {
-			_, err := repo.GetUserAllNotesByUserID(context.Background(), "user-1", "", pagination.NewParams(2, 5))
+			_, _, err := repo.GetUserAllNotesByUserID(context.Background(), "user-1", "", pagination.NewParams(2, 5))
 
 			So(err, ShouldBeNil)
 			So(gotQuery, ShouldContainSubstring, "user_id = $1")
@@ -163,7 +212,7 @@ func TestGetUserAllNotesByUserIDArgs(t *testing.T) {
 		})
 
 		Convey("When searching, LIKE wildcards and backslashes in the term are escaped so they match literally", func() {
-			_, err := repo.GetUserAllNotesByUserID(context.Background(), "user-1", `50%_off\`, pagination.NewParams(1, 10))
+			_, _, err := repo.GetUserAllNotesByUserID(context.Background(), "user-1", `50%_off\`, pagination.NewParams(1, 10))
 
 			So(err, ShouldBeNil)
 			So(gotArgs[1], ShouldEqual, `50\%\_off\\`)

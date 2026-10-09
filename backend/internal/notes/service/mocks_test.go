@@ -11,7 +11,7 @@ type mockNotesRepo struct {
 	createUserNotes         func(ctx context.Context, notes *notesdomain.UserNotes) (*notesdomain.UserNotes, error)
 	getUserNotesByID        func(ctx context.Context, id, userID string) (*notesdomain.UserNotes, error)
 	getUserNotesByIDForUpd  func(ctx context.Context, id, userID string) (*notesdomain.UserNotes, error)
-	getUserAllNotesByUserID func(ctx context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, error)
+	getUserAllNotesByUserID func(ctx context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, int, error)
 	updateUserNotes         func(ctx context.Context, notes *notesdomain.UserNotes) error
 	deleteUserNotes         func(ctx context.Context, id, userID string) error
 }
@@ -40,7 +40,7 @@ func (m *mockNotesRepo) GetUserNotesByIDForUpdate(ctx context.Context, id, userI
 	return m.getUserNotesByIDForUpd(ctx, id, userID)
 }
 
-func (m *mockNotesRepo) GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, error) {
+func (m *mockNotesRepo) GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, int, error) {
 	if m.getUserAllNotesByUserID == nil {
 		panic("mockNotesRepo.GetUserAllNotesByUserID not set")
 	}

@@ -3,6 +3,7 @@ package notesdomain
 import (
 	"learnflow_backend/internal/shared/validator"
 	"time"
+	"unicode/utf8"
 )
 
 // ResourceType names the kind of resource a note is linked to.
@@ -13,6 +14,18 @@ const (
 	ContentResourceType ResourceType = "content_item"
 	CourseResourceType  ResourceType = "course"
 )
+
+// MaxSearchLength is the longest search filter, in characters, accepted by the notes list.
+const MaxSearchLength = 100
+
+// ValidateSearch rejects a search filter longer than MaxSearchLength characters.
+func ValidateSearch(search string) error {
+	if utf8.RuneCountInString(search) > MaxSearchLength {
+		return ErrInvalidSearch
+	}
+
+	return nil
+}
 
 // UserNotes is a note owned by a user, optionally linked to a course or content item.
 type UserNotes struct {

@@ -18,7 +18,7 @@ func TestGetInstanceAdminActions(t *testing.T) {
 		var gotID string
 		var gotParams pagination.Params
 		actions := &mockAdminActionRepo{}
-		srv := newTestUserService(&mockUserRepo{}, actions)
+		srv := newTestUserService(usersByID(map[string]*admindomain.UserData{testAdminID: activeUserWithRole(admindomain.RoleAdmin)}), actions)
 		params := pagination.NewParams(2, 10)
 
 		Convey("When the repository fails the error is returned, not swallowed", func() {
@@ -100,73 +100,115 @@ func usersByID(users map[string]*admindomain.UserData) *mockUserRepo {
 	}}
 }
 
+const auditTargetID = "44444444-4444-4444-4444-444444444444"
+
+type auditReadFixture struct {
+	users      map[string]*admindomain.UserData
+	repoCalled bool
+	srv        *Service
+}
+
+func newAuditReadFixture(actorRole admindomain.UserRole) *auditReadFixture {
+	f := &auditReadFixture{users: map[string]*admindomain.UserData{
+		testAdminID:   activeUserWithRole(actorRole),
+		auditTargetID: activeUserWithRole(admindomain.RoleUser),
+	}}
+	actions := &mockAdminActionRepo{getInstanceAdminActions: func(_ context.Context, _ auditdomain.AdminTargetType, _ string, _ pagination.Params) ([]*auditdomain.AdminAction, int, error) {
+		f.repoCalled = true
+		return []*auditdomain.AdminAction{{ID: "a-1"}}, 1, nil
+	}}
+	f.srv = newTestUserService(usersByID(f.users), actions)
+
+	return f
+}
+
+func (f *auditReadFixture) read(targetType auditdomain.AdminTargetType) error {
+	f.repoCalled = false
+	_, _, err := f.srv.GetInstanceAdminActions(context.Background(), testAdminID, targetType, auditTargetID, pagination.NewParams(1, 10))
+
+	return err
+}
+
 func TestGetInstanceAdminActionsAuthorization(t *testing.T) {
-	const targetID = "44444444-4444-4444-4444-444444444444"
-
 	Convey("Given the audit trail of a user", t, func() {
-		var repoCalled bool
-		actions := &mockAdminActionRepo{getInstanceAdminActions: func(_ context.Context, _ auditdomain.AdminTargetType, _ string, _ pagination.Params) ([]*auditdomain.AdminAction, int, error) {
-			repoCalled = true
-			return []*auditdomain.AdminAction{{ID: "a-1"}}, 1, nil
-		}}
-		users := map[string]*admindomain.UserData{
-			testAdminID: activeUserWithRole(admindomain.RoleAdmin),
-			targetID:    activeUserWithRole(admindomain.RoleUser),
-		}
-		read := func(targetType auditdomain.AdminTargetType) error {
-			_, _, err := newTestUserService(usersByID(users), actions).GetInstanceAdminActions(context.Background(), testAdminID, targetType, targetID, pagination.NewParams(1, 10))
-			return err
-		}
-
 		Convey("An admin reads the trail of a plain user, a subadmin and another admin", func() {
+			f := newAuditReadFixture(admindomain.RoleAdmin)
 			for _, role := range []admindomain.UserRole{admindomain.RoleUser, admindomain.RoleSubAdmin, admindomain.RoleAdmin} {
-				users[targetID] = activeUserWithRole(role)
-				repoCalled = false
+				f.users[auditTargetID] = activeUserWithRole(role)
 
-				So(read(auditdomain.TargetUser), ShouldBeNil)
-				So(repoCalled, ShouldBeTrue)
+				So(f.read(auditdomain.TargetUser), ShouldBeNil)
+				So(f.repoCalled, ShouldBeTrue)
 			}
 		})
 
 		Convey("A subadmin reads the trail of a plain user", func() {
-			users[testAdminID] = activeUserWithRole(admindomain.RoleSubAdmin)
+			f := newAuditReadFixture(admindomain.RoleSubAdmin)
 
-			So(read(auditdomain.TargetUser), ShouldBeNil)
-			So(repoCalled, ShouldBeTrue)
+			So(f.read(auditdomain.TargetUser), ShouldBeNil)
+			So(f.repoCalled, ShouldBeTrue)
 		})
 
 		Convey("A subadmin cannot read the trail of an admin or another subadmin, and the repository is never asked", func() {
-			users[testAdminID] = activeUserWithRole(admindomain.RoleSubAdmin)
+			f := newAuditReadFixture(admindomain.RoleSubAdmin)
 
 			for _, role := range []admindomain.UserRole{admindomain.RoleAdmin, admindomain.RoleSubAdmin} {
-				users[targetID] = activeUserWithRole(role)
+				f.users[auditTargetID] = activeUserWithRole(role)
 
-				So(errors.Is(read(auditdomain.TargetUser), admindomain.ErrForbiddenUserAction), ShouldBeTrue)
+				So(errors.Is(f.read(auditdomain.TargetUser), admindomain.ErrForbiddenUserAction), ShouldBeTrue)
 			}
-			So(repoCalled, ShouldBeFalse)
+			So(f.repoCalled, ShouldBeFalse)
 		})
 
 		Convey("A subadmin gets 'user not found' for a missing target instead of an empty page", func() {
-			users[testAdminID] = activeUserWithRole(admindomain.RoleSubAdmin)
-			delete(users, targetID)
+			f := newAuditReadFixture(admindomain.RoleSubAdmin)
+			delete(f.users, auditTargetID)
 
-			So(errors.Is(read(auditdomain.TargetUser), admindomain.ErrUserNotFound), ShouldBeTrue)
+			So(errors.Is(f.read(auditdomain.TargetUser), admindomain.ErrUserNotFound), ShouldBeTrue)
 		})
 
 		Convey("A blocked actor and a plain-user actor are forbidden", func() {
-			users[testAdminID] = &admindomain.UserData{Role: admindomain.RoleAdmin, Status: admindomain.StatusBlocked}
-			So(errors.Is(read(auditdomain.TargetUser), admindomain.ErrForbiddenUserAction), ShouldBeTrue)
+			f := newAuditReadFixture(admindomain.RoleAdmin)
+			f.users[testAdminID] = &admindomain.UserData{Role: admindomain.RoleAdmin, Status: admindomain.StatusBlocked}
+			So(errors.Is(f.read(auditdomain.TargetUser), admindomain.ErrForbiddenUserAction), ShouldBeTrue)
 
-			users[testAdminID] = activeUserWithRole(admindomain.RoleUser)
-			So(errors.Is(read(auditdomain.TargetUser), admindomain.ErrForbiddenUserAction), ShouldBeTrue)
-			So(repoCalled, ShouldBeFalse)
+			f.users[testAdminID] = activeUserWithRole(admindomain.RoleUser)
+			So(errors.Is(f.read(auditdomain.TargetUser), admindomain.ErrForbiddenUserAction), ShouldBeTrue)
+			So(f.repoCalled, ShouldBeFalse)
+		})
+	})
+}
+
+func TestGetInstanceAdminActionsAuthorizationTargets(t *testing.T) {
+	Convey("Given the audit trail of a non-user target", t, func() {
+		Convey("A subadmin reads the trail of the entities they manage", func() {
+			f := newAuditReadFixture(admindomain.RoleSubAdmin)
+
+			for _, targetType := range []auditdomain.AdminTargetType{
+				auditdomain.TargetCourse, auditdomain.TargetContentItem, auditdomain.TargetArticle,
+				auditdomain.TargetReview, auditdomain.TargetAnnouncement,
+			} {
+				So(f.read(targetType), ShouldBeNil)
+				So(f.repoCalled, ShouldBeTrue)
+			}
 		})
 
-		Convey("The trail of a non-user target needs no role lookup", func() {
-			users[testAdminID] = activeUserWithRole(admindomain.RoleSubAdmin)
+		Convey("A subadmin cannot read the trail of any other target type, and the repository is never asked", func() {
+			f := newAuditReadFixture(admindomain.RoleSubAdmin)
 
-			So(read(auditdomain.TargetCourse), ShouldBeNil)
-			So(repoCalled, ShouldBeTrue)
+			for _, targetType := range []auditdomain.AdminTargetType{
+				auditdomain.TargetPayment, auditdomain.TargetExpense, auditdomain.TargetGiftCoupon,
+				auditdomain.TargetBooking, auditdomain.TargetSupportChat, auditdomain.TargetFailedJob,
+			} {
+				So(errors.Is(f.read(targetType), admindomain.ErrForbiddenUserAction), ShouldBeTrue)
+			}
+			So(f.repoCalled, ShouldBeFalse)
+		})
+
+		Convey("An admin reads the trail of any target type", func() {
+			f := newAuditReadFixture(admindomain.RoleAdmin)
+
+			So(f.read(auditdomain.TargetPayment), ShouldBeNil)
+			So(f.repoCalled, ShouldBeTrue)
 		})
 	})
 }

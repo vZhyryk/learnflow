@@ -63,12 +63,12 @@ func (srv *Service) GetUserNotesByID(ctx context.Context, id, userID string) (*n
 }
 
 // GetUserAllNotesByUserID implements notesdomain.Service.
-func (srv *Service) GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, error) {
-	notesList, err := srv.notesRepo.GetUserAllNotesByUserID(ctx, userID, search, params)
+func (srv *Service) GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, int, error) {
+	notesList, total, err := srv.notesRepo.GetUserAllNotesByUserID(ctx, userID, search, params)
 	if err != nil {
-		return nil, fmt.Errorf("service.GetUserAllNotesByUserID: %w", err)
+		return nil, 0, fmt.Errorf("service.GetUserAllNotesByUserID: %w", err)
 	}
-	return notesList, nil
+	return notesList, total, nil
 }
 
 // UpdateUserNotes implements notesdomain.Service.

@@ -18,7 +18,7 @@ func (s *Service) ChangePassword(ctx context.Context, req authdomain.ChangePassw
 		return fmt.Errorf("change_password: get user: %w", err)
 	}
 
-	if err := s.verifyOldPassword(ctx, user, req.OldPassword); err != nil {
+	if err := s.verifyCurrentPassword(ctx, user, req.OldPassword, "change_password"); err != nil {
 		return err
 	}
 
@@ -37,26 +37,22 @@ func (s *Service) ChangePassword(ctx context.Context, req authdomain.ChangePassw
 			return fmt.Errorf("change_password: reset failed login: %w", err)
 		}
 
-		if req.IsAllSessionsLogout {
-			return s.logoutEverywhere(ctx, "change_password", req.UserID, func(ctx context.Context) error {
-				return s.sessionRepo.RevokeAllUserSessions(ctx, req.UserID, nil, authdomain.RevokeReasonPasswordChanged)
-			})
-		}
-
-		return nil
+		return s.logoutEverywhere(ctx, "change_password", req.UserID, func(ctx context.Context) error {
+			return s.sessionRepo.RevokeAllUserSessions(ctx, req.UserID, nil, authdomain.RevokeReasonPasswordChanged)
+		})
 	})
 }
 
-// verifyOldPassword rejects a locked account before bcrypt, and counts a wrong password towards the login lock.
-func (s *Service) verifyOldPassword(ctx context.Context, user *authdomain.User, oldPassword string) error {
+// verifyCurrentPassword rejects a locked account before bcrypt, and counts a wrong password towards the login lock.
+func (s *Service) verifyCurrentPassword(ctx context.Context, user *authdomain.User, currentPassword, methodName string) error {
 	if user.LoginLockedUntil != nil && user.LoginLockedUntil.After(time.Now().UTC()) {
 		return &authdomain.ErrAccountLockedError{LockedUntil: *user.LoginLockedUntil}
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)); err != nil {
 		incErr := s.userRepo.IncrementFailedLogin(ctx, user.ID, loginLockInterval, loginFailLimit)
 		if incErr != nil && !errors.Is(incErr, authdomain.ErrUserNotFound) {
-			return fmt.Errorf("change_password: increment failed login: %w", incErr)
+			return fmt.Errorf("%s: increment failed login: %w", methodName, incErr)
 		}
 		return authdomain.ErrWrongPassword
 	}

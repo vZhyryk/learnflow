@@ -497,7 +497,7 @@ func TestGetActiveSessionsByUserID_Integration(t *testing.T) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 				sessionList, err := repo.GetActiveSessionsByUserID(ctx, nonExistentUUID)
 				So(err, ShouldBeNil)
-				So(sessionList, ShouldBeNil)
+				So(sessionList, ShouldBeEmpty)
 				So(len(sessionList), ShouldEqual, 0)
 			})
 		})
@@ -561,7 +561,7 @@ func TestGetAllSessionsByUserID_Integration(t *testing.T) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 				sessionList, err := repo.GetAllSessionsByUserID(ctx, nonExistentUUID)
 				So(err, ShouldBeNil)
-				So(sessionList, ShouldBeNil)
+				So(sessionList, ShouldBeEmpty)
 				So(len(sessionList), ShouldEqual, 0)
 			})
 		})

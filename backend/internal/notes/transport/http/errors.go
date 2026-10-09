@@ -17,7 +17,8 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 		errors.Is(err, notesdomain.ErrInvalidBody),
 		errors.Is(err, notesdomain.ErrInvalidResourceType),
 		errors.Is(err, notesdomain.ErrInvalidResourceID),
-		errors.Is(err, notesdomain.ErrInvalidUserID):
+		errors.Is(err, notesdomain.ErrInvalidUserID),
+		errors.Is(err, notesdomain.ErrInvalidSearch):
 		h.handleErrorRespond(r, "validation_error", func() error {
 			return helpers.ErrorResponse(w, http.StatusUnprocessableEntity, helpers.RootError(err).Error())
 		})

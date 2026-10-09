@@ -23,6 +23,8 @@ var bcryptCompareHashAndPassword = bcrypt.CompareHashAndPassword
 
 // Login authenticates a user and returns access/refresh tokens. Check order (lock →
 // bcrypt → status) is timing-attack-sensitive — do not reorder, see TestLoginConstantTimeUserEnumeration.
+// A locked account answers like a wrong password (dummy bcrypt, ErrInvalidCredentials), so the lock does not reveal
+// that the account exists.
 func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*authdomain.AuthTokens, error) {
 	user, err := s.loginGetUser(ctx, req)
 	if err != nil {
@@ -30,7 +32,8 @@ func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*auth
 	}
 
 	if user.LoginLockedUntil != nil && user.LoginLockedUntil.After(time.Now().UTC()) {
-		return nil, &authdomain.ErrAccountLockedError{LockedUntil: *user.LoginLockedUntil}
+		bcryptCompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck,gosec // discarded intentionally, only used to consume constant time
+		return nil, authdomain.ErrInvalidCredentials
 	}
 
 	err = bcryptCompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))

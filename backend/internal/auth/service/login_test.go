@@ -142,9 +142,27 @@ func TestLoginAccountLocked(t *testing.T) {
 
 			_, err := srv.Login(context.Background(), validLoginReq())
 
-			var lockErr *authdomain.ErrAccountLockedError
-			So(errors.As(err, &lockErr), ShouldBeTrue)
-			So(lockErr.LockedUntil, ShouldEqual, lockedUntil)
+			So(errors.Is(err, authdomain.ErrInvalidCredentials), ShouldBeTrue)
+			So(errors.Is(err, authdomain.ErrAccountLocked), ShouldBeFalse)
+		})
+
+		Convey("When the account is locked, a dummy bcrypt keeps the timing like a wrong password and the attempt is not counted", func() {
+			original := bcryptCompareHashAndPassword
+			Reset(func() { bcryptCompareHashAndPassword = original })
+			var compared int
+			bcryptCompareHashAndPassword = func(hashedPassword, password []byte) error {
+				compared++
+				return original(hashedPassword, password)
+			}
+			lockedUntil := time.Now().UTC().Add(10 * time.Minute)
+			user := newLoginTestUser(validLoginReq().Password, authdomain.StatusActive)
+			user.LoginLockedUntil = &lockedUntil
+			srv := newTestService(&mockUserRepo{getUserByEmail: loginGetUserByEmail(user)}, nil, nil, nil, nil)
+
+			_, err := srv.Login(context.Background(), validLoginReq())
+
+			So(errors.Is(err, authdomain.ErrInvalidCredentials), ShouldBeTrue)
+			So(compared, ShouldEqual, 1)
 		})
 
 		Convey("When the lock has already expired", func() {

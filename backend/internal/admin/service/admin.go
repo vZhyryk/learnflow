@@ -26,12 +26,19 @@ func (srv *Service) GetInstanceAdminActions(ctx context.Context, actorID string,
 	return actions, count, err
 }
 
-// authorizeInstanceAuditRead lets an admin read any trail and a subadmin only the trail of plain users.
-func (srv *Service) authorizeInstanceAuditRead(ctx context.Context, actorID string, targetType auditdomain.AdminTargetType, targetID string) error {
-	if targetType != auditdomain.TargetUser {
-		return nil
-	}
+// subAdminAuditTargets lists the non-user trails a subadmin may read: the entities a subadmin manages.
+// Everything else (payments, expenses, coupons, bookings, support chats, failed jobs) is admin-only by default.
+var subAdminAuditTargets = map[auditdomain.AdminTargetType]struct{}{
+	auditdomain.TargetCourse:       {},
+	auditdomain.TargetContentItem:  {},
+	auditdomain.TargetArticle:      {},
+	auditdomain.TargetReview:       {},
+	auditdomain.TargetAnnouncement: {},
+}
 
+// authorizeInstanceAuditRead lets an admin read any trail; a subadmin reads the trail of plain users and of the
+// targets in subAdminAuditTargets, and nothing else.
+func (srv *Service) authorizeInstanceAuditRead(ctx context.Context, actorID string, targetType auditdomain.AdminTargetType, targetID string) error {
 	actor, err := srv.userRepo.GetUserDataByID(ctx, actorID)
 	if err != nil {
 		return fmt.Errorf("load actor: %w", err)
@@ -45,12 +52,24 @@ func (srv *Service) authorizeInstanceAuditRead(ctx context.Context, actorID stri
 		return nil
 	}
 
+	if actor.Role != admindomain.RoleSubAdmin {
+		return admindomain.ErrForbiddenUserAction
+	}
+
+	if targetType != auditdomain.TargetUser {
+		if _, ok := subAdminAuditTargets[targetType]; ok {
+			return nil
+		}
+
+		return admindomain.ErrForbiddenUserAction
+	}
+
 	target, err := srv.userRepo.GetUserDataByID(ctx, targetID)
 	if err != nil {
 		return fmt.Errorf("load target: %w", err)
 	}
 
-	if actor.Role == admindomain.RoleSubAdmin && target.Role == admindomain.RoleUser {
+	if target.Role == admindomain.RoleUser {
 		return nil
 	}
 

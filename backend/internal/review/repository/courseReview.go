@@ -65,6 +65,7 @@ func (rep *Repository) GetCourseReviewList(ctx context.Context, params paginatio
 	} else {
 		query = strings.Replace(query, filterPlace, "", 1)
 	}
+
 	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, query, "GetCourseReviewList", &params, scanCourseReview, args)
 }
 

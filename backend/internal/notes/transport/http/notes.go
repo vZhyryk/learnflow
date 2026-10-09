@@ -59,7 +59,7 @@ func (h *Handler) getUserNotesByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"notes": notes}, nil)
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"note": notes}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
@@ -69,14 +69,18 @@ func (h *Handler) getUserAllNotesByUserID(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
 	filter := r.URL.Query().Get("filter")
+	if err := notesdomain.ValidateSearch(filter); err != nil {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
 
-	notesList, err := h.svc.GetUserAllNotesByUserID(ctx, user.ID, filter, pagination.ParsePaginationParams(r))
+	notesList, total, err := h.svc.GetUserAllNotesByUserID(ctx, user.ID, filter, pagination.ParsePaginationParams(r))
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
 	}
 
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"note_list": notesList}, nil)
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"notes": notesList, "total": total}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}

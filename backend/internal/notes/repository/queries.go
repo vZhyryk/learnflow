@@ -12,13 +12,20 @@ const (
 
 	getUserNotesByIDForUpdateSQL = getUserNotesByIDSQL + `FOR UPDATE`
 
-	getUserAllNotesByUserIDSQL = `
-		SELECT ` + notesColumns + `
-		FROM user_notes
+	userNotesFilterSQL = `
 		WHERE user_id = $1 AND deleted_at IS NULL
 			AND ($2::text = '' OR title ILIKE '%' || $2 || '%' OR body ILIKE '%' || $2 || '%')
+	`
+
+	getUserAllNotesByUserIDSQL = `
+		SELECT ` + notesColumns + `
+		FROM user_notes` + userNotesFilterSQL + `
 		ORDER BY created_at DESC
 		LIMIT $3 OFFSET $4
+	`
+
+	countUserNotesSQL = `
+		SELECT COUNT(*) FROM user_notes` + userNotesFilterSQL + `
 	`
 
 	createUserNotesSQL = `
