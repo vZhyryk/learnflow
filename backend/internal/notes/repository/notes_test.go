@@ -56,6 +56,38 @@ func TestCreateUserNotes(t *testing.T) {
 	})
 }
 
+func TestGetUserNotesByIDForUpdate(t *testing.T) {
+	Convey("Given a notes repository", t, func() {
+		var gotQuery string
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, sql string, _ ...any) pgx.Row {
+				gotQuery = sql
+				return &testutil.MockRow{ScanFn: fakeNoteScan(fakeNote(1))}
+			},
+		})
+
+		Convey("When the note is fetched for update, the row is locked", func() {
+			_, err := repo.GetUserNotesByIDForUpdate(context.Background(), "note-1", "user-1")
+
+			So(err, ShouldBeNil)
+			So(gotQuery, ShouldContainSubstring, "FOR UPDATE")
+			So(gotQuery, ShouldContainSubstring, "deleted_at IS NULL")
+		})
+
+		Convey("When no row matches, it is ErrNoteNotFound", func() {
+			repo := newTestRepo(&testutil.MockQueryRunner{
+				QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+					return &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+				},
+			})
+
+			_, err := repo.GetUserNotesByIDForUpdate(context.Background(), "note-1", "user-1")
+
+			So(errors.Is(err, notesdomain.ErrNoteNotFound), ShouldBeTrue)
+		})
+	})
+}
+
 func TestGetUserNotesByID(t *testing.T) {
 	Convey("Given a notes repository", t, func() {
 		var row *testutil.MockRow

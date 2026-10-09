@@ -794,6 +794,7 @@ CREATE TABLE admin_actions (
 
 CREATE INDEX idx_admin_actions_admin_user_id_created_at ON admin_actions(admin_user_id, created_at DESC);
 CREATE INDEX idx_admin_actions_target_type_target_id    ON admin_actions(target_type, target_id);
+CREATE INDEX idx_admin_actions_created_at_id            ON admin_actions(created_at DESC, id DESC);
 
 CREATE FUNCTION admin_actions_reject_modification() RETURNS trigger AS $$
 BEGIN
@@ -805,6 +806,10 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER admin_actions_append_only
     BEFORE UPDATE OR DELETE ON admin_actions
     FOR EACH ROW EXECUTE FUNCTION admin_actions_reject_modification();
+
+CREATE TRIGGER admin_actions_no_truncate
+    BEFORE TRUNCATE ON admin_actions
+    FOR EACH STATEMENT EXECUTE FUNCTION admin_actions_reject_modification();
 
 -- ---------------------------------------------------------------------------
 -- 23. SUPPORT CHAT

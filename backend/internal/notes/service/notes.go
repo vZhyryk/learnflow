@@ -74,7 +74,7 @@ func (srv *Service) GetUserAllNotesByUserID(ctx context.Context, userID, search 
 // UpdateUserNotes implements notesdomain.Service.
 func (srv *Service) UpdateUserNotes(ctx context.Context, req notesdomain.UpdateNotesRequest) error {
 	return srv.transactor.InTransaction(ctx, func(ctx context.Context) error {
-		notes, err := srv.notesRepo.GetUserNotesByID(ctx, req.ID, req.UserID)
+		notes, err := srv.notesRepo.GetUserNotesByIDForUpdate(ctx, req.ID, req.UserID)
 		if err != nil {
 			return fmt.Errorf("service.UpdateUserNotes: %w", err)
 		}

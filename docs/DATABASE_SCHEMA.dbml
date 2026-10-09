@@ -1,6 +1,6 @@
 Project LearnFlowDatabase {
   database_type: "PostgreSQL"
-  Note: 'Synchronized with backend/migrations through migration 000015. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
+  Note: 'Synchronized with backend/migrations through migration 000016. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
 }
 
 Table users {
@@ -652,7 +652,7 @@ Table failed_jobs {
 }
 
 Table admin_actions {
-  Note: 'Append-only: BEFORE UPDATE OR DELETE trigger admin_actions_append_only rejects changes (000015)'
+  Note: 'Append-only: BEFORE UPDATE OR DELETE trigger admin_actions_append_only rejects changes (000015); BEFORE TRUNCATE trigger admin_actions_no_truncate (000016)'
 
   id uuid [pk]
   admin_user_id uuid [not null, ref: > users.id]
@@ -665,6 +665,7 @@ Table admin_actions {
   indexes {
     (admin_user_id, created_at) [name: 'idx_admin_actions_admin_user_id_created_at', note: 'DESC on created_at in SQL']
     (target_type, target_id) [name: 'idx_admin_actions_target_type_target_id']
+    (created_at, id) [name: 'idx_admin_actions_created_at_id', note: 'DESC on both in SQL; added in 000016']
   }
 }
 

@@ -23,11 +23,11 @@ func (routes *RouteHandler) RecoverPanic(next http.Handler) http.Handler {
 				w.Header().Set("Connection", "close")
 				routes.App.Logger.Error(fmt.Errorf("panic: %v", err), map[string]any{
 					"method": r.Method,
-					"url":    r.URL.String(),
+					"url":    r.URL.Path,
 					"stack":  string(debug.Stack()),
 				})
 
-				helpers.LogRespondError(routes.App.Logger, r, "panic_response_write", map[string]any{"method": r.Method, "url": r.URL.String()}, func() error {
+				helpers.LogRespondError(routes.App.Logger, r, "panic_response_write", map[string]any{"method": r.Method, "url": r.URL.Path}, func() error {
 					return helpers.WriteJSON(w, http.StatusInternalServerError, helpers.Envelope{"error": "internal server error"}, nil)
 				})
 			}

@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"learnflow_backend/internal/shared/rediskeys"
@@ -17,11 +18,18 @@ type PoolConfig struct {
 	MinIdleConns    int
 	MaxRetries      int
 	ConnMaxLifetime time.Duration
+	TLS             bool
 }
 
 // InitRedis creates and pings a Redis client using the given address, password, and pool settings.
 func InitRedis(addr, password string, pool PoolConfig) (*Instance, error) {
+	var tlsConfig *tls.Config
+	if pool.TLS {
+		tlsConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+
 	client := redis.NewClient(&redis.Options{
+		TLSConfig:       tlsConfig,
 		Addr:            addr,
 		Password:        password,
 		DB:              0,

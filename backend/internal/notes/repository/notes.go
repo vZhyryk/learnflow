@@ -33,12 +33,21 @@ func (rep *Repository) CreateUserNotes(ctx context.Context, notes *notesdomain.U
 
 // GetUserNotesByID implements notesdomain.NotesRepository.
 func (rep *Repository) GetUserNotesByID(ctx context.Context, id, userID string) (*notesdomain.UserNotes, error) {
-	result, err := scanUserNotes(rep.QueryRunner(ctx).QueryRow(ctx, getUserNotesByIDSQL, id, userID))
+	return rep.getUserNotesByID(ctx, getUserNotesByIDSQL, "GetUserNotesByID", id, userID)
+}
+
+// GetUserNotesByIDForUpdate is GetUserNotesByID with a row lock held until the surrounding transaction ends.
+func (rep *Repository) GetUserNotesByIDForUpdate(ctx context.Context, id, userID string) (*notesdomain.UserNotes, error) {
+	return rep.getUserNotesByID(ctx, getUserNotesByIDForUpdateSQL, "GetUserNotesByIDForUpdate", id, userID)
+}
+
+func (rep *Repository) getUserNotesByID(ctx context.Context, query, method, id, userID string) (*notesdomain.UserNotes, error) {
+	result, err := scanUserNotes(rep.QueryRunner(ctx).QueryRow(ctx, query, id, userID))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, notesdomain.ErrNoteNotFound
 	}
 	if err != nil {
-		return nil, fmt.Errorf("repository.GetUserNotesByID: %w", err)
+		return nil, fmt.Errorf("repository.%s: %w", method, err)
 	}
 
 	return result, nil

@@ -24,6 +24,7 @@ type ContentRepository interface {
 type NotesRepository interface {
 	CreateUserNotes(ctx context.Context, notes *UserNotes) (*UserNotes, error)
 	GetUserNotesByID(ctx context.Context, id, userID string) (*UserNotes, error)
+	GetUserNotesByIDForUpdate(ctx context.Context, id, userID string) (*UserNotes, error)
 	GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*UserNotes, error)
 	UpdateUserNotes(ctx context.Context, notes *UserNotes) error
 	DeleteUserNotes(ctx context.Context, id, userID string) error

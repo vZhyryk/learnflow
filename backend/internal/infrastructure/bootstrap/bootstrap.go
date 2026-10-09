@@ -68,6 +68,7 @@ func GetRedis() (*redis.Instance, error) {
 		MinIdleConns:    env.GetIntEnv("REDIS_MIN_IDLE_CONNS", 2),
 		MaxRetries:      env.GetIntEnv("REDIS_MAX_RETRIES", 3),
 		ConnMaxLifetime: env.GetDurationEnv("REDIS_CONN_MAX_LIFETIME", 5*time.Minute),
+		TLS:             env.GetBoolEnv("REDIS_TLS", false),
 	}
 	return redis.InitRedis(env.GetStringEnv("REDIS_ADDR", "redis:6379"), env.GetStringEnv("REDIS_PASSWORD", ""), pool)
 }

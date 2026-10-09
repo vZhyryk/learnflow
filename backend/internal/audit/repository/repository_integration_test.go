@@ -238,6 +238,14 @@ func TestAdminActionsAppendOnly_Integration(t *testing.T) {
 			})
 		})
 
+		Convey("When the table is truncated, the database rejects it", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				_, err := tx.Exec(ctx, `TRUNCATE admin_actions`)
+
+				requireRestrictViolation(err)
+			})
+		})
+
 		Convey("When a DELETE matches no row, nothing fires and nothing is removed", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
 				tag, err := tx.Exec(ctx, `DELETE FROM admin_actions WHERE target_id = '00000000-0000-0000-0000-000000000000'`)

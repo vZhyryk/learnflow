@@ -190,7 +190,7 @@ func TestUpdateUserNotes(t *testing.T) {
 		var updated *notesdomain.UserNotes
 		var getErr, updateErr error
 		notesRepo := &mockNotesRepo{
-			getUserNotesByID: func(_ context.Context, _, userID string) (*notesdomain.UserNotes, error) {
+			getUserNotesByIDForUpd: func(_ context.Context, _, userID string) (*notesdomain.UserNotes, error) {
 				gotLookupUserID = userID
 				return stored, getErr
 			},
