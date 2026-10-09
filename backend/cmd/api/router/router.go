@@ -68,12 +68,6 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 		token:  tokens.NewTokens(a.Config.Secret.JWTSecret, a.Config.Secret.JWTSecretPrev, a.Config.Secret.JWTIssuer, a.Config.Secret.JWTAudience),
 	}
 
-	router.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		helpers.LogRespondError(a.Logger, r, "not_found_response_write", nil, func() error {
-			return helpers.NotFoundResponse(w)
-		})
-	}))
-
 	adminAction := auditrepository.New(a.DB)
 
 	transactor := db.NewTransactor(a.DB)
@@ -152,7 +146,19 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 		})
 	admin.RegisterAdminRoutes(router, adminSvc, adminStaticWithAuth, chains.StaticWithAuth, a.Logger)
 
-	// Helper routes
+	route.registerHelperRoutes(router)
+
+	return route, nil
+}
+
+// registerHelperRoutes registers the JSON 404 fallback and the unauthenticated health, readiness and metrics endpoints.
+func (route *RouteHandler) registerHelperRoutes(router *http.ServeMux) {
+	router.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		helpers.LogRespondError(route.App.Logger, r, "not_found_response_write", nil, func() error {
+			return helpers.NotFoundResponse(w)
+		})
+	}))
+
 	router.Handle("GET /health", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		helpers.LogRespondError(route.App.Logger, r, "health_response_write", map[string]any{"method": r.Method}, func() error {
 			return helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"status": "ok"}, nil)
@@ -162,8 +168,6 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	router.Handle("GET /readiness", http.HandlerFunc(route.Readiness))
 
 	router.Handle("GET /metrics", promhttp.Handler())
-
-	return route, nil
 }
 
 const rateLimitBodyLimit = 4_096

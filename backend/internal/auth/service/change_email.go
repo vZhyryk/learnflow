@@ -96,14 +96,9 @@ func (s *Service) ChangeEmail(ctx context.Context, req authdomain.EmailChangeReq
 		}
 
 		if req.IsAllSessionsLogout {
-			err = s.revokeUserSessions(ctx, "change_email", req.JTI, req.AccessTokenExpiresAt, func(ctx context.Context) error {
+			return s.logoutEverywhere(ctx, "change_email", token.UserID, func(ctx context.Context) error {
 				return s.sessionRepo.RevokeAllUserSessions(ctx, token.UserID, nil, authdomain.RevokeReasonEmailChanged)
 			})
-			if err != nil {
-				return err
-			}
-
-			return s.revokeAllUserTokens(ctx, "change_email", token.UserID)
 		}
 
 		return nil

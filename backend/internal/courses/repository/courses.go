@@ -6,6 +6,7 @@ import (
 	"fmt"
 	coursedomain "learnflow_backend/internal/courses/domain"
 	"learnflow_backend/internal/infrastructure/db"
+	apperrors "learnflow_backend/internal/shared/errors"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/repository"
 
@@ -62,22 +63,22 @@ func (rep *Repository) UpdateCourse(ctx context.Context, course *coursedomain.Co
 
 // GetAllPublishedCourses returns every non-deleted published course.
 func (rep *Repository) GetAllPublishedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllPublishedCoursesSQL, "GetAllPublishedCourses", params, scanCourse)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllPublishedCoursesSQL, "GetAllPublishedCourses", &params, scanCourse)
 }
 
 // GetAllDraftCourses returns every non-deleted draft course.
 func (rep *Repository) GetAllDraftCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllDraftCoursesSQL, "GetAllDraftCourses", params, scanCourse)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllDraftCoursesSQL, "GetAllDraftCourses", &params, scanCourse)
 }
 
 // GetAllArchivedCourses returns every archived course, including soft-deleted ones.
 func (rep *Repository) GetAllArchivedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllArchivedCoursesSQL, "GetAllArchivedCourses", params, scanCourse)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllArchivedCoursesSQL, "GetAllArchivedCourses", &params, scanCourse)
 }
 
 // GetAllCourses returns every course regardless of status, including soft-deleted ones.
 func (rep *Repository) GetAllCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllCoursesSQL, "GetAllCourses", params, scanCourse)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllCoursesSQL, "GetAllCourses", &params, scanCourse)
 }
 
 // GetCourseByID retrieves a non-deleted course by ID.
@@ -128,9 +129,13 @@ func (rep *Repository) CheckIfCourseExistsActiveByID(ctx context.Context, course
 	return exists, nil
 }
 
-// GetCourseTitleByID returns the title of a non-deleted course; pgx.ErrNoRows (wrapped) if it does not exist.
+// GetCourseTitleByID returns the title of a non-deleted course. A missing course is reported as both
+// coursedomain.ErrCourseNotFound (for this module) and apperrors.ErrNotFound (for other modules, e.g. admin).
 func (rep *Repository) GetCourseTitleByID(ctx context.Context, courseID string) (string, error) {
 	course, err := scanCourse(rep.QueryRunner(ctx).QueryRow(ctx, getCourseByIDSQL, courseID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("repository.GetCourseTitleByID: %w: %w", coursedomain.ErrCourseNotFound, apperrors.ErrNotFound)
+	}
 	if err != nil {
 		return "", fmt.Errorf("repository.GetCourseTitleByID: %w", err)
 	}

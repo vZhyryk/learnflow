@@ -6,6 +6,7 @@ import (
 	"fmt"
 	contentdomain "learnflow_backend/internal/content/domain"
 	"learnflow_backend/internal/infrastructure/db"
+	apperrors "learnflow_backend/internal/shared/errors"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/repository"
 
@@ -62,22 +63,22 @@ func (rep *Repository) UpdateContentItem(ctx context.Context, contentItem *conte
 
 // GetAllPublishedContentItems returns every non-deleted published ContentItem.
 func (rep *Repository) GetAllPublishedContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllPublishedContentItemsSQL, "GetAllPublishedContentItems", params, scanContentItem)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllPublishedContentItemsSQL, "GetAllPublishedContentItems", &params, scanContentItem)
 }
 
 // GetAllDraftContentItems returns every non-deleted draft ContentItem.
 func (rep *Repository) GetAllDraftContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllDraftContentItemsSQL, "GetAllDraftContentItems", params, scanContentItem)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllDraftContentItemsSQL, "GetAllDraftContentItems", &params, scanContentItem)
 }
 
 // GetAllArchivedContentItems returns every archived ContentItem, including soft-deleted ones.
 func (rep *Repository) GetAllArchivedContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllArchivedContentItemsSQL, "GetAllArchivedContentItems", params, scanContentItem)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllArchivedContentItemsSQL, "GetAllArchivedContentItems", &params, scanContentItem)
 }
 
 // GetAllContentItems returns every ContentItem regardless of status, including soft-deleted ones.
 func (rep *Repository) GetAllContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllContentItemsSQL, "GetAllContentItems", params, scanContentItem)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllContentItemsSQL, "GetAllContentItems", &params, scanContentItem)
 }
 
 // GetContentItemByID retrieves a non-deleted ContentItem by ID.
@@ -128,11 +129,15 @@ func (rep *Repository) CheckIfContentItemExistsActiveByID(ctx context.Context, c
 	return exists, nil
 }
 
-// GetContentItemTitleByID returns the title of a non-deleted content item; pgx.ErrNoRows (wrapped) if it does not exist.
+// GetContentItemTitleByID returns the title of a non-deleted content item. A missing item is reported as both
+// contentdomain.ErrContentItemNotFound (for this module) and apperrors.ErrNotFound (for other modules, e.g. admin).
 func (rep *Repository) GetContentItemTitleByID(ctx context.Context, contentItemID string) (string, error) {
 	contentItem, err := scanContentItem(rep.QueryRunner(ctx).QueryRow(ctx, getContentItemByIDSQL, contentItemID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("repository.GetContentItemTitleByID: %w: %w", contentdomain.ErrContentItemNotFound, apperrors.ErrNotFound)
+	}
 	if err != nil {
-		return "", fmt.Errorf("repository.GetContentItemByID: %w", err)
+		return "", fmt.Errorf("repository.GetContentItemTitleByID: %w", err)
 	}
 
 	return contentItem.Title, nil

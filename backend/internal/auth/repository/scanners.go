@@ -4,6 +4,7 @@ import (
 	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/infrastructure/convert"
+	"learnflow_backend/internal/shared/repository"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -22,15 +23,11 @@ func mapLockNotAvailable(err error) error {
 	return err
 }
 
-type rowScanner interface {
-	Scan(dest ...any) error
-}
-
 // dobLayout matches authdomain's DateOfBirth string format and the
 // validator.IsValidDateOfBirth parse layout.
 const dobLayout = "2006-01-02"
 
-func scanUser(row rowScanner) (*authdomain.User, error) {
+func scanUser(row repository.RowScanner) (*authdomain.User, error) {
 	user := &authdomain.User{}
 	err := row.Scan(
 		&user.ID,
@@ -55,7 +52,7 @@ func scanUser(row rowScanner) (*authdomain.User, error) {
 	return user, nil
 }
 
-func scanUserProfile(row rowScanner) (*authdomain.UserProfile, error) {
+func scanUserProfile(row repository.RowScanner) (*authdomain.UserProfile, error) {
 	userProfile := &authdomain.UserProfile{}
 	var dob pgtype.Date
 	err := row.Scan(
@@ -81,7 +78,7 @@ func scanUserProfile(row rowScanner) (*authdomain.UserProfile, error) {
 	return userProfile, nil
 }
 
-func scanUserSession(row rowScanner) (*authdomain.UserSession, error) {
+func scanUserSession(row repository.RowScanner) (*authdomain.UserSession, error) {
 	session := &authdomain.UserSession{}
 	err := row.Scan(
 		&session.ID,
@@ -108,7 +105,7 @@ func scanUserSession(row rowScanner) (*authdomain.UserSession, error) {
 	return session, nil
 }
 
-func scanToken(row rowScanner) (*authdomain.TokenBase, error) {
+func scanToken(row repository.RowScanner) (*authdomain.TokenBase, error) {
 	token := &authdomain.TokenBase{}
 	err := row.Scan(
 		&token.ID,
@@ -126,7 +123,7 @@ func scanToken(row rowScanner) (*authdomain.TokenBase, error) {
 	return token, nil
 }
 
-func scanEmailChangeToken(row rowScanner) (*authdomain.EmailChangeToken, error) {
+func scanEmailChangeToken(row repository.RowScanner) (*authdomain.EmailChangeToken, error) {
 	token := &authdomain.EmailChangeToken{}
 	err := row.Scan(
 		&token.ID,

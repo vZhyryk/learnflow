@@ -103,10 +103,11 @@ type AdminAction struct {
 	CreatedAt   time.Time       `json:"created_at"`
 }
 
-// GetInstanceAdminActionsRequest selects the target whose audit trail is read.
+// GetInstanceAdminActionsRequest selects the target whose audit trail is read; the handler fills it from the
+// target_id and target_type query parameters, never from a JSON body.
 type GetInstanceAdminActionsRequest struct {
-	ItemID     string          `json:"item_id"`
-	TargetType AdminTargetType `json:"target_type"`
+	ItemID     string
+	TargetType AdminTargetType
 }
 
 // Validate checks that the target id is a UUID and the target type is a known one.

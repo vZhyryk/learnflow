@@ -60,27 +60,27 @@ func (rep *Repository) ApproveAnnouncement(ctx context.Context, announcementID, 
 
 // GetAnnouncements returns a paginated list of all announcements.
 func (rep *Repository) GetAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAnnouncementsSQL, "GetAnnouncements", params, scanAnnouncement)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAnnouncementsSQL, "GetAnnouncements", &params, scanAnnouncement)
 }
 
 // GetUnApprovedAnnouncements returns a paginated list of announcements pending approval.
 func (rep *Repository) GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getUnApprovedAnnouncementsSQL, "GetUnApprovedAnnouncements", params, scanAnnouncement)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getUnApprovedAnnouncementsSQL, "GetUnApprovedAnnouncements", &params, scanAnnouncement)
 }
 
 // GetApprovedAnnouncements returns a paginated list of approved announcements.
 func (rep *Repository) GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getApprovedAnnouncementsSQL, "GetApprovedAnnouncements", params, scanAnnouncement)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getApprovedAnnouncementsSQL, "GetApprovedAnnouncements", &params, scanAnnouncement)
 }
 
 // GetExpiredAnnouncements returns a paginated list of expired announcements.
 func (rep *Repository) GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getExpiredAnnouncementsSQL, "GetExpiredAnnouncements", params, scanAnnouncement)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getExpiredAnnouncementsSQL, "GetExpiredAnnouncements", &params, scanAnnouncement)
 }
 
 // GetPublicAnnouncements returns a paginated list of approved banner announcements userID may see.
 func (rep *Repository) GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
-	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getPublicAnnouncementsSQL, "GetPublicAnnouncements", params, scanPublicAnnouncement, []any{userID})
+	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getPublicAnnouncementsSQL, "GetPublicAnnouncements", &params, scanPublicAnnouncement, []any{userID})
 }
 
 // GetAnnouncementByID retrieves an announcement by ID.

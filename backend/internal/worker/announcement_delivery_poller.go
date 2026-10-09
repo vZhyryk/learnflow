@@ -6,6 +6,7 @@ import (
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/logger"
+	"learnflow_backend/internal/shared/repository"
 	"time"
 )
 
@@ -86,7 +87,7 @@ func (p AnnouncementDeliver) GetIdempotencyKey() []string {
 	return []string{p.UserID, p.AnnouncementID}
 }
 
-func scanAnnouncementDeliveryPoller(row entryScanner) (PollerEntry[AnnouncementDeliveryPoller], error) {
+func scanAnnouncementDeliveryPoller(row repository.RowScanner) (PollerEntry[AnnouncementDeliveryPoller], error) {
 	var entry AnnouncementDeliver
 	var pollerEntry PollerEntry[AnnouncementDeliveryPoller]
 	err := row.Scan(&entry.ID, &entry.UserID, &entry.AnnouncementID, &entry.FirstName, &entry.Title, &entry.Body, &entry.Email)

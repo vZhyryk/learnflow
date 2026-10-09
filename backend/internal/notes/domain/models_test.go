@@ -113,7 +113,8 @@ func TestUpdateNotesRequestApply(t *testing.T) {
 		note := &UserNotes{Title: "old", Description: &oldDescription, Body: "old body"}
 
 		Convey("When no field is provided, the note is unchanged", func() {
-			UpdateNotesRequest{}.Apply(note)
+			req := UpdateNotesRequest{}
+			req.Apply(note)
 
 			So(note.Title, ShouldEqual, "old")
 			So(*note.Description, ShouldEqual, "old description")
@@ -121,7 +122,8 @@ func TestUpdateNotesRequestApply(t *testing.T) {
 		})
 
 		Convey("When fields are provided, only those are copied", func() {
-			UpdateNotesRequest{Title: ptr("new"), Body: ptr("new body")}.Apply(note)
+			req := UpdateNotesRequest{Title: ptr("new"), Body: ptr("new body")}
+			req.Apply(note)
 
 			So(note.Title, ShouldEqual, "new")
 			So(note.Body, ShouldEqual, "new body")

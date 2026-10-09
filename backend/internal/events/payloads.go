@@ -123,6 +123,7 @@ func (p UserNotificationPayload) GetEmail() string {
 	return p.Email
 }
 
+// GrantAccessPayload is the event payload of the email telling a user that an admin granted them access to an item.
 type GrantAccessPayload struct {
 	UserID   string `json:"user_id"`
 	ItemName string `json:"item_name"`
@@ -132,6 +133,7 @@ type GrantAccessPayload struct {
 	Email    string `json:"email"`
 }
 
+// RequiredFields lists the fields that must be set for the payload to be valid.
 func (p GrantAccessPayload) RequiredFields() []Field {
 	return []Field{
 		{Name: "UserID", IsValid: func() bool { return p.UserID != "" }},
@@ -143,10 +145,12 @@ func (p GrantAccessPayload) RequiredFields() []Field {
 	}
 }
 
+// GetIdempotencyKey identifies one grant: the same user, item and item type are emailed once.
 func (p GrantAccessPayload) GetIdempotencyKey() []string {
 	return []string{p.UserID, p.ItemID, p.ItemType}
 }
 
+// GetEmail returns the recipient address.
 func (p GrantAccessPayload) GetEmail() string {
 	return p.Email
 }

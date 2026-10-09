@@ -4,6 +4,7 @@ import (
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/logger"
+	"learnflow_backend/internal/shared/repository"
 	"time"
 )
 
@@ -35,7 +36,7 @@ const (
 	`
 )
 
-func scanOutboxEntry(row entryScanner) (PollerEntry[OutboxPoller], error) {
+func scanOutboxEntry(row repository.RowScanner) (PollerEntry[OutboxPoller], error) {
 	var entry PollerEntry[OutboxPoller]
 	err := row.Scan(&entry.ID, &entry.EventType, &entry.PayloadJSON)
 	return entry, err

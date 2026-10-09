@@ -16,12 +16,11 @@ func (s *Service) Refresh(ctx context.Context, req authdomain.RefreshRequest) (*
 	var rawToken string
 	session := &authdomain.UserSession{}
 
-	err := s.checkRefreshSessionPrevHash(ctx, refreshHashHex)
-	if err != nil {
-		return nil, err
+	if reuseErr := s.checkRefreshSessionPrevHash(ctx, refreshHashHex); reuseErr != nil {
+		return nil, reuseErr
 	}
 
-	err = s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		uSession, err := s.sessionRepo.GetUserSessionByRefreshToken(ctx, refreshHashHex)
 		if err != nil {
 			return err

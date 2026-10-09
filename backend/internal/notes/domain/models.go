@@ -175,30 +175,31 @@ func (req *UpdateNotesRequest) validateID() error {
 }
 
 // Apply copies the provided fields onto p.
-func (r UpdateNotesRequest) Apply(p *UserNotes) {
+func (req *UpdateNotesRequest) Apply(p *UserNotes) {
 	appliers := []func(*UserNotes){
-		r.applyTitle,
-		r.applyDescription,
-		r.applyBody,
+		req.applyTitle,
+		req.applyDescription,
+		req.applyBody,
 	}
 	for _, apply := range appliers {
 		apply(p)
 	}
 }
-func (r UpdateNotesRequest) applyTitle(p *UserNotes) {
-	if r.Title != nil {
-		p.Title = *r.Title
+
+func (req *UpdateNotesRequest) applyTitle(p *UserNotes) {
+	if req.Title != nil {
+		p.Title = *req.Title
 	}
 }
 
-func (r UpdateNotesRequest) applyDescription(p *UserNotes) {
-	if r.Description != nil {
-		p.Description = r.Description
+func (req *UpdateNotesRequest) applyDescription(p *UserNotes) {
+	if req.Description != nil {
+		p.Description = req.Description
 	}
 }
 
-func (r UpdateNotesRequest) applyBody(p *UserNotes) {
-	if r.Body != nil {
-		p.Body = *r.Body
+func (req *UpdateNotesRequest) applyBody(p *UserNotes) {
+	if req.Body != nil {
+		p.Body = *req.Body
 	}
 }

@@ -5,13 +5,13 @@ import (
 	"errors"
 	admindomain "learnflow_backend/internal/admin/domain"
 	auditdomain "learnflow_backend/internal/audit/domain"
+	apperrors "learnflow_backend/internal/shared/errors"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 	"learnflow_backend/internal/shared/tokens"
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -856,7 +856,7 @@ func TestGrantAccessSuccess(t *testing.T) {
 	}
 }
 
-func TestGrantAccessFailures(t *testing.T) {
+func TestGrantAccessLookupFailures(t *testing.T) {
 	for _, tc := range grantCases() {
 		Convey("Given "+tc.name, t, func() {
 			f := newGrantFixture()
@@ -868,7 +868,7 @@ func TestGrantAccessFailures(t *testing.T) {
 			})
 
 			Convey("When the item does not exist", func() {
-				tc.setLookup(f, pgx.ErrNoRows)
+				tc.setLookup(f, apperrors.ErrNotFound)
 				err := tc.call(f, validUserID)
 				So(errors.Is(err, admindomain.ErrItemNotFound), ShouldBeTrue)
 				So(f.granted, ShouldBeFalse)
@@ -881,6 +881,14 @@ func TestGrantAccessFailures(t *testing.T) {
 				So(err.Error(), ShouldContainSubstring, "service."+tc.name)
 				So(f.granted, ShouldBeFalse)
 			})
+		})
+	}
+}
+
+func TestGrantAccessUserStateFailures(t *testing.T) {
+	for _, tc := range grantCases() {
+		Convey("Given "+tc.name, t, func() {
+			f := newGrantFixture()
 
 			Convey("When the user does not exist", func() {
 				f.users.getUserDataByID = func(_ context.Context, _ string) (*admindomain.UserData, error) {
@@ -905,6 +913,14 @@ func TestGrantAccessFailures(t *testing.T) {
 				So(errors.Is(err, admindomain.ErrInvalidUserState), ShouldBeTrue)
 				So(f.granted, ShouldBeFalse)
 			})
+		})
+	}
+}
+
+func TestGrantAccessWriteFailures(t *testing.T) {
+	for _, tc := range grantCases() {
+		Convey("Given "+tc.name, t, func() {
+			f := newGrantFixture()
 
 			Convey("When the access is already granted", func() {
 				tc.setGrant(f, admindomain.ErrAccessAlreadyGranted)
@@ -971,7 +987,7 @@ func TestRevokeSubAdminAccessSessionFailure(t *testing.T) {
 		}}
 		srv := newTestUserServiceFull(&mockUserRepo{}, noopAdminActions(), sessions, recordingBlocklist(&calls, nil, nil))
 
-		err := srv.revokeSubAdminAccess(context.Background(), validUserID, testAdminID)
+		err := srv.revokeSessionsAndMark(context.Background(), validUserID, testAdminID, "set user_role_revoked", srv.blocklist.RevokeUserRole)
 
 		So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		So(err.Error(), ShouldContainSubstring, "revoke sessions")

@@ -7,6 +7,7 @@ import (
 	"learnflow_backend/internal/infrastructure/db"
 	notesdomain "learnflow_backend/internal/notes/domain"
 	"learnflow_backend/internal/shared/pagination"
+	"learnflow_backend/internal/shared/repository"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -45,26 +46,7 @@ func (rep *Repository) GetUserNotesByID(ctx context.Context, id, userID string) 
 
 // GetUserAllNotesByUserID returns a page of the user's notes; a non-empty search matches title or body case-insensitively.
 func (rep *Repository) GetUserAllNotesByUserID(ctx context.Context, userID, search string, params pagination.Params) ([]*notesdomain.UserNotes, error) {
-	rows, err := rep.QueryRunner(ctx).Query(ctx, getUserAllNotesByUserIDSQL, userID, likeEscaper.Replace(search), params.Limit(), params.Offset())
-	if err != nil {
-		return nil, fmt.Errorf("repository.GetUserAllNotesByUserID: %w", err)
-	}
-	defer rows.Close()
-
-	var notesList []*notesdomain.UserNotes
-	for rows.Next() {
-		note, err := scanUserNotes(rows)
-		if err != nil {
-			return nil, fmt.Errorf("repository.GetUserAllNotesByUserID scan: %w", err)
-		}
-		notesList = append(notesList, note)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repository.GetUserAllNotesByUserID rows: %w", err)
-	}
-
-	return notesList, nil
+	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getUserAllNotesByUserIDSQL, "GetUserAllNotesByUserID", &params, scanUserNotes, []any{userID, likeEscaper.Replace(search)})
 }
 
 // UpdateUserNotes implements notesdomain.NotesRepository.

@@ -29,6 +29,7 @@ const (
 	StatusPendingVerification UserStatus = "pending_verification"
 )
 
+// Item types an admin can grant access to.
 const (
 	ContentItemType ItemType = "content"
 	CourseItemType  ItemType = "course"

@@ -6,6 +6,7 @@ import (
 	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
+	"strconv"
 	"testing"
 	"time"
 
@@ -35,7 +36,7 @@ func TestCreateAdminAction(t *testing.T) {
 			execErr = testutil.ErrDBUnexpected
 			err := repo.CreateAdminAction(context.Background(), action)
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "audit.CreateAdminAction")
+			So(err.Error(), ShouldContainSubstring, "repository.CreateAdminAction")
 		})
 
 		Convey("When it succeeds", func() {
@@ -70,7 +71,7 @@ func TestWasDeletedByAdmin(t *testing.T) {
 			scanErr = testutil.ErrDBUnexpected
 			_, err := repo.WasDeletedByAdmin(context.Background(), "user-1")
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "audit.WasDeletedByAdmin")
+			So(err.Error(), ShouldContainSubstring, "repository.WasDeletedByAdmin")
 		})
 
 		Convey("When no row comes back, it reports false", func() {
@@ -97,7 +98,7 @@ func TestNew(t *testing.T) {
 }
 
 func fakeAdminAction(n int) *auditdomain.AdminAction {
-	id := string(rune('a' + n))
+	id := strconv.Itoa(n)
 	return &auditdomain.AdminAction{
 		ID:          "action-" + id,
 		AdminUserID: "admin-" + id,
@@ -167,14 +168,14 @@ func TestGetInstanceAdminActions(t *testing.T) {
 			f.countErr = testutil.ErrDBUnexpected
 			_, _, err := call()
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "audit.GetInstanceAdminActionsCount")
+			So(err.Error(), ShouldContainSubstring, "repository.GetInstanceAdminActionsCount")
 		})
 
 		Convey("When the list query fails", func() {
 			f.queryErr = testutil.ErrDBUnexpected
 			_, _, err := call()
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "audit.GetInstanceAdminActions")
+			So(err.Error(), ShouldContainSubstring, "repository.GetInstanceAdminActions")
 		})
 
 		Convey("When a row fails to scan", func() {
@@ -228,7 +229,7 @@ func fakeFailedJob(n int) *auditdomain.FailedJob {
 	note, errMsg := "retried manually", "smtp: connection refused"
 	resolved := time.Date(2026, 10, n, 13, 0, 0, 0, time.UTC)
 	return &auditdomain.FailedJob{
-		ID:             "job-" + string(rune('a'+n)),
+		ID:             "job-" + strconv.Itoa(n),
 		EventType:      "user.blocked",
 		QueueName:      "email",
 		AttemptCount:   3,
@@ -269,14 +270,14 @@ func TestGetFailedJobs(t *testing.T) {
 			f.countErr = testutil.ErrDBUnexpected
 			_, _, err := call()
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "audit.GetFailedJobsCount")
+			So(err.Error(), ShouldContainSubstring, "repository.GetFailedJobsCount")
 		})
 
 		Convey("When the list query fails", func() {
 			f.queryErr = testutil.ErrDBUnexpected
 			_, _, err := call()
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "audit.GetFailedJobs")
+			So(err.Error(), ShouldContainSubstring, "repository.GetFailedJobs")
 		})
 
 		Convey("When a row fails to scan", func() {
@@ -338,14 +339,14 @@ func TestGetAdminActions(t *testing.T) {
 			f.countErr = testutil.ErrDBUnexpected
 			_, _, err := call()
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "audit.GetAdminActionsCount")
+			So(err.Error(), ShouldContainSubstring, "repository.GetAdminActionsCount")
 		})
 
 		Convey("When the list query fails", func() {
 			f.queryErr = testutil.ErrDBUnexpected
 			_, _, err := call()
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "audit.GetAdminActions")
+			So(err.Error(), ShouldContainSubstring, "repository.GetAdminActions")
 		})
 
 		Convey("When a row fails to scan", func() {

@@ -65,7 +65,7 @@ func (rep *Repository) GetArticleReviewList(ctx context.Context, params paginati
 	} else {
 		query = strings.Replace(query, filterPlace, "", 1)
 	}
-	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, query, "GetArticleReviewList", params, scanArticleReview, args)
+	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, query, "GetArticleReviewList", &params, scanArticleReview, args)
 }
 
 // GetArticleReviewByID retrieves a non-deleted Article review by ID.

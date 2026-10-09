@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/repository"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -86,27 +87,7 @@ func (rep *Repository) RevokeAllUserSessionsAdmin(ctx context.Context, userID, r
 
 // GetActiveSessionsByUserID returns all non-revoked sessions for the given user.
 func (rep *Repository) GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
-	rows, err := rep.QueryRunner(ctx).Query(ctx, getActiveUserSessionSQL, userID)
-	if err != nil {
-		return nil, fmt.Errorf("repository.GetActiveSessionsByUserID: %w", err)
-	}
-
-	defer rows.Close()
-
-	var sessions []*authdomain.UserSession
-	for rows.Next() {
-		session, err := scanUserSession(rows)
-		if err != nil {
-			return nil, fmt.Errorf("repository.GetActiveSessionsByUserID scan: %w", err)
-		}
-		sessions = append(sessions, session)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repository.GetActiveSessionsByUserID rows: %w", err)
-	}
-
-	return sessions, nil
+	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getActiveUserSessionSQL, "GetActiveSessionsByUserID", nil, scanUserSession, []any{userID})
 }
 
 // UpdateSessionToken replaces the refresh token hash for a session (token rotation).
@@ -137,25 +118,5 @@ func (rep *Repository) UpdateFailedLoginAttempts(ctx context.Context, sessionID,
 
 // GetAllSessionsByUserID returns all sessions belonging to the given user.
 func (rep *Repository) GetAllSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
-	rows, err := rep.QueryRunner(ctx).Query(ctx, getAllUserSessionSQL, userID)
-	if err != nil {
-		return nil, fmt.Errorf("repository.GetAllSessionsByUserID: %w", err)
-	}
-
-	defer rows.Close()
-
-	var sessions []*authdomain.UserSession
-	for rows.Next() {
-		session, err := scanUserSession(rows)
-		if err != nil {
-			return nil, fmt.Errorf("repository.GetAllSessionsByUserID scan: %w", err)
-		}
-		sessions = append(sessions, session)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repository.GetAllSessionsByUserID rows: %w", err)
-	}
-
-	return sessions, nil
+	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getAllUserSessionSQL, "GetAllSessionsByUserID", nil, scanUserSession, []any{userID})
 }

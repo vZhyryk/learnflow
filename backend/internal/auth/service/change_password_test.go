@@ -40,17 +40,13 @@ func validChangePasswordRequest() authdomain.ChangePasswordRequest {
 	}
 }
 
-// changePasswordLogoutRequest builds a ChangePasswordRequest with IsAllSessionsLogout
-// enabled, varying only the access token expiry so tests can exercise the blocklist
-// skip/apply branches in revokeUserSessions.
-func changePasswordLogoutRequest(accessTokenExpiresAt time.Time) authdomain.ChangePasswordRequest {
+// changePasswordLogoutRequest builds a ChangePasswordRequest with IsAllSessionsLogout enabled.
+func changePasswordLogoutRequest() authdomain.ChangePasswordRequest {
 	return authdomain.ChangePasswordRequest{
-		UserID:               TestUserID,
-		OldPassword:          "correct-old-password",
-		NewPassword:          "new-password",
-		IsAllSessionsLogout:  true,
-		JTI:                  "jti-123",
-		AccessTokenExpiresAt: accessTokenExpiresAt,
+		UserID:              TestUserID,
+		OldPassword:         "correct-old-password",
+		NewPassword:         "new-password",
+		IsAllSessionsLogout: true,
 	}
 }
 
@@ -244,7 +240,7 @@ func TestChangePasswordWithSessionLogout(t *testing.T) {
 			}
 			srv := newTestService(uRepo, sRepo, nil, nil, newSuccessfulMockBlocklist())
 
-			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest(time.Now().UTC().Add(15*time.Minute)))
+			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest())
 
 			So(err, ShouldBeNil)
 			So(gotUserID, ShouldEqual, TestUserID)
@@ -273,58 +269,20 @@ func TestChangePasswordWithSessionLogout(t *testing.T) {
 	})
 }
 
-func TestChangePasswordSessionBlocklistFails(t *testing.T) {
-	Convey("Given an auth service", t, func() {
-		Convey("When IsAllSessionsLogout is true and blocklisting the JTI fails", func() {
-			uRepo := validChangePasswordUserRepo()
-			sRepo := validChangePasswordSessionRepo()
-			blocklist := mockBlocklistBlockTokenError(testutil.ErrRedisUnavailable)
-			srv := newTestService(uRepo, sRepo, nil, nil, blocklist)
-
-			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest(time.Now().UTC().Add(15*time.Minute)))
-
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "session blocklist")
-			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
-		})
-	})
-}
-
-func TestChangePasswordSkipsBlocklistWhenTokenExpired(t *testing.T) {
-	Convey("Given an auth service", t, func() {
-		Convey("When the access token is already expired, blocklisting is skipped", func() {
-			var blocked bool
-			uRepo := validChangePasswordUserRepo()
-			sRepo := validChangePasswordSessionRepo()
-			blocklist := newSuccessfulMockBlocklist()
-			blocklist.blockToken = func(_ context.Context, _ string, _ time.Duration) error {
-				blocked = true
-				return nil
-			}
-			srv := newTestService(uRepo, sRepo, nil, nil, blocklist)
-
-			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest(time.Now().UTC().Add(-time.Minute)))
-
-			So(err, ShouldBeNil)
-			So(blocked, ShouldBeFalse)
-		})
-	})
-}
-
 func TestChangePasswordRevokesAllTokens(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		var revokedUserID string
 		var revokedTTL time.Duration
 		var revokeErr error
-		blocklist := newSuccessfulMockBlocklist()
-		blocklist.revokeUserTokens = func(_ context.Context, userID string, ttl time.Duration) error {
+		// blockToken is deliberately unset: the mark covers the caller's own token, so BlockToken must not be called.
+		blocklist := &mockBlocklist{revokeUserTokens: func(_ context.Context, userID string, ttl time.Duration) error {
 			revokedUserID, revokedTTL = userID, ttl
 			return revokeErr
-		}
+		}}
 		srv := newTestService(validChangePasswordUserRepo(), validChangePasswordSessionRepo(), nil, nil, blocklist)
 
 		Convey("When all sessions are logged out, every access token issued so far is revoked for one token lifetime", func() {
-			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest(time.Now().UTC().Add(15*time.Minute)))
+			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest())
 
 			So(err, ShouldBeNil)
 			So(revokedUserID, ShouldEqual, TestUserID)
@@ -341,7 +299,7 @@ func TestChangePasswordRevokesAllTokens(t *testing.T) {
 		Convey("When the Redis revocation fails, the change fails with ErrBlocklistUnavailable", func() {
 			revokeErr = testutil.ErrRedisUnavailable
 
-			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest(time.Now().UTC().Add(15*time.Minute)))
+			err := srv.ChangePassword(context.Background(), changePasswordLogoutRequest())
 
 			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
 			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)

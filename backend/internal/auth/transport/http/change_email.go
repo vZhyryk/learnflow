@@ -40,8 +40,6 @@ func (h *Handler) changeEmail(w http.ResponseWriter, r *http.Request) {
 	user := appcontext.MustUserFromContext(ctx)
 
 	req.UserID = user.ID
-	req.JTI = appcontext.JTIFromContext(ctx)
-	req.AccessTokenExpiresAt = appcontext.AccessTokenExpiresAtFromContext(ctx)
 
 	err := h.svc.ChangeEmail(ctx, req)
 	if err != nil {

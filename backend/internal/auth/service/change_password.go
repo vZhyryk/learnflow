@@ -38,14 +38,9 @@ func (s *Service) ChangePassword(ctx context.Context, req authdomain.ChangePassw
 		}
 
 		if req.IsAllSessionsLogout {
-			err = s.revokeUserSessions(ctx, "change_password", req.JTI, req.AccessTokenExpiresAt, func(ctx context.Context) error {
+			return s.logoutEverywhere(ctx, "change_password", req.UserID, func(ctx context.Context) error {
 				return s.sessionRepo.RevokeAllUserSessions(ctx, req.UserID, nil, authdomain.RevokeReasonPasswordChanged)
 			})
-			if err != nil {
-				return err
-			}
-
-			return s.revokeAllUserTokens(ctx, "change_password", req.UserID)
 		}
 
 		return nil

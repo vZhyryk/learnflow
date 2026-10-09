@@ -7,11 +7,28 @@ import (
 
 	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
+	"learnflow_backend/internal/shared/repository"
 
 	"github.com/jackc/pgx/v5"
 )
 
 const (
+	// adminActionSelectSQL is the shared SELECT ... JOIN part of every admin_actions list query; the admin's display
+	// name falls back to the email when the profile has no first name.
+	adminActionSelectSQL = `
+		SELECT
+			a.id,
+			a.admin_user_id,
+			COALESCE(NULLIF(p.first_name, ''), u.email) AS admin_name,
+			a.action_type,
+			a.target_type,
+			a.target_id,
+			a.details_json,
+			a.created_at
+		FROM admin_actions a
+		JOIN users u ON u.id = a.admin_user_id
+		LEFT JOIN user_profiles p ON p.user_id = u.id`
+
 	createAdminActionSQL = `
 		INSERT INTO admin_actions (admin_user_id, action_type, target_type, target_id, details_json)
 		VALUES ($1, $2, $3, $4, $5::jsonb)
@@ -25,19 +42,7 @@ const (
 		LIMIT 1
 	`
 
-	getInstanceAdminActionsSQL = `
-		SELECT
-			a.id,
-			a.admin_user_id,
-			COALESCE(NULLIF(p.first_name, ''), u.email) AS admin_name,
-			a.action_type,
-			a.target_type,
-			a.target_id,
-			a.details_json,
-			a.created_at
-		FROM admin_actions a
-		JOIN users u ON u.id = a.admin_user_id
-		LEFT JOIN user_profiles p ON p.user_id = u.id
+	getInstanceAdminActionsSQL = adminActionSelectSQL + `
 		WHERE a.target_type = $1 AND a.target_id = $2
 		ORDER BY a.created_at DESC, a.id DESC
 		LIMIT $3 OFFSET $4
@@ -54,19 +59,7 @@ const (
 			AND ($4::timestamptz IS NULL OR a.created_at < $4)
 	`
 
-	getAdminActionsSQL = `
-		SELECT
-			a.id,
-			a.admin_user_id,
-			COALESCE(NULLIF(p.first_name, ''), u.email) AS admin_name,
-			a.action_type,
-			a.target_type,
-			a.target_id,
-			a.details_json,
-			a.created_at
-		FROM admin_actions a
-		JOIN users u ON u.id = a.admin_user_id
-		LEFT JOIN user_profiles p ON p.user_id = u.id` + adminActionFilterSQL + `
+	getAdminActionsSQL = adminActionSelectSQL + adminActionFilterSQL + `
 		ORDER BY a.created_at DESC, a.id DESC
 		LIMIT $5 OFFSET $6
 	`
@@ -101,7 +94,7 @@ const (
 func (r *Audit) CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error {
 	_, err := r.QueryRunner(ctx).Exec(ctx, createAdminActionSQL, action.AdminUserID, action.ActionType, action.TargetType, action.TargetID, detailsArg(action.Details))
 	if err != nil {
-		return fmt.Errorf("audit.CreateAdminAction: %w", err)
+		return fmt.Errorf("repository.CreateAdminAction: %w", err)
 	}
 
 	return nil
@@ -117,7 +110,7 @@ func (r *Audit) WasDeletedByAdmin(ctx context.Context, targetID string) (bool, e
 	}
 
 	if err != nil {
-		return false, fmt.Errorf("audit.WasDeletedByAdmin: %w", err)
+		return false, fmt.Errorf("repository.WasDeletedByAdmin: %w", err)
 	}
 	return exists, nil
 }
@@ -136,26 +129,12 @@ func (r *Audit) GetInstanceAdminActions(ctx context.Context, targetType auditdom
 	var count int
 	err := r.QueryRunner(ctx).QueryRow(ctx, getInstanceAdminActionsCountSQL, targetType, targetID).Scan(&count)
 	if err != nil {
-		return nil, 0, fmt.Errorf("audit.GetInstanceAdminActionsCount: %w", err)
+		return nil, 0, fmt.Errorf("repository.GetInstanceAdminActionsCount: %w", err)
 	}
 
-	rows, err := r.QueryRunner(ctx).Query(ctx, getInstanceAdminActionsSQL, targetType, targetID, params.Limit(), params.Offset())
+	actions, err := repository.GetAndParseListWithArgs(ctx, &r.BaseRepository, getInstanceAdminActionsSQL, "GetInstanceAdminActions", &params, scanAdminAction, []any{targetType, targetID})
 	if err != nil {
-		return nil, 0, fmt.Errorf("audit.GetInstanceAdminActions: %w", err)
-	}
-	defer rows.Close()
-
-	actions := make([]*auditdomain.AdminAction, 0)
-	for rows.Next() {
-		action, err := scanAdminAction(rows)
-		if err != nil {
-			return nil, 0, fmt.Errorf("audit.GetInstanceAdminActions: %w", err)
-		}
-		actions = append(actions, action)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("audit.GetInstanceAdminActions: %w", err)
+		return nil, 0, err
 	}
 
 	return actions, count, nil
@@ -167,26 +146,12 @@ func (r *Audit) GetAdminActions(ctx context.Context, filter auditdomain.AdminAct
 
 	var count int
 	if err := r.QueryRunner(ctx).QueryRow(ctx, getAdminActionsCountSQL, filterArgs...).Scan(&count); err != nil {
-		return nil, 0, fmt.Errorf("audit.GetAdminActionsCount: %w", err)
+		return nil, 0, fmt.Errorf("repository.GetAdminActionsCount: %w", err)
 	}
 
-	rows, err := r.QueryRunner(ctx).Query(ctx, getAdminActionsSQL, append(filterArgs, params.Limit(), params.Offset())...)
+	actions, err := repository.GetAndParseListWithArgs(ctx, &r.BaseRepository, getAdminActionsSQL, "GetAdminActions", &params, scanAdminAction, filterArgs)
 	if err != nil {
-		return nil, 0, fmt.Errorf("audit.GetAdminActions: %w", err)
-	}
-	defer rows.Close()
-
-	actions := make([]*auditdomain.AdminAction, 0)
-	for rows.Next() {
-		action, err := scanAdminAction(rows)
-		if err != nil {
-			return nil, 0, fmt.Errorf("audit.GetAdminActions scan: %w", err)
-		}
-		actions = append(actions, action)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("audit.GetAdminActions rows: %w", err)
+		return nil, 0, err
 	}
 
 	return actions, count, nil
@@ -206,26 +171,12 @@ func (r *Audit) GetFailedJobs(ctx context.Context, params pagination.Params) ([]
 	var count int
 	err := r.QueryRunner(ctx).QueryRow(ctx, getFailedJobsCountSQL).Scan(&count)
 	if err != nil {
-		return nil, 0, fmt.Errorf("audit.GetFailedJobsCount: %w", err)
+		return nil, 0, fmt.Errorf("repository.GetFailedJobsCount: %w", err)
 	}
 
-	rows, err := r.QueryRunner(ctx).Query(ctx, getFailedJobsSQL, params.Limit(), params.Offset())
+	jobs, err := repository.GetAndParseList(ctx, &r.BaseRepository, getFailedJobsSQL, "GetFailedJobs", &params, scanFailedJob)
 	if err != nil {
-		return nil, 0, fmt.Errorf("audit.GetFailedJobs: %w", err)
-	}
-	defer rows.Close()
-
-	jobs := make([]*auditdomain.FailedJob, 0)
-	for rows.Next() {
-		job, err := scanFailedJob(rows)
-		if err != nil {
-			return nil, 0, fmt.Errorf("audit.GetFailedJobs: %w", err)
-		}
-		jobs = append(jobs, job)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("audit.GetFailedJobs: %w", err)
+		return nil, 0, err
 	}
 
 	return jobs, count, nil

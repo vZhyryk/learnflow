@@ -345,12 +345,10 @@ func (r *ResetPasswordRequest) Validate() error {
 
 // ChangePasswordRequest carries the user ID, current password, and desired new password.
 type ChangePasswordRequest struct {
-	UserID               string    `json:"user_id"`
-	OldPassword          string    `json:"old_password"`
-	NewPassword          string    `json:"new_password"`
-	IsAllSessionsLogout  bool      `json:"is_all_sessions_logout"`
-	JTI                  string    `json:"-"`
-	AccessTokenExpiresAt time.Time `json:"-"`
+	UserID              string `json:"user_id"`
+	OldPassword         string `json:"old_password"`
+	NewPassword         string `json:"new_password"`
+	IsAllSessionsLogout bool   `json:"is_all_sessions_logout"`
 }
 
 // Validate checks that the change password fields are valid.
@@ -386,11 +384,9 @@ func (r *RequestEmailChangeRequest) Validate() error {
 
 // EmailChangeRequest carries the token submitted to confirm an email address change.
 type EmailChangeRequest struct {
-	Token                string    `json:"token"` // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
-	UserID               string    `json:"-"`
-	IsAllSessionsLogout  bool      `json:"is_all_sessions_logout"`
-	JTI                  string    `json:"-"`
-	AccessTokenExpiresAt time.Time `json:"-"`
+	Token               string `json:"token"` // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
+	UserID              string `json:"-"`
+	IsAllSessionsLogout bool   `json:"is_all_sessions_logout"`
 }
 
 // Validate checks that the email change fields are valid.

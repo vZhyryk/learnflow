@@ -7,11 +7,11 @@ import (
 	admindomain "learnflow_backend/internal/admin/domain"
 	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/events"
+	apperrors "learnflow_backend/internal/shared/errors"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/tokens"
 	"learnflow_backend/internal/shared/validator"
-
-	"github.com/jackc/pgx/v5"
+	"time"
 )
 
 type userOperation struct {
@@ -181,7 +181,7 @@ func (srv *Service) runUserOperation(ctx context.Context, operationName admindom
 // that can still fail may run after it. If COMMIT then fails, the mismatch lasts at most tokens.BlockMarkTTL.
 func (srv *Service) applyChangeEffects(ctx context.Context, action auditdomain.AdminActionType, userID, adminID string) error {
 	if blocksUser(action) {
-		return srv.blockUserAccess(ctx, userID, adminID)
+		return srv.revokeSessionsAndMark(ctx, userID, adminID, "set user_blocked", srv.blocklist.BlockUser)
 	}
 
 	if unblocksUser(action) {
@@ -189,7 +189,7 @@ func (srv *Service) applyChangeEffects(ctx context.Context, action auditdomain.A
 	}
 
 	if isUserRevokeOperation(action) {
-		return srv.revokeSubAdminAccess(ctx, userID, adminID)
+		return srv.revokeSessionsAndMark(ctx, userID, adminID, "set user_role_revoked", srv.blocklist.RevokeUserRole)
 	}
 
 	if isUserAssignOperation(action) {
@@ -199,24 +199,15 @@ func (srv *Service) applyChangeEffects(ctx context.Context, action auditdomain.A
 	return nil
 }
 
-// blockUserAccess revokes the user's sessions and marks the user blocked in Redis for one access-token lifetime,
-// which is enough to invalidate every already-issued token; the DB status keeps the user blocked afterwards.
-func (srv *Service) blockUserAccess(ctx context.Context, userID, adminID string) error {
+// revokeSessionsAndMark revokes the user's sessions and then sets a Redis mark (named by step) for one access-token
+// lifetime: user_blocked invalidates every already-issued token, role_revoked makes RequireRole reject tokens issued
+// with the old role. The DB status/role keeps the change afterwards.
+func (srv *Service) revokeSessionsAndMark(ctx context.Context, userID, adminID, step string, mark func(ctx context.Context, userID string, ttl time.Duration) error) error {
 	if err := srv.sessionRepo.RevokeAllUserSessionsAdmin(ctx, userID, adminID); err != nil {
 		return fmt.Errorf("revoke sessions: %w", err)
 	}
 
-	return blocklistError("set user_blocked", srv.blocklist.BlockUser(ctx, userID, tokens.BlockMarkTTL))
-}
-
-// revokeSubAdminAccess revokes the user's sessions and marks their role revoked for one access-token lifetime,
-// so tokens issued with the old role stop passing RequireRole.
-func (srv *Service) revokeSubAdminAccess(ctx context.Context, userID, adminID string) error {
-	if err := srv.sessionRepo.RevokeAllUserSessionsAdmin(ctx, userID, adminID); err != nil {
-		return fmt.Errorf("revoke sessions: %w", err)
-	}
-
-	return blocklistError("set user_role_revoked", srv.blocklist.RevokeUserRole(ctx, userID, tokens.BlockMarkTTL))
+	return blocklistError(step, mark(ctx, userID, tokens.BlockMarkTTL))
 }
 
 // blocklistError tags a failed blocklist write with ErrBlocklistUnavailable so the handler can answer 503; nil passes through.
@@ -326,7 +317,7 @@ func (srv *Service) grantAccess(ctx context.Context, userID, adminID string, act
 
 	return srv.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		title, err := spec.lookup(ctx, spec.itemID)
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			return admindomain.ErrItemNotFound
 		}
 		if err != nil {

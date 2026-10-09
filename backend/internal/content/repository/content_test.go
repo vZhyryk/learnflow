@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	contentdomain "learnflow_backend/internal/content/domain"
+	apperrors "learnflow_backend/internal/shared/errors"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
@@ -315,6 +316,47 @@ func TestCheckIfContentItemExistsActiveByID(t *testing.T) {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CheckIfContentItemExistsActiveByID(context.Background(), "content-123")
 			testutil.AssertUnexpectedDBError(err, "db error")
+		})
+	})
+}
+
+func TestGetContentItemTitleByID(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+
+	Convey("Given a content repository", t, func() {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+				return row
+			},
+		})
+
+		Convey("When the content item exists, only its title is returned", func() {
+			expected := fakeContentItem(now)
+			row = &testutil.MockRow{ScanFn: fakeContentItemScan(expected)}
+
+			title, err := repo.GetContentItemTitleByID(context.Background(), "content-123")
+
+			So(err, ShouldBeNil)
+			So(title, ShouldEqual, expected.Title)
+		})
+
+		Convey("When the content item does not exist, it is both the module's and the shared not-found error, not a storage error", func() {
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+
+			_, err := repo.GetContentItemTitleByID(context.Background(), "unknown")
+
+			So(errors.Is(err, contentdomain.ErrContentItemNotFound), ShouldBeTrue)
+			So(errors.Is(err, apperrors.ErrNotFound), ShouldBeTrue)
+			So(errors.Is(err, pgx.ErrNoRows), ShouldBeFalse)
+		})
+
+		Convey("When the database returns an unexpected error", func() {
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
+
+			_, err := repo.GetContentItemTitleByID(context.Background(), "content-123")
+
+			testutil.AssertUnexpectedDBError(err, "repository.GetContentItemTitleByID")
 		})
 	})
 }

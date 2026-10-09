@@ -25,6 +25,16 @@ func (s *Service) revokeUserSessions(ctx context.Context, caller, jti string, ac
 	return nil
 }
 
+// logoutEverywhere revokes all of the user's sessions through revokeSessions and then every access token issued so far.
+// The revocation mark also covers the caller's own token, so no per-token (jti) blocklisting is needed on this path.
+func (s *Service) logoutEverywhere(ctx context.Context, caller, userID string, revokeSessions func(ctx context.Context) error) error {
+	if err := revokeSessions(ctx); err != nil {
+		return fmt.Errorf("%s: revoke sessions: %w", caller, err)
+	}
+
+	return s.revokeAllUserTokens(ctx, caller, userID)
+}
+
 // revokeAllUserTokens invalidates every access token issued to userID so far (tokens issued later keep working).
 // Redis cannot roll back, so callers run it as the last fallible step; a failure is reported as ErrBlocklistUnavailable.
 func (s *Service) revokeAllUserTokens(ctx context.Context, caller, userID string) error {
@@ -45,15 +55,19 @@ func (s *Service) emitTokenEvent(
 ) error {
 	rawToken, hashToken, err := tokens.GenerateSecureToken()
 	if err != nil {
-		return fmt.Errorf("generate token: %w", err)
+		return fmt.Errorf("emit_token_event %s: generate token: %w", eventType, err)
 	}
 
 	expiresAt := time.Now().UTC().Add(ttl)
 
 	payload, err := fn(ctx, rawToken, hashToken, expiresAt)
 	if err != nil {
-		return err
+		return fmt.Errorf("emit_token_event %s: build payload: %w", eventType, err)
 	}
 
-	return s.outbox.Emit(ctx, aggregation, userID, eventType, payload)
+	if err = s.outbox.Emit(ctx, aggregation, userID, eventType, payload); err != nil {
+		return fmt.Errorf("emit_token_event %s: emit: %w", eventType, err)
+	}
+
+	return nil
 }

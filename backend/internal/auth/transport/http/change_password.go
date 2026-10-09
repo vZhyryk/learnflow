@@ -21,9 +21,6 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	req.UserID = user.ID
 
-	req.JTI = appcontext.JTIFromContext(ctx)
-	req.AccessTokenExpiresAt = appcontext.AccessTokenExpiresAtFromContext(ctx)
-
 	err := h.svc.ChangePassword(ctx, req)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)

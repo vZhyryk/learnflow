@@ -46,7 +46,7 @@ func TestGetUsersData(t *testing.T) {
 			queryErr = testutil.ErrDBUnexpected
 			_, _, err := repo.GetUsersData(context.Background(), params)
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "repository.GetUsersData query")
+			So(err.Error(), ShouldContainSubstring, "repository.GetUsersData")
 		})
 
 		Convey("When a row fails to scan", func() {

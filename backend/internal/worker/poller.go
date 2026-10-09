@@ -7,14 +7,9 @@ import (
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/logger"
+	"learnflow_backend/internal/shared/repository"
 	"time"
 )
-
-// entryScanner is the minimal Scan capability poll needs from a pgx.Rows cursor —
-// decoupled from pgx directly, mirrors courses/repository's rowScanner pattern.
-type entryScanner interface {
-	Scan(dest ...any) error
-}
 
 // PollerEntry is a row fetched by a Poller[T] — T only distinguishes poller instantiations
 // at the type level, it does not affect these fields.
@@ -34,7 +29,7 @@ type SQLList[T any] struct {
 	selectSQL      string
 	markSuccessSQL string
 	markFailedSQL  string
-	scanEntry      func(row entryScanner) (PollerEntry[T], error)
+	scanEntry      func(row repository.RowScanner) (PollerEntry[T], error)
 }
 
 // Poller is a generic transactional-poll worker: on each tick it selects a batch of rows
@@ -101,17 +96,8 @@ func (p *Poller[T]) getList(ctx context.Context) ([]PollerEntry[T], error) {
 
 	defer rows.Close()
 
-	var entries []PollerEntry[T]
-
-	for rows.Next() {
-		entry, err := p.SQLList.scanEntry(rows)
-		if err != nil {
-			return nil, fmt.Errorf("%s.poll scan: %w", p.actionName, err)
-		}
-		entries = append(entries, entry)
-	}
-
-	if err := rows.Err(); err != nil {
+	entries, err := repository.CollectRows(rows, fmt.Sprintf("s.poll: %s", p.actionName), p.SQLList.scanEntry)
+	if err != nil {
 		return nil, fmt.Errorf("%s.poll rows: %w", p.actionName, err)
 	}
 

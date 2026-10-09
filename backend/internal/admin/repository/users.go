@@ -7,6 +7,7 @@ import (
 	admindomain "learnflow_backend/internal/admin/domain"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/shared/pagination"
+	"learnflow_backend/internal/shared/repository"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -18,24 +19,9 @@ func (rep *Repository) GetUsersData(ctx context.Context, params pagination.Param
 		return nil, 0, fmt.Errorf("repository.GetUsersData count: %w", err)
 	}
 
-	rows, err := rep.QueryRunner(ctx).Query(ctx, getUserDataSQL, params.Limit(), params.Offset())
+	users, err := repository.GetAndParseList(ctx, &rep.BaseRepository, getUserDataSQL, "GetUsersData", &params, scanUserData)
 	if err != nil {
-		return nil, 0, fmt.Errorf("repository.GetUsersData query: %w", err)
-	}
-
-	defer rows.Close()
-
-	users := make([]*admindomain.UserData, 0)
-	for rows.Next() {
-		user, err := scanUserData(rows)
-		if err != nil {
-			return nil, 0, fmt.Errorf("repository.GetUsersData scan: %w", err)
-		}
-		users = append(users, user)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("repository.GetUsersData rows: %w", err)
+		return nil, 0, err
 	}
 
 	return users, total, nil

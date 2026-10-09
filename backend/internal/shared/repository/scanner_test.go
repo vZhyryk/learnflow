@@ -33,9 +33,11 @@ func TestGetAndParseList(t *testing.T) {
 			},
 		}}
 
+		params := pagination.NewParams(1, 20)
+
 		Convey("When the query fails", func() {
 			queryErr = testutil.ErrDBUnexpected
-			_, err := GetAndParseList(context.Background(), rep, "SELECT id FROM items", "MyMethod", pagination.NewParams(1, 20), scanFakeListItem)
+			_, err := GetAndParseList(context.Background(), rep, "SELECT id FROM items", "MyMethod", &params, scanFakeListItem)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "repository.MyMethod")
 		})
@@ -44,14 +46,14 @@ func TestGetAndParseList(t *testing.T) {
 			rows = &testutil.MockRows{Rows: []*testutil.MockRow{
 				{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }},
 			}}
-			_, err := GetAndParseList(context.Background(), rep, "SELECT id FROM items", "MyMethod", pagination.NewParams(1, 20), scanFakeListItem)
+			_, err := GetAndParseList(context.Background(), rep, "SELECT id FROM items", "MyMethod", &params, scanFakeListItem)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "scan")
 		})
 
 		Convey("When rows.Err() reports a failure after iteration", func() {
 			rows = &testutil.MockRows{RowsErr: testutil.ErrDBUnexpected}
-			_, err := GetAndParseList(context.Background(), rep, "SELECT id FROM items", "MyMethod", pagination.NewParams(1, 20), scanFakeListItem)
+			_, err := GetAndParseList(context.Background(), rep, "SELECT id FROM items", "MyMethod", &params, scanFakeListItem)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "rows")
 		})
@@ -67,7 +69,7 @@ func TestGetAndParseList(t *testing.T) {
 					return nil
 				}},
 			}}
-			got, err := GetAndParseList(context.Background(), rep, "SELECT id FROM items", "MyMethod", pagination.NewParams(1, 20), scanFakeListItem)
+			got, err := GetAndParseList(context.Background(), rep, "SELECT id FROM items", "MyMethod", &params, scanFakeListItem)
 			So(err, ShouldBeNil)
 			So(got, ShouldHaveLength, 2)
 			So(got[0].ID, ShouldEqual, "item-1")

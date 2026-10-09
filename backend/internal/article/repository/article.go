@@ -62,22 +62,22 @@ func (rep *Repository) UpdateArticle(ctx context.Context, article *articledomain
 
 // GetAllPublishedArticles returns every non-deleted published Article.
 func (rep *Repository) GetAllPublishedArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllPublishedArticlesSQL, "GetAllPublishedArticles", params, scanArticle)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllPublishedArticlesSQL, "GetAllPublishedArticles", &params, scanArticle)
 }
 
 // GetAllDraftArticles returns every non-deleted draft Article.
 func (rep *Repository) GetAllDraftArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllDraftArticlesSQL, "GetAllDraftArticles", params, scanArticle)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllDraftArticlesSQL, "GetAllDraftArticles", &params, scanArticle)
 }
 
 // GetAllArchivedArticles returns every archived Article, including soft-deleted ones.
 func (rep *Repository) GetAllArchivedArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllArchivedArticlesSQL, "GetAllArchivedArticles", params, scanArticle)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllArchivedArticlesSQL, "GetAllArchivedArticles", &params, scanArticle)
 }
 
 // GetAllArticles returns every Article regardless of status, including soft-deleted ones.
 func (rep *Repository) GetAllArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllArticlesSQL, "GetAllArticles", params, scanArticle)
+	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllArticlesSQL, "GetAllArticles", &params, scanArticle)
 }
 
 // GetArticleByID retrieves a non-deleted Article by ID.

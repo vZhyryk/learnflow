@@ -64,6 +64,7 @@ func (h *Handler) getUserNotesByID(w http.ResponseWriter, r *http.Request) {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
 }
+
 func (h *Handler) getUserAllNotesByUserID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
@@ -80,6 +81,7 @@ func (h *Handler) getUserAllNotesByUserID(w http.ResponseWriter, r *http.Request
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
 }
+
 func (h *Handler) updateUserNotes(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
@@ -107,6 +109,7 @@ func (h *Handler) updateUserNotes(w http.ResponseWriter, r *http.Request) {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
 }
+
 func (h *Handler) deleteUserNotes(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)

@@ -191,11 +191,11 @@ func (route *RouteHandler) AuthenticateUser(next http.Handler) http.Handler {
 		}
 
 		jti := claims.ID
-		err = route.authUserRedis(w, r, map[string]any{"user_id": claims.Subject, "jti": jti}, func() (bool, string, error) {
+		answered := route.authUserRedis(w, r, map[string]any{"user_id": claims.Subject, "jti": jti}, func() (bool, string, error) {
 			exists, blockErr := route.App.Redis.IsBlocked(r.Context(), claims.Subject, jti, claims.IssuedAt.Time)
 			return exists, rediskeys.UserBlockedPrefix + "|" + rediskeys.JTIBlockedPrefix + "|" + rediskeys.TokensRevokedBeforePrefix, blockErr
 		})
-		if err != nil {
+		if answered {
 			return
 		}
 
@@ -228,29 +228,28 @@ func authRejectProps(r *http.Request, subject map[string]any, key string) map[st
 	return props
 }
 
-// authUserRedis runs one Redis check and answers 401 (blocked) or 500 (check failed, fail closed); a non-nil
-// error means the request was already answered. A 401 is not logged (4xx rule); subject (user_id/jti) goes into the 500 log.
-func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request, subject map[string]any, fn func() (bool, string, error)) error {
+// authUserRedis runs one Redis check and answers 401 (blocked) or 500 (check failed, fail closed); true means the
+// request was already answered. A 401 is not logged (4xx rule); subject (user_id/jti) goes into the 500 log.
+func (route *RouteHandler) authUserRedis(w http.ResponseWriter, r *http.Request, subject map[string]any, fn func() (bool, string, error)) (answered bool) {
 	blocked, key, err := fn()
 	if err != nil {
-		wrapped := fmt.Errorf("router.authUserRedis: %s: %w", key, err)
-		route.App.Logger.Error(wrapped, authRejectProps(r, subject, key))
+		route.App.Logger.Error(fmt.Errorf("router.authUserRedis: %s: %w", key, err), authRejectProps(r, subject, key))
 		helpers.LogRespondError(route.App.Logger, r, "auth_redis_error_response_write", map[string]any{
 			"method":     r.Method,
 			"request_id": appcontext.RequestIDFromContext(r.Context()),
 		}, func() error {
 			return helpers.ServerErrorResponse(w)
 		})
-		return wrapped
+		return true
 	}
 	if blocked {
 		helpers.LogRespondError(route.App.Logger, r, "auth_blocked_response_write", map[string]any{"method": r.Method}, func() error {
 			return helpers.InvalidCredentialsResponse(w)
 		})
-		return fmt.Errorf("%s: session or account blocked", key)
+		return true
 	}
 
-	return nil
+	return false
 }
 
 // SetIPAddress extracts the client IP from headers and stores it in context.
@@ -345,10 +344,10 @@ func (route *RouteHandler) roleAllowed(w http.ResponseWriter, r *http.Request, u
 		return false
 	}
 
-	err := route.authUserRedis(w, r, map[string]any{"user_id": user.ID}, func() (bool, string, error) {
+	answered := route.authUserRedis(w, r, map[string]any{"user_id": user.ID}, func() (bool, string, error) {
 		exists, redisErr := route.App.Redis.IsUserRoleRevoked(r.Context(), user.ID)
 		return exists, rediskeys.UserRoleRevokedPrefix, redisErr
 	})
 
-	return err == nil
+	return !answered
 }

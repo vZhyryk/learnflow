@@ -382,47 +382,44 @@ func TestAuthUserRedis(t *testing.T) {
 	Convey("authUserRedis", t, func() {
 		route := newTestRouteHandler()
 
-		Convey("When the check reports not blocked, it writes nothing and returns nil", func() {
+		Convey("When the check reports not blocked, it writes nothing and the request is not answered", func() {
 			w, r := newTestRequest("/")
 
-			err := route.authUserRedis(w, r, nil, func() (bool, string, error) { return false, "user_blocked:", nil })
+			answered := route.authUserRedis(w, r, nil, func() (bool, string, error) { return false, "user_blocked:", nil })
 
-			So(err, ShouldBeNil)
+			So(answered, ShouldBeFalse)
 			So(w.Code, ShouldEqual, http.StatusOK)
 			So(w.Body.Len(), ShouldEqual, 0)
 		})
 
-		Convey("When the check reports blocked, it responds 401 and returns an error naming the key", func() {
+		Convey("When the check reports blocked, the request is answered with 401", func() {
 			w, r := newTestRequest("/")
 
-			err := route.authUserRedis(w, r, nil, func() (bool, string, error) { return true, "user_blocked:", nil })
+			answered := route.authUserRedis(w, r, nil, func() (bool, string, error) { return true, "user_blocked:", nil })
 
-			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "user_blocked:")
-			So(err.Error(), ShouldContainSubstring, "blocked")
+			So(answered, ShouldBeTrue)
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
-		Convey("When the check fails, it fails closed with 500 and wraps the cause", func() {
+		Convey("When the check fails, it fails closed: the request is answered with 500", func() {
 			w, r := newTestRequest("/")
 
-			err := route.authUserRedis(w, r, nil, func() (bool, string, error) {
+			answered := route.authUserRedis(w, r, nil, func() (bool, string, error) {
 				return false, "blocklist:", testutil.ErrRedisUnavailable
 			})
 
-			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)
-			So(err.Error(), ShouldContainSubstring, "blocklist:")
+			So(answered, ShouldBeTrue)
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("When the check fails and reports blocked, the error wins over the blocked flag", func() {
 			w, r := newTestRequest("/")
 
-			err := route.authUserRedis(w, r, nil, func() (bool, string, error) {
+			answered := route.authUserRedis(w, r, nil, func() (bool, string, error) {
 				return true, "blocklist:", testutil.ErrRedisUnavailable
 			})
 
-			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)
+			So(answered, ShouldBeTrue)
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 	})

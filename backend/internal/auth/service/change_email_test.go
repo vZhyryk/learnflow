@@ -365,11 +365,9 @@ func TestChangeEmailWithSessionLogout(t *testing.T) {
 			srv := newTestService(uRepo, sRepo, tRepo, nil, newSuccessfulMockBlocklist())
 
 			err := srv.ChangeEmail(context.Background(), authdomain.EmailChangeRequest{
-				Token:                "tok",
-				UserID:               TestUserID,
-				IsAllSessionsLogout:  true,
-				JTI:                  "jti-123",
-				AccessTokenExpiresAt: time.Now().UTC().Add(15 * time.Minute),
+				Token:               "tok",
+				UserID:              TestUserID,
+				IsAllSessionsLogout: true,
 			})
 
 			So(err, ShouldBeNil)
@@ -413,7 +411,7 @@ func TestChangeEmailRevokesAllTokens(t *testing.T) {
 		sRepo := &mockSessionRepo{revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error { return nil }}
 		srv := newTestService(validChangeEmailUserRepo(), sRepo, validTokenRepo(), nil, blocklist)
 		logoutRequest := authdomain.EmailChangeRequest{
-			Token: "tok", UserID: TestUserID, IsAllSessionsLogout: true, JTI: "jti-123", AccessTokenExpiresAt: time.Now().UTC().Add(15 * time.Minute),
+			Token: "tok", UserID: TestUserID, IsAllSessionsLogout: true,
 		}
 
 		Convey("When all sessions are logged out, every access token issued so far is revoked", func() {

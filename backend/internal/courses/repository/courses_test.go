@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	coursedomain "learnflow_backend/internal/courses/domain"
+	apperrors "learnflow_backend/internal/shared/errors"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
@@ -319,6 +320,47 @@ func TestCheckIfCourseExistsActiveByID(t *testing.T) {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CheckIfCourseExistsActiveByID(context.Background(), "course-123")
 			testutil.AssertUnexpectedDBError(err, "db error")
+		})
+	})
+}
+
+func TestGetCourseTitleByID(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+
+	Convey("Given a course repository", t, func() {
+		var row *testutil.MockRow
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+				return row
+			},
+		})
+
+		Convey("When the course exists, only its title is returned", func() {
+			expected := fakeCourse(now)
+			row = &testutil.MockRow{ScanFn: fakeCourseScan(expected)}
+
+			title, err := repo.GetCourseTitleByID(context.Background(), "course-123")
+
+			So(err, ShouldBeNil)
+			So(title, ShouldEqual, expected.Title)
+		})
+
+		Convey("When the course does not exist, it is both the module's and the shared not-found error, not a storage error", func() {
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
+
+			_, err := repo.GetCourseTitleByID(context.Background(), "unknown")
+
+			So(errors.Is(err, coursedomain.ErrCourseNotFound), ShouldBeTrue)
+			So(errors.Is(err, apperrors.ErrNotFound), ShouldBeTrue)
+			So(errors.Is(err, pgx.ErrNoRows), ShouldBeFalse)
+		})
+
+		Convey("When the database returns an unexpected error", func() {
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
+
+			_, err := repo.GetCourseTitleByID(context.Background(), "course-123")
+
+			testutil.AssertUnexpectedDBError(err, "repository.GetCourseTitleByID")
 		})
 	})
 }
