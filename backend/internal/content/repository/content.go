@@ -118,6 +118,16 @@ func (rep *Repository) CheckIfContentItemExistsByID(ctx context.Context, content
 	return exists, nil
 }
 
+// CheckIfContentItemExistsActiveByID reports whether a published, non-deleted content item with the given ID exists.
+func (rep *Repository) CheckIfContentItemExistsActiveByID(ctx context.Context, contentItemID string) (bool, error) {
+	var exists bool
+	if err := rep.QueryRunner(ctx).QueryRow(ctx, checkIfContentExistsActiveByID, contentItemID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("repository.CheckIfContentItemExistsActiveByID: %w", err)
+	}
+
+	return exists, nil
+}
+
 // GetContentItemTitleByID returns the title of a non-deleted content item; pgx.ErrNoRows (wrapped) if it does not exist.
 func (rep *Repository) GetContentItemTitleByID(ctx context.Context, contentItemID string) (string, error) {
 	contentItem, err := scanContentItem(rep.QueryRunner(ctx).QueryRow(ctx, getContentItemByIDSQL, contentItemID))

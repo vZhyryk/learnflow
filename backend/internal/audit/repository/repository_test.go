@@ -325,3 +325,98 @@ func TestGetFailedJobs(t *testing.T) {
 		})
 	})
 }
+
+func TestGetAdminActions(t *testing.T) {
+	Convey("Given an audit repository", t, func() {
+		f := newGetActionsFixture()
+		params := pagination.NewParams(2, 10)
+		call := func() ([]*auditdomain.AdminAction, int, error) {
+			return f.repo.GetAdminActions(context.Background(), auditdomain.AdminActionFilter{}, params)
+		}
+
+		Convey("When the count query fails", func() {
+			f.countErr = testutil.ErrDBUnexpected
+			_, _, err := call()
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "audit.GetAdminActionsCount")
+		})
+
+		Convey("When the list query fails", func() {
+			f.queryErr = testutil.ErrDBUnexpected
+			_, _, err := call()
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "audit.GetAdminActions")
+		})
+
+		Convey("When a row fails to scan", func() {
+			f.rows = &testutil.MockRows{Rows: []*testutil.MockRow{{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}}}
+			_, _, err := call()
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "scan")
+		})
+
+		Convey("When rows.Err() reports a failure after iteration", func() {
+			f.rows = &testutil.MockRows{RowsErr: testutil.ErrDBUnexpected}
+			_, _, err := call()
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "rows")
+		})
+
+		Convey("When there are no entries the page is empty, not nil", func() {
+			actions, count, err := call()
+			So(err, ShouldBeNil)
+			So(count, ShouldEqual, 0)
+			So(actions, ShouldNotBeNil)
+			So(actions, ShouldBeEmpty)
+		})
+
+		Convey("When two entries exist, both are returned with the total", func() {
+			first, second := fakeAdminAction(1), fakeAdminAction(2)
+			f.count = 25
+			f.rows = &testutil.MockRows{Rows: []*testutil.MockRow{
+				{ScanFn: fakeAdminActionScan(first)},
+				{ScanFn: fakeAdminActionScan(second)},
+			}}
+
+			actions, count, err := call()
+
+			So(err, ShouldBeNil)
+			So(count, ShouldEqual, 25)
+			So(actions, ShouldResemble, []*auditdomain.AdminAction{first, second})
+		})
+	})
+}
+
+func TestGetAdminActionsFilterArgs(t *testing.T) {
+	Convey("Given an audit repository", t, func() {
+		f := newGetActionsFixture()
+		params := pagination.NewParams(2, 10)
+		from := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+		to := from.Add(24 * time.Hour)
+		filter := auditdomain.AdminActionFilter{}
+		call := func() error {
+			_, _, err := f.repo.GetAdminActions(context.Background(), filter, params)
+			return err
+		}
+
+		Convey("An empty filter passes NULL for every condition, so nothing is filtered", func() {
+			err := call()
+
+			So(err, ShouldBeNil)
+			So(f.countQuery, ShouldEqual, getAdminActionsCountSQL)
+			So(f.countArgs, ShouldResemble, []any{nil, nil, (*time.Time)(nil), (*time.Time)(nil)})
+			So(f.listQuery, ShouldEqual, getAdminActionsSQL)
+			So(f.listArgs, ShouldResemble, []any{nil, nil, (*time.Time)(nil), (*time.Time)(nil), params.Limit(), params.Offset()})
+		})
+
+		Convey("A full filter passes every value to both the count and the list query", func() {
+			filter = auditdomain.AdminActionFilter{AdminUserID: "admin-1", ActionType: auditdomain.ActionBlockUser, From: &from, To: &to}
+
+			err := call()
+
+			So(err, ShouldBeNil)
+			So(f.countArgs, ShouldResemble, []any{"admin-1", string(auditdomain.ActionBlockUser), &from, &to})
+			So(f.listArgs, ShouldResemble, []any{"admin-1", string(auditdomain.ActionBlockUser), &from, &to, params.Limit(), params.Offset()})
+		})
+	})
+}

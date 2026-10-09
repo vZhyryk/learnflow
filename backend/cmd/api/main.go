@@ -134,6 +134,9 @@ func getJWTConfig(cfg *app.Config) error {
 	if len(cfg.Secret.JWTSecret) < 32 {
 		return fmt.Errorf("JWT_SECRET must be at least 32 bytes, got %d", len(cfg.Secret.JWTSecret))
 	}
+	if cfg.Secret.JWTSecretPrev != "" && len(cfg.Secret.JWTSecretPrev) < 32 {
+		return fmt.Errorf("JWT_SECRET_PREV must be at least 32 bytes when set, got %d", len(cfg.Secret.JWTSecretPrev))
+	}
 	cfg.Secret.JWTIssuer = env.GetStringEnv("JWT_ISSUER", "")
 	if cfg.Secret.JWTIssuer == "" {
 		return fmt.Errorf("JWT_ISSUER cannot be empty")

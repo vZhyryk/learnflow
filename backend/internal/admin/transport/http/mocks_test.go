@@ -51,7 +51,8 @@ type mockService struct {
 	changeUserField            func(ctx context.Context, userID, adminID string, operationName admindomain.UserAdminOperation) error
 	grantUserCourseAccess      func(ctx context.Context, userID, courseID, adminID string, action auditdomain.AdminActionType) error
 	grantUserContentAccess     func(ctx context.Context, userID, contentItemID, adminID string, action auditdomain.AdminActionType) error
-	getInstanceAdminActions    func(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
+	getInstanceAdminActions    func(ctx context.Context, actorID string, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
+	getAdminActions            func(ctx context.Context, actorID string, filter auditdomain.AdminActionFilter, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
 	getFailedJobs              func(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error)
 }
 
@@ -62,11 +63,18 @@ func (m *mockService) GetFailedJobs(ctx context.Context, params pagination.Param
 	return m.getFailedJobs(ctx, params)
 }
 
-func (m *mockService) GetInstanceAdminActions(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
+func (m *mockService) GetInstanceAdminActions(ctx context.Context, actorID string, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
 	if m.getInstanceAdminActions == nil {
 		panic("mockService.getInstanceAdminActions not set")
 	}
-	return m.getInstanceAdminActions(ctx, targetType, targetID, params)
+	return m.getInstanceAdminActions(ctx, actorID, targetType, targetID, params)
+}
+
+func (m *mockService) GetAdminActions(ctx context.Context, actorID string, filter auditdomain.AdminActionFilter, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
+	if m.getAdminActions == nil {
+		panic("mockService.getAdminActions not set")
+	}
+	return m.getAdminActions(ctx, actorID, filter, params)
 }
 
 func (m *mockService) GrantUserCourseAccess(ctx context.Context, userID, courseID, adminID string, action auditdomain.AdminActionType) error {

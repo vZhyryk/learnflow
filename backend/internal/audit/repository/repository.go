@@ -47,6 +47,34 @@ const (
 		SELECT COUNT(*) FROM admin_actions
 		WHERE target_type = $1 AND target_id = $2
 	`
+	adminActionFilterSQL = `
+		WHERE ($1::uuid IS NULL OR a.admin_user_id = $1)
+			AND ($2::text IS NULL OR a.action_type = $2)
+			AND ($3::timestamptz IS NULL OR a.created_at >= $3)
+			AND ($4::timestamptz IS NULL OR a.created_at < $4)
+	`
+
+	getAdminActionsSQL = `
+		SELECT
+			a.id,
+			a.admin_user_id,
+			COALESCE(NULLIF(p.first_name, ''), u.email) AS admin_name,
+			a.action_type,
+			a.target_type,
+			a.target_id,
+			a.details_json,
+			a.created_at
+		FROM admin_actions a
+		JOIN users u ON u.id = a.admin_user_id
+		LEFT JOIN user_profiles p ON p.user_id = u.id` + adminActionFilterSQL + `
+		ORDER BY a.created_at DESC, a.id DESC
+		LIMIT $5 OFFSET $6
+	`
+
+	getAdminActionsCountSQL = `
+		SELECT COUNT(*) FROM admin_actions a` + adminActionFilterSQL + `
+	`
+
 	getFailedJobsSQL = `
 		SELECT
 			id,
@@ -133,6 +161,47 @@ func (r *Audit) GetInstanceAdminActions(ctx context.Context, targetType auditdom
 	return actions, count, nil
 }
 
+// GetAdminActions returns one page of the general audit journal, newest first, and the total count of the filter.
+func (r *Audit) GetAdminActions(ctx context.Context, filter auditdomain.AdminActionFilter, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
+	filterArgs := []any{nilIfEmpty(filter.AdminUserID), nilIfEmpty(string(filter.ActionType)), filter.From, filter.To}
+
+	var count int
+	if err := r.QueryRunner(ctx).QueryRow(ctx, getAdminActionsCountSQL, filterArgs...).Scan(&count); err != nil {
+		return nil, 0, fmt.Errorf("audit.GetAdminActionsCount: %w", err)
+	}
+
+	rows, err := r.QueryRunner(ctx).Query(ctx, getAdminActionsSQL, append(filterArgs, params.Limit(), params.Offset())...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("audit.GetAdminActions: %w", err)
+	}
+	defer rows.Close()
+
+	actions := make([]*auditdomain.AdminAction, 0)
+	for rows.Next() {
+		action, err := scanAdminAction(rows)
+		if err != nil {
+			return nil, 0, fmt.Errorf("audit.GetAdminActions scan: %w", err)
+		}
+		actions = append(actions, action)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("audit.GetAdminActions rows: %w", err)
+	}
+
+	return actions, count, nil
+}
+
+// nilIfEmpty passes an unset filter value as SQL NULL so its condition is skipped.
+func nilIfEmpty(value string) any {
+	if value == "" {
+		return nil
+	}
+
+	return value
+}
+
+// GetFailedJobs returns one page of dead-lettered jobs, newest first, and the total count.
 func (r *Audit) GetFailedJobs(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error) {
 	var count int
 	err := r.QueryRunner(ctx).QueryRow(ctx, getFailedJobsCountSQL).Scan(&count)

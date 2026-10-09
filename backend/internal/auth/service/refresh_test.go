@@ -97,11 +97,18 @@ func TestRefreshReplayedTokenRevokesAllSessions(t *testing.T) {
 					return nil
 				},
 			}
-			srv := newTestService(&mockUserRepo{}, sRepo, nil, nil, nil)
+			var revokedTokensUserID string
+			blocklist := newSuccessfulMockBlocklist()
+			blocklist.revokeUserTokens = func(_ context.Context, userID string, _ time.Duration) error {
+				revokedTokensUserID = userID
+				return nil
+			}
+			srv := newTestService(&mockUserRepo{}, sRepo, nil, nil, blocklist)
 
 			_, err := srv.Refresh(context.Background(), validReq)
 
 			So(errors.Is(err, authdomain.ErrSessionRevoked), ShouldBeTrue)
+			So(revokedTokensUserID, ShouldEqual, activeSession.UserID)
 			So(gotUserID, ShouldEqual, activeSession.UserID)
 			So(gotRevokedBy, ShouldBeNil)
 			So(gotReason, ShouldEqual, authdomain.RevokeReasonSuspiciousActivity)
@@ -127,7 +134,7 @@ func TestRefreshTokenReuseErrors(t *testing.T) {
 					return testutil.ErrDBUnexpected
 				},
 			}
-			srv := newTestService(&mockUserRepo{}, sRepo, nil, nil, nil)
+			srv := newTestService(&mockUserRepo{}, sRepo, nil, nil, newSuccessfulMockBlocklist())
 
 			_, err := srv.Refresh(context.Background(), validReq)
 
@@ -241,6 +248,35 @@ func TestRefreshSessionPersistence(t *testing.T) {
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "update session token")
+		})
+	})
+}
+
+func TestRefreshReplayRevokeTokensFails(t *testing.T) {
+	validReq, _, activeSession := newRefreshTestFixtures()
+
+	Convey("Given an auth service", t, func() {
+		Convey("When revoking the user's access tokens fails, sessions are left untouched and the request fails closed", func() {
+			sessionsRevoked := false
+			sRepo := &mockSessionRepo{
+				getSessionByPrevHash: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
+					return activeSession, nil
+				},
+				revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error {
+					sessionsRevoked = true
+					return nil
+				},
+			}
+			blocklist := newSuccessfulMockBlocklist()
+			blocklist.revokeUserTokens = func(_ context.Context, _ string, _ time.Duration) error {
+				return testutil.ErrRedisUnavailable
+			}
+			srv := newTestService(&mockUserRepo{}, sRepo, nil, nil, blocklist)
+
+			_, err := srv.Refresh(context.Background(), validReq)
+
+			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
+			So(sessionsRevoked, ShouldBeFalse)
 		})
 	})
 }

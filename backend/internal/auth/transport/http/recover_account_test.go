@@ -2,6 +2,7 @@ package authhttp_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -117,10 +118,11 @@ func TestRecoverAccountServiceOutcomes(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
-		Convey("Service ErrInvalidAccountState → 200 (deleted account guard)", func() {
+		Convey("Service ErrInvalidAccountState → 403 (the token holder is told the account was not recovered)", func() {
 			f.svcErr = authdomain.ErrInvalidAccountState
 			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
-			So(w.Code, ShouldEqual, http.StatusOK)
+			So(w.Code, ShouldEqual, http.StatusForbidden)
+			So(testutil.DecodeBody(t, w.Body.Bytes())["code"], ShouldEqual, "account_not_recoverable")
 		})
 
 		Convey("Service ErrBlocklistUnavailable → 503", func() {
@@ -129,10 +131,11 @@ func TestRecoverAccountServiceOutcomes(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusServiceUnavailable)
 		})
 
-		Convey("Service ErrDeletedByAdmin → 200 (deleted account guard)", func() {
-			f.svcErr = authdomain.ErrDeletedByAdmin
+		Convey("Service ErrDeletedByAdmin → 403, also when wrapped by the service", func() {
+			f.svcErr = fmt.Errorf("recover_account: %w", authdomain.ErrDeletedByAdmin)
 			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
-			So(w.Code, ShouldEqual, http.StatusOK)
+			So(w.Code, ShouldEqual, http.StatusForbidden)
+			So(w.Body.String(), ShouldNotContainSubstring, "recover_account")
 		})
 
 		Convey("Unexpected service error → 500", func() {

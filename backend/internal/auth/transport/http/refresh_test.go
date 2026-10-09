@@ -59,6 +59,13 @@ func TestRefreshServiceOutcomes(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
+		Convey("Service ErrRequestInProgress → 409 with Retry-After", func() {
+			f.svcErr = authdomain.ErrRequestInProgress
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token":"ref"}`))
+			So(w.Code, ShouldEqual, http.StatusConflict)
+			So(w.Header().Get("Retry-After"), ShouldEqual, "1")
+		})
+
 		Convey("Service ErrSessionExpired → 401", func() {
 			f.svcErr = authdomain.ErrSessionExpired
 			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token":"ref"}`))

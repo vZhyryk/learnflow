@@ -18,7 +18,7 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 
 	case errors.Is(err, admindomain.ErrForbiddenUserAction):
 		h.handleErrorRespond(r, "forbidden_user_action", func() error {
-			return helpers.ForbiddenResponse(w, helpers.Envelope{"error": err.Error(), "code": "forbidden_user_action"})
+			return helpers.ForbiddenResponse(w, helpers.Envelope{"error": helpers.RootError(err).Error(), "code": "forbidden_user_action"})
 		})
 
 	case errors.Is(err, admindomain.ErrItemNotFound):
@@ -28,12 +28,12 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 
 	case errors.Is(err, admindomain.ErrAccessAlreadyGranted):
 		h.handleErrorRespond(r, "access_already_granted", func() error {
-			return helpers.ErrorResponse(w, http.StatusConflict, err.Error())
+			return helpers.ErrorResponse(w, http.StatusConflict, helpers.RootError(err).Error())
 		})
 
 	case errors.Is(err, admindomain.ErrInvalidUserState):
 		h.handleErrorRespond(r, "invalid_user_state", func() error {
-			return helpers.ErrorResponse(w, http.StatusConflict, err.Error())
+			return helpers.ErrorResponse(w, http.StatusConflict, helpers.RootError(err).Error())
 		})
 
 	case errors.Is(err, admindomain.ErrBlocklistUnavailable):
@@ -63,7 +63,7 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 		errors.Is(err, admindomain.ErrAnnouncementApproved):
 
 		h.handleErrorRespond(r, "validation_error", func() error {
-			return helpers.ErrorResponse(w, http.StatusUnprocessableEntity, err.Error())
+			return helpers.ErrorResponse(w, http.StatusUnprocessableEntity, "invalid request data")
 		})
 
 	default:

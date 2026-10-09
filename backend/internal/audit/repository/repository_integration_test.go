@@ -4,6 +4,7 @@ package auditrepository
 
 import (
 	"context"
+	"errors"
 	auditdomain "learnflow_backend/internal/audit/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/repository"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -189,6 +191,156 @@ func TestCreateAdminActionAndWasDeletedByAdmin_Integration(t *testing.T) {
 				deleted, err = repo.WasDeletedByAdmin(ctx, targetID)
 				So(err, ShouldBeNil)
 				So(deleted, ShouldBeTrue)
+			})
+		})
+	})
+}
+
+func TestAdminActionsAppendOnly_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+
+	insertAction := func(ctx context.Context, tx pgx.Tx) string {
+		adminID := testutil.InsertRandomTestUser(t, tx)
+		targetID := testutil.InsertRandomTestUser(t, tx)
+		So(newIntegrationRepo(tx).CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: adminID, ActionType: auditdomain.ActionBlockUser,
+			TargetType: auditdomain.TargetUser, TargetID: targetID,
+		}), ShouldBeNil)
+
+		return targetID
+	}
+
+	requireRestrictViolation := func(err error) {
+		var pgErr *pgconn.PgError
+		So(errors.As(err, &pgErr), ShouldBeTrue)
+		So(pgErr.Code, ShouldEqual, "23001")
+		So(pgErr.Message, ShouldContainSubstring, "append-only")
+	}
+
+	Convey("Given the admin_actions trigger on real Postgres", t, func() {
+		Convey("When a row is updated, the database rejects it", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				targetID := insertAction(ctx, tx)
+
+				_, err := tx.Exec(ctx, `UPDATE admin_actions SET details_json = '{}' WHERE target_id = $1`, targetID)
+
+				requireRestrictViolation(err)
+			})
+		})
+
+		Convey("When a row is deleted, the database rejects it", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				targetID := insertAction(ctx, tx)
+
+				_, err := tx.Exec(ctx, `DELETE FROM admin_actions WHERE target_id = $1`, targetID)
+
+				requireRestrictViolation(err)
+			})
+		})
+
+		Convey("When a DELETE matches no row, nothing fires and nothing is removed", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				tag, err := tx.Exec(ctx, `DELETE FROM admin_actions WHERE target_id = '00000000-0000-0000-0000-000000000000'`)
+
+				So(err, ShouldBeNil)
+				So(tag.RowsAffected(), ShouldEqual, 0)
+			})
+		})
+	})
+}
+
+func TestGetAdminActions_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+	base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+
+	Convey("Given the general audit journal on real Postgres", t, func() {
+		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+			repo := newIntegrationRepo(tx)
+			adminA := testutil.InsertRandomTestUser(t, tx)
+			adminB := testutil.InsertRandomTestUser(t, tx)
+			targetID := testutil.InsertRandomTestUser(t, tx)
+			insert := func(adminID string, action auditdomain.AdminActionType, day int) {
+				_, err := tx.Exec(ctx, `
+					INSERT INTO admin_actions (admin_user_id, action_type, target_type, target_id, created_at)
+					VALUES ($1, $2, 'user', $3, $4)`, adminID, action, targetID, base.AddDate(0, 0, day))
+				So(err, ShouldBeNil)
+			}
+			insert(adminA, auditdomain.ActionBlockUser, 0)
+			insert(adminA, auditdomain.ActionUnblockUser, 1)
+			insert(adminA, auditdomain.ActionBlockUser, 2)
+			insert(adminB, auditdomain.ActionBlockUser, 1)
+			params := pagination.NewParams(1, 20)
+			dayTime := func(day int) *time.Time { d := base.AddDate(0, 0, day); return &d }
+			types := func(actions []*auditdomain.AdminAction) []auditdomain.AdminActionType {
+				out := make([]auditdomain.AdminActionType, 0, len(actions))
+				for _, action := range actions {
+					out = append(out, action.ActionType)
+				}
+				return out
+			}
+
+			Convey("Without a filter it lists the journal, newest first, and counts at least our rows", func() {
+				actions, total, err := repo.GetAdminActions(ctx, auditdomain.AdminActionFilter{}, params)
+
+				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, 4)
+				So(actions, ShouldNotBeEmpty)
+			})
+
+			Convey("By admin it returns only that admin's actions, newest first, with the admin's name", func() {
+				actions, total, err := repo.GetAdminActions(ctx, auditdomain.AdminActionFilter{AdminUserID: adminA}, params)
+
+				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 3)
+				So(types(actions), ShouldResemble, []auditdomain.AdminActionType{auditdomain.ActionBlockUser, auditdomain.ActionUnblockUser, auditdomain.ActionBlockUser})
+				So(actions[0].AdminUserID, ShouldEqual, adminA)
+				So(actions[0].AdminName, ShouldNotBeEmpty)
+				So(actions[0].CreatedAt.Equal(base.AddDate(0, 0, 2)), ShouldBeTrue)
+			})
+
+			Convey("By admin and action type it narrows further", func() {
+				actions, total, err := repo.GetAdminActions(ctx, auditdomain.AdminActionFilter{AdminUserID: adminA, ActionType: auditdomain.ActionUnblockUser}, params)
+
+				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 1)
+				So(types(actions), ShouldResemble, []auditdomain.AdminActionType{auditdomain.ActionUnblockUser})
+			})
+
+			Convey("The date range includes from and excludes to", func() {
+				actions, total, err := repo.GetAdminActions(ctx, auditdomain.AdminActionFilter{AdminUserID: adminA, From: dayTime(1), To: dayTime(2)}, params)
+
+				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 1)
+				So(types(actions), ShouldResemble, []auditdomain.AdminActionType{auditdomain.ActionUnblockUser})
+			})
+
+			Convey("Only from, or only to, bound one side of the range", func() {
+				_, fromTotal, err := repo.GetAdminActions(ctx, auditdomain.AdminActionFilter{AdminUserID: adminA, From: dayTime(1)}, params)
+				So(err, ShouldBeNil)
+				So(fromTotal, ShouldEqual, 2)
+
+				_, toTotal, err := repo.GetAdminActions(ctx, auditdomain.AdminActionFilter{AdminUserID: adminA, To: dayTime(1)}, params)
+				So(err, ShouldBeNil)
+				So(toTotal, ShouldEqual, 1)
+			})
+
+			Convey("A filter that matches nothing is an empty page with a zero total", func() {
+				actions, total, err := repo.GetAdminActions(ctx, auditdomain.AdminActionFilter{AdminUserID: adminB, ActionType: auditdomain.ActionDeleteUser}, params)
+
+				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 0)
+				So(actions, ShouldBeEmpty)
+			})
+
+			Convey("Pagination slices the filtered list and keeps the total", func() {
+				first, total, err := repo.GetAdminActions(ctx, auditdomain.AdminActionFilter{AdminUserID: adminA}, pagination.NewParams(1, 2))
+				So(err, ShouldBeNil)
+				second, _, err := repo.GetAdminActions(ctx, auditdomain.AdminActionFilter{AdminUserID: adminA}, pagination.NewParams(2, 2))
+				So(err, ShouldBeNil)
+
+				So(total, ShouldEqual, 3)
+				So(first, ShouldHaveLength, 2)
+				So(second, ShouldHaveLength, 1)
 			})
 		})
 	})

@@ -655,3 +655,25 @@ func TestSessionIsolationBetweenUsers_Integration(t *testing.T) {
 		})
 	})
 }
+
+func TestGetUserSessionByRefreshTokenLocked_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+
+	Convey("GetUserSessionByRefreshToken while another transaction holds the row lock", t, func() {
+		ctx := context.Background()
+		poolRepo := &Repository{repository.BaseRepository{DB: pool}}
+		_, seed, _ := newSessionFixture(t, ctx, poolRepo)
+
+		holder, err := pool.Begin(ctx)
+		So(err, ShouldBeNil)
+		defer holder.Rollback(ctx) //nolint:errcheck // rollback of a read-only holder tx; nothing to act on
+
+		_, err = (&Repository{repository.BaseRepository{DB: holder}}).GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
+		So(err, ShouldBeNil)
+
+		got, err := poolRepo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
+
+		So(errors.Is(err, authdomain.ErrRequestInProgress), ShouldBeTrue)
+		So(got, ShouldBeNil)
+	})
+}

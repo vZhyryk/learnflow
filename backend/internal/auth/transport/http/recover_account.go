@@ -35,7 +35,7 @@ func (h *Handler) recoverAccount(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	err := h.svc.RecoverAccount(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, r, err)
+		h.handleRecoverAccountError(w, r, err)
 		return
 	}
 

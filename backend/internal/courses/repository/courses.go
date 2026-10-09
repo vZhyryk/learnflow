@@ -118,6 +118,16 @@ func (rep *Repository) CheckIfCourseExistsByID(ctx context.Context, courseID str
 	return exists, nil
 }
 
+// CheckIfCourseExistsActiveByID reports whether a published, non-deleted course with the given ID exists.
+func (rep *Repository) CheckIfCourseExistsActiveByID(ctx context.Context, courseID string) (bool, error) {
+	var exists bool
+	if err := rep.QueryRunner(ctx).QueryRow(ctx, checkIfCourseExistsActiveByID, courseID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("repository.CheckIfCourseExistsActiveByID: %w", err)
+	}
+
+	return exists, nil
+}
+
 // GetCourseTitleByID returns the title of a non-deleted course; pgx.ErrNoRows (wrapped) if it does not exist.
 func (rep *Repository) GetCourseTitleByID(ctx context.Context, courseID string) (string, error) {
 	course, err := scanCourse(rep.QueryRunner(ctx).QueryRow(ctx, getCourseByIDSQL, courseID))

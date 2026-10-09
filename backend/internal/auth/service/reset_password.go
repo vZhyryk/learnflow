@@ -95,6 +95,6 @@ func (s *Service) ResetPassword(ctx context.Context, req authdomain.ResetPasswor
 			return fmt.Errorf("reset_password: revoke sessions: %w", revokeErr)
 		}
 
-		return nil
+		return s.revokeAllUserTokens(ctx, "reset_password", user.ID)
 	})
 }

@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"errors"
 	"net/http"
 )
 
@@ -25,6 +26,18 @@ func BadRequestResponse(w http.ResponseWriter, err error) error {
 		return WriteJSON(w, http.StatusBadRequest, Envelope{"error": err.Error()}, nil)
 	}
 	return WriteJSON(w, http.StatusBadRequest, Envelope{"error": "bad request"}, nil)
+}
+
+// RootError returns the innermost error of a fmt.Errorf("...: %w") chain. For a wrapped sentinel that is the sentinel
+// itself, whose fixed text is safe to show a client; the wrappers around it carry internal method names (CWE-209).
+func RootError(err error) error {
+	for {
+		next := errors.Unwrap(err)
+		if next == nil {
+			return err
+		}
+		err = next
+	}
 }
 
 // ErrorResponse writes a response with the given status code and error message.

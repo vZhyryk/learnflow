@@ -444,3 +444,32 @@ func TestContentItemCreatedByUserForeignKeyRestrict_Integration(t *testing.T) {
 		})
 	})
 }
+
+func TestCheckIfContentItemExistsActiveByID_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+
+	Convey("Given a content repository backed by real Postgres", t, func() {
+		Convey("A draft is not active, a published item is, and a soft-deleted one is not", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				itemID := testutil.InsertTestContentItem(t, tx)
+
+				exists, err := repo.CheckIfContentItemExistsActiveByID(ctx, itemID)
+				So(err, ShouldBeNil)
+				So(exists, ShouldBeFalse)
+
+				_, err = tx.Exec(ctx, `UPDATE content_items SET status = 'published', published_at = now(), published_by_user_id = created_by_user_id WHERE id = $1`, itemID)
+				So(err, ShouldBeNil)
+				exists, err = repo.CheckIfContentItemExistsActiveByID(ctx, itemID)
+				So(err, ShouldBeNil)
+				So(exists, ShouldBeTrue)
+
+				_, err = tx.Exec(ctx, `UPDATE content_items SET deleted_at = now(), deleted_by_user_id = created_by_user_id WHERE id = $1`, itemID)
+				So(err, ShouldBeNil)
+				exists, err = repo.CheckIfContentItemExistsActiveByID(ctx, itemID)
+				So(err, ShouldBeNil)
+				So(exists, ShouldBeFalse)
+			})
+		})
+	})
+}

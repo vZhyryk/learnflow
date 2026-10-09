@@ -442,3 +442,43 @@ func TestCourseCreatedByUserForeignKeyRestrict_Integration(t *testing.T) {
 		})
 	})
 }
+
+func TestCheckIfCourseExistsActiveByID_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+
+	Convey("Given a course repository backed by real Postgres", t, func() {
+		Convey("A draft is not active, a published course is, and a soft-deleted one is not", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				courseID := testutil.InsertTestCourse(t, tx)
+
+				exists, err := repo.CheckIfCourseExistsActiveByID(ctx, courseID)
+				So(err, ShouldBeNil)
+				So(exists, ShouldBeFalse)
+
+				_, err = tx.Exec(ctx, `UPDATE courses SET status = 'published', published_at = now(), published_by_user_id = created_by_user_id WHERE id = $1`, courseID)
+				So(err, ShouldBeNil)
+				exists, err = repo.CheckIfCourseExistsActiveByID(ctx, courseID)
+				So(err, ShouldBeNil)
+				So(exists, ShouldBeTrue)
+
+				_, err = tx.Exec(ctx, `UPDATE courses SET deleted_at = now(), deleted_by_user_id = created_by_user_id WHERE id = $1`, courseID)
+				So(err, ShouldBeNil)
+				exists, err = repo.CheckIfCourseExistsActiveByID(ctx, courseID)
+				So(err, ShouldBeNil)
+				So(exists, ShouldBeFalse)
+			})
+		})
+
+		Convey("An unknown id is not active", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+
+				exists, err := repo.CheckIfCourseExistsActiveByID(ctx, "00000000-0000-0000-0000-000000000000")
+
+				So(err, ShouldBeNil)
+				So(exists, ShouldBeFalse)
+			})
+		})
+	})
+}

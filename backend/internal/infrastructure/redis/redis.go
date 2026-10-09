@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"learnflow_backend/internal/shared/rediskeys"
 	"time"
@@ -141,11 +142,43 @@ func (ri *Instance) IsUserRoleRevoked(ctx context.Context, userID string) (bool,
 	return exists > 0, nil
 }
 
-// IsBlocked reports whether the user or the access token (by jti) is blocklisted, in one round-trip.
-func (ri *Instance) IsBlocked(ctx context.Context, userID, jti string) (bool, error) {
-	exists, err := ri.client.Exists(ctx, rediskeys.UserBlocked(userID), rediskeys.JTIBlocked(jti)).Result()
-	if err != nil {
+// RevokeUserTokens revokes every access token issued to userID up to now, for ttl (one access-token lifetime is enough:
+// later the older tokens have expired anyway). Tokens issued after this call are not affected.
+func (ri *Instance) RevokeUserTokens(ctx context.Context, userID string, ttl time.Duration) error {
+	if err := checkTTL("RevokeUserTokens", ttl); err != nil {
+		return err
+	}
+
+	if err := ri.client.Set(ctx, rediskeys.TokensRevokedBefore(userID), time.Now().Unix(), ttl).Err(); err != nil {
+		return fmt.Errorf("redis.RevokeUserTokens: %w", err)
+	}
+
+	return nil
+}
+
+// IsBlocked reports whether the user, the access token (by jti), or every token issued up to issuedAt (see
+// RevokeUserTokens) is blocklisted, in one round-trip. A token is revoked when issued at or before the revocation
+// second, because the iat claim has one-second precision.
+func (ri *Instance) IsBlocked(ctx context.Context, userID, jti string, issuedAt time.Time) (bool, error) {
+	pipe := ri.client.Pipeline()
+	exists := pipe.Exists(ctx, rediskeys.UserBlocked(userID), rediskeys.JTIBlocked(jti))
+	revokedBefore := pipe.Get(ctx, rediskeys.TokensRevokedBefore(userID))
+
+	if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
 		return false, fmt.Errorf("redis.IsBlocked: %w", err)
 	}
-	return exists > 0, nil
+
+	if exists.Val() > 0 {
+		return true, nil
+	}
+
+	cutoff, err := revokedBefore.Int64()
+	if errors.Is(err, redis.Nil) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("redis.IsBlocked: parse revoked-before: %w", err)
+	}
+
+	return issuedAt.Unix() <= cutoff, nil
 }

@@ -69,6 +69,12 @@ func TestGetEmailVerificationToken(t *testing.T) {
 			So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 		})
 
+		Convey("When the row is locked by a concurrent request (55P03)", func() {
+			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return &pgconn.PgError{Code: "55P03"} }}
+			_, err := repo.GetEmailVerificationToken(context.Background(), "hash-abc")
+			So(errors.Is(err, authdomain.ErrRequestInProgress), ShouldBeTrue)
+		})
+
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetEmailVerificationToken(context.Background(), "hash-abc")
@@ -155,6 +161,12 @@ func TestGetPasswordResetToken(t *testing.T) {
 			So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 		})
 
+		Convey("When the row is locked by a concurrent request (55P03)", func() {
+			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return &pgconn.PgError{Code: "55P03"} }}
+			_, err := repo.GetPasswordResetToken(context.Background(), "hash-abc")
+			So(errors.Is(err, authdomain.ErrRequestInProgress), ShouldBeTrue)
+		})
+
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetPasswordResetToken(context.Background(), "hash-abc")
@@ -212,6 +224,12 @@ func TestGetEmailChangeToken(t *testing.T) {
 			So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
 		})
 
+		Convey("When the row is locked by a concurrent request (55P03)", func() {
+			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return &pgconn.PgError{Code: "55P03"} }}
+			_, err := repo.GetEmailChangeToken(context.Background(), "hash-abc")
+			So(errors.Is(err, authdomain.ErrRequestInProgress), ShouldBeTrue)
+		})
+
 		Convey("When the database returns an unexpected error", func() {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetEmailChangeToken(context.Background(), "hash-abc")
@@ -264,6 +282,12 @@ func TestGetAccountRecoveryToken(t *testing.T) {
 			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return pgx.ErrNoRows }}
 			_, err := repo.GetAccountRecoveryToken(context.Background(), "unknown")
 			So(errors.Is(err, authdomain.ErrInvalidToken), ShouldBeTrue)
+		})
+
+		Convey("When the row is locked by a concurrent request (55P03)", func() {
+			rh.row = &testutil.MockRow{ScanFn: func(_ ...any) error { return &pgconn.PgError{Code: "55P03"} }}
+			_, err := repo.GetAccountRecoveryToken(context.Background(), "hash-abc")
+			So(errors.Is(err, authdomain.ErrRequestInProgress), ShouldBeTrue)
 		})
 
 		Convey("When the database returns an unexpected error", func() {

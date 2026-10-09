@@ -1,6 +1,6 @@
 -- LearnFlow database initialization — annotated version
 -- PostgreSQL 17+; run once on empty volume via /docker-entrypoint-initdb.d/
--- Synced through: migration 000014
+-- Synced through: migration 000015
 --
 -- GLOBAL DESIGN DECISIONS
 -- ───────────────────────
@@ -1549,6 +1549,20 @@ CREATE INDEX idx_admin_actions_admin_user_id_created_at ON admin_actions(admin_u
 
 -- [target_type + target_id]: "Show all admin actions on booking #X" — per-resource audit.
 CREATE INDEX idx_admin_actions_target_type_target_id ON admin_actions(target_type, target_id);
+
+-- [append-only trigger]: added in migration 000015 — ADMN-10 requires an immutable audit trail.
+-- A trigger (not REVOKE) so it also binds the table owner the app connects as; rows can only be INSERTed.
+
+CREATE FUNCTION admin_actions_reject_modification() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'admin_actions is append-only: % is not allowed', TG_OP
+        USING ERRCODE = 'restrict_violation';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER admin_actions_append_only
+    BEFORE UPDATE OR DELETE ON admin_actions
+    FOR EACH ROW EXECUTE FUNCTION admin_actions_reject_modification();
 
 -- ---------------------------------------------------------------------------
 -- 23. SUPPORT CHAT

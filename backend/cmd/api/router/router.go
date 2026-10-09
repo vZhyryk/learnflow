@@ -4,6 +4,9 @@ package router
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -30,6 +33,9 @@ import (
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/helpers"
+	"learnflow_backend/internal/notes"
+	notesrepository "learnflow_backend/internal/notes/repository"
+	notesservice "learnflow_backend/internal/notes/service"
 	"learnflow_backend/internal/review"
 	reviewrepository "learnflow_backend/internal/review/repository"
 	reviewservice "learnflow_backend/internal/review/service"
@@ -39,6 +45,7 @@ import (
 	usersrepository "learnflow_backend/internal/users/repository"
 	usersservice "learnflow_backend/internal/users/service"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/justinas/alice"
@@ -123,6 +130,11 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	reviewSvc := reviewservice.New(reviewRepo, reviewRepo, reviewRepo, transactor, accessChecker, adminAction)
 	review.RegisterReviewRoutes(router, reviewSvc, chains.Static, chains.StaticWithAuth, adminStaticWithAuth, a.Logger)
 
+	// Notes Routes
+	notesRepo := notesrepository.NewRepository(a.DB)
+	notesSvc := notesservice.New(notesRepo, courseRepo, contentRepo, transactor)
+	notes.RegisterNotesRoutes(router, notesSvc, chains.StaticWithAuth, a.Logger)
+
 	// Admin Routes
 	adminRepo := adminrepository.NewRepository(a.DB)
 	adminSvc := adminservice.New(
@@ -179,7 +191,15 @@ func (route *RouteHandler) bodyRateLimitKey(r *http.Request, extractField func(b
 		return appcontext.IPAddressFromContext(r.Context())
 	}
 
-	return tokens.MakeHash(value)
+	return route.rateLimitDigest(value)
+}
+
+// rateLimitDigest keys a limiter bucket by an HMAC of value, so a leaked key cannot be reversed by a dictionary of emails.
+func (route *RouteHandler) rateLimitDigest(value string) string {
+	mac := hmac.New(sha256.New, []byte(route.App.Config.Secret.JWTSecret))
+	mac.Write([]byte("ratelimit-key:" + value))
+
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
@@ -188,7 +208,7 @@ func (route *RouteHandler) getEmailFromBody(r *http.Request) string {
 		if err := json.Unmarshal(bodyBytes, &req); err != nil {
 			return "", false
 		}
-		return req.Email, true
+		return strings.ToLower(strings.TrimSpace(req.Email)), true
 	})
 }
 
@@ -202,36 +222,40 @@ func (route *RouteHandler) getTokenFromBody(r *http.Request) string {
 	})
 }
 
+func ipKey(r *http.Request) string {
+	return appcontext.IPAddressFromContext(r.Context())
+}
+
+func (route *RouteHandler) ipEmailKey(r *http.Request) string {
+	return ipKey(r) + ":" + route.getEmailFromBody(r)
+}
+
+func (route *RouteHandler) ipTokenKey(r *http.Request) string {
+	return ipKey(r) + ":" + route.getTokenFromBody(r)
+}
+
+// buildChains sets up the auth route limits; login and password reset also have a looser per-IP limit,
+// so one IP cannot try endless different emails.
 func (route *RouteHandler) buildChains() authhttp.AuthRouteChains {
-	staticLimiter := route.NewRouteRateLimiter(route.App.Config.Limiter.Rps, time.Second, route.App.Config.Limiter.Burst, func(r *http.Request) string {
-		return appcontext.IPAddressFromContext(r.Context())
-	})
+	cfg := route.App.Config.Limiter
 
-	staticChain := route.SetChain(staticLimiter)
+	static := route.NewRouteRateLimiter("static", cfg.Rps, time.Second, cfg.Burst, ipKey)
+	register := route.NewRouteRateLimiter("register", 3, time.Hour, 3, ipKey)
+	emailVerify := route.NewRouteRateLimiter("email_verify", 3, time.Hour, 3, route.ipTokenKey)
 
-	loginLimiter := route.NewRouteRateLimiter(5, time.Minute, 5, func(r *http.Request) string {
-		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getEmailFromBody(r)
-	})
+	loginPerIP := route.NewRouteRateLimiter("login_ip", 20, time.Minute, 20, ipKey)
+	loginPerEmail := route.NewRouteRateLimiter("login", 5, time.Minute, 5, route.ipEmailKey)
 
-	registerLimiter := route.NewRouteRateLimiter(3, time.Hour, 3, func(r *http.Request) string {
-		return appcontext.IPAddressFromContext(r.Context())
-	})
-
-	passResetLimiter := route.NewRouteRateLimiter(2, time.Hour, 2, func(r *http.Request) string {
-		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getEmailFromBody(r)
-	})
-
-	emailVerifyLimiter := route.NewRouteRateLimiter(3, time.Hour, 3, func(r *http.Request) string {
-		return appcontext.IPAddressFromContext(r.Context()) + ":" + route.getTokenFromBody(r)
-	})
+	resetPerIP := route.NewRouteRateLimiter("password_reset_ip", 10, time.Hour, 10, ipKey)
+	resetPerEmail := route.NewRouteRateLimiter("password_reset", 2, time.Hour, 2, route.ipEmailKey)
 
 	return authhttp.AuthRouteChains{
-		Static:         staticChain,
-		Login:          route.SetChain(loginLimiter),
-		Register:       route.SetChain(registerLimiter),
-		PassReset:      route.SetChain(passResetLimiter),
-		EmailVerify:    route.SetChain(emailVerifyLimiter),
-		StaticWithAuth: staticChain.Append(route.AuthenticateUser),
+		Static:         route.SetChain(static),
+		Login:          route.SetChain(loginPerIP, loginPerEmail),
+		Register:       route.SetChain(register),
+		PassReset:      route.SetChain(resetPerIP, resetPerEmail),
+		EmailVerify:    route.SetChain(emailVerify),
+		StaticWithAuth: route.SetChain(static).Append(route.AuthenticateUser),
 	}
 }
 
@@ -266,7 +290,9 @@ func (h *RouteHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// SetChain builds the standard middleware chain, inserting limiter for rate limiting.
-func (route *RouteHandler) SetChain(limiter func(http.Handler) http.Handler) alice.Chain {
-	return alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger, limiter, route.EnableCORS, route.Timeout, route.SetSecurityHeaders)
+// SetChain builds the standard middleware chain, inserting the limiters (in order) for rate limiting.
+func (route *RouteHandler) SetChain(limiters ...alice.Constructor) alice.Chain {
+	return alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger).
+		Append(limiters...).
+		Append(route.EnableCORS, route.Timeout, route.SetSecurityHeaders)
 }

@@ -237,6 +237,7 @@ func (m *mockUserRepo) GetUserDataByID(ctx context.Context, userID string) (*adm
 type mockAdminActionRepo struct {
 	createAdminAction       func(ctx context.Context, action *auditdomain.AdminAction) error
 	getInstanceAdminActions func(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
+	getAdminActions         func(ctx context.Context, filter auditdomain.AdminActionFilter, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
 	getFailedJobs           func(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error)
 }
 
@@ -252,6 +253,13 @@ func (m *mockAdminActionRepo) GetInstanceAdminActions(ctx context.Context, targe
 		panic("mockAdminActionRepo.GetInstanceAdminActions not set")
 	}
 	return m.getInstanceAdminActions(ctx, targetType, targetID, params)
+}
+
+func (m *mockAdminActionRepo) GetAdminActions(ctx context.Context, filter auditdomain.AdminActionFilter, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
+	if m.getAdminActions == nil {
+		panic("mockAdminActionRepo.GetAdminActions not set")
+	}
+	return m.getAdminActions(ctx, filter, params)
 }
 
 func (m *mockAdminActionRepo) CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error {

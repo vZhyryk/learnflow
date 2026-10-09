@@ -41,12 +41,21 @@ func postJSON(handler http.Handler, remoteAddr, body string) *httptest.ResponseR
 	return w
 }
 
+// uniqueTestAddr spreads runs over 16M addresses: the limiter buckets live in the shared Redis for up to two hours,
+// so a fixed or low-entropy address would inherit the exhausted buckets of earlier runs. UnixNano is only
+// microsecond-granular on some platforms, hence the division before taking the octets.
+func uniqueTestAddr(seed int64) string {
+	n := seed / 1000
+
+	return fmt.Sprintf("10.%d.%d.%d:4321", (n>>16)&255, (n>>8)&255, n&255)
+}
+
 func TestRateLimitedChains_Integration(t *testing.T) {
 	Convey("Given the auth chains with the limiter enabled on real Redis", t, func() {
 		route := newRealRedisRouteHandler(t)
 		chains := route.buildChains()
 		suffix := time.Now().UnixNano()
-		ip := fmt.Sprintf("198.51.100.%d:4321", suffix%200+1)
+		ip := uniqueTestAddr(suffix)
 
 		var gotBody string
 		echo := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +112,35 @@ func TestRateLimitedChains_Integration(t *testing.T) {
 			}
 
 			So(postJSON(handler, ip, body).Code, ShouldEqual, http.StatusTooManyRequests)
+		})
+
+		Convey("When the login email differs only by case or spaces, the variants share one bucket", func() {
+			handler := chains.Login.Then(echo)
+			variants := []string{
+				fmt.Sprintf("case-%d@example.com", suffix),
+				fmt.Sprintf("CASE-%d@Example.com", suffix),
+				fmt.Sprintf(" Case-%d@example.com ", suffix),
+				fmt.Sprintf("case-%d@EXAMPLE.COM", suffix),
+				fmt.Sprintf("CASE-%d@example.com", suffix),
+			}
+
+			for _, email := range variants {
+				So(postJSON(handler, ip, fmt.Sprintf(`{"email":%q}`, email)).Code, ShouldEqual, http.StatusOK)
+			}
+
+			So(postJSON(handler, ip, fmt.Sprintf(`{"email":"Case-%d@example.com"}`, suffix)).Code, ShouldEqual, http.StatusTooManyRequests)
+		})
+
+		Convey("When one IP tries many different emails on the login chain, the IP-only bucket stops it after 20", func() {
+			otherIP := uniqueTestAddr(suffix + 1)
+			handler := chains.Login.Then(echo)
+
+			for i := 0; i < 20; i++ {
+				body := fmt.Sprintf(`{"email":"spray-%d-%d@example.com"}`, suffix, i)
+				So(postJSON(handler, otherIP, body).Code, ShouldEqual, http.StatusOK)
+			}
+
+			So(postJSON(handler, otherIP, fmt.Sprintf(`{"email":"spray-%d-last@example.com"}`, suffix)).Code, ShouldEqual, http.StatusTooManyRequests)
 		})
 
 		Convey("When Redis is unreachable, the limiter fails closed with 500", func() {

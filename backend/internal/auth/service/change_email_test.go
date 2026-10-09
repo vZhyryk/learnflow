@@ -400,3 +400,38 @@ func TestChangeEmailSessionLogoutFails(t *testing.T) {
 		})
 	})
 }
+
+func TestChangeEmailRevokesAllTokens(t *testing.T) {
+	Convey("Given an auth service", t, func() {
+		var revokedUserID string
+		var revokeErr error
+		blocklist := newSuccessfulMockBlocklist()
+		blocklist.revokeUserTokens = func(_ context.Context, userID string, _ time.Duration) error {
+			revokedUserID = userID
+			return revokeErr
+		}
+		sRepo := &mockSessionRepo{revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error { return nil }}
+		srv := newTestService(validChangeEmailUserRepo(), sRepo, validTokenRepo(), nil, blocklist)
+		logoutRequest := authdomain.EmailChangeRequest{
+			Token: "tok", UserID: TestUserID, IsAllSessionsLogout: true, JTI: "jti-123", AccessTokenExpiresAt: time.Now().UTC().Add(15 * time.Minute),
+		}
+
+		Convey("When all sessions are logged out, every access token issued so far is revoked", func() {
+			So(srv.ChangeEmail(context.Background(), logoutRequest), ShouldBeNil)
+			So(revokedUserID, ShouldEqual, TestUserID)
+		})
+
+		Convey("When the sessions stay, the user's access tokens are not touched", func() {
+			So(srv.ChangeEmail(context.Background(), validEmailChangeRequest()), ShouldBeNil)
+			So(revokedUserID, ShouldBeEmpty)
+		})
+
+		Convey("When the Redis revocation fails, the change fails with ErrBlocklistUnavailable", func() {
+			revokeErr = testutil.ErrRedisUnavailable
+
+			err := srv.ChangeEmail(context.Background(), logoutRequest)
+
+			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
+		})
+	})
+}

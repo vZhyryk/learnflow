@@ -732,14 +732,23 @@ type grantFixture struct {
 	outbox    []any
 	granted   bool
 	user      *admindomain.UserData
+	actor     *admindomain.UserData
 }
 
 func newGrantFixture() *grantFixture {
-	f := &grantFixture{user: &admindomain.UserData{UserID: validUserID, Email: &testEmail}}
+	f := &grantFixture{
+		user:  &admindomain.UserData{UserID: validUserID, Email: &testEmail, Role: admindomain.RoleUser, Status: admindomain.StatusActive},
+		actor: &admindomain.UserData{UserID: testAdminID, Role: admindomain.RoleAdmin, Status: admindomain.StatusActive},
+	}
 	f.courses = &mockCourseRepo{getCourseTitleByID: func(_ context.Context, _ string) (string, error) { return "Go Basics", nil }}
 	f.content = &mockContentItemRepo{getContentItemTitleByID: func(_ context.Context, _ string) (string, error) { return "Intro Video", nil }}
 	f.users = &mockUserRepo{
-		getUserDataByID: func(_ context.Context, _ string) (*admindomain.UserData, error) { return f.user, nil },
+		getUserDataByID: func(_ context.Context, userID string) (*admindomain.UserData, error) {
+			if userID == testAdminID {
+				return f.actor, nil
+			}
+			return f.user, nil
+		},
 		grantUserCourseAccess: func(_ context.Context, _, _ string) error {
 			f.granted = true
 			return nil
@@ -968,4 +977,94 @@ func TestRevokeSubAdminAccessSessionFailure(t *testing.T) {
 		So(err.Error(), ShouldContainSubstring, "revoke sessions")
 		So(calls, ShouldBeEmpty)
 	})
+}
+
+func TestCanGrantAccess(t *testing.T) {
+	deletedAt := time.Now()
+	blockedAdmin := &admindomain.UserData{Role: admindomain.RoleAdmin, Status: admindomain.StatusBlocked}
+	deletedAdmin := &admindomain.UserData{Role: admindomain.RoleAdmin, Status: admindomain.StatusActive, DeletedAt: &deletedAt}
+
+	Convey("canGrantAccess", t, func() {
+		Convey("An admin may grant to a user, a subadmin and another admin", func() {
+			for _, role := range []admindomain.UserRole{admindomain.RoleUser, admindomain.RoleSubAdmin, admindomain.RoleAdmin} {
+				So(canGrantAccess(activeUserWithRole(admindomain.RoleAdmin), activeUserWithRole(role)), ShouldBeTrue)
+			}
+		})
+
+		Convey("A subadmin may grant only to a plain user", func() {
+			subadmin := activeUserWithRole(admindomain.RoleSubAdmin)
+
+			So(canGrantAccess(subadmin, activeUserWithRole(admindomain.RoleUser)), ShouldBeTrue)
+			So(canGrantAccess(subadmin, activeUserWithRole(admindomain.RoleSubAdmin)), ShouldBeFalse)
+			So(canGrantAccess(subadmin, activeUserWithRole(admindomain.RoleAdmin)), ShouldBeFalse)
+		})
+
+		Convey("A plain user may not grant", func() {
+			So(canGrantAccess(activeUserWithRole(admindomain.RoleUser), activeUserWithRole(admindomain.RoleUser)), ShouldBeFalse)
+		})
+
+		Convey("A blocked or soft-deleted admin may not grant", func() {
+			So(canGrantAccess(blockedAdmin, activeUserWithRole(admindomain.RoleUser)), ShouldBeFalse)
+			So(canGrantAccess(deletedAdmin, activeUserWithRole(admindomain.RoleUser)), ShouldBeFalse)
+		})
+	})
+}
+
+func TestGrantAccessSubadminLimits(t *testing.T) {
+	for _, tc := range grantCases() {
+		Convey("Given "+tc.name+" run by a subadmin", t, func() {
+			f := newGrantFixture()
+			f.actor.Role = admindomain.RoleSubAdmin
+
+			Convey("When the target is a plain user, the grant goes through", func() {
+				So(tc.call(f, validUserID), ShouldBeNil)
+				So(f.granted, ShouldBeTrue)
+			})
+
+			Convey("When the target is an admin or another subadmin, it is forbidden and nothing is written", func() {
+				for _, role := range []admindomain.UserRole{admindomain.RoleAdmin, admindomain.RoleSubAdmin} {
+					f.user.Role = role
+
+					So(errors.Is(tc.call(f, validUserID), admindomain.ErrForbiddenUserAction), ShouldBeTrue)
+				}
+				So(f.granted, ShouldBeFalse)
+				So(f.actions, ShouldBeEmpty)
+				So(f.outbox, ShouldBeNil)
+			})
+		})
+	}
+}
+
+func TestGrantAccessActorChecks(t *testing.T) {
+	for _, tc := range grantCases() {
+		Convey("Given "+tc.name, t, func() {
+			f := newGrantFixture()
+
+			Convey("When the actor is a plain user, it is forbidden", func() {
+				f.actor.Role = admindomain.RoleUser
+
+				So(errors.Is(tc.call(f, validUserID), admindomain.ErrForbiddenUserAction), ShouldBeTrue)
+				So(f.granted, ShouldBeFalse)
+			})
+
+			Convey("When the actor is blocked, it is forbidden", func() {
+				f.actor.Status = admindomain.StatusBlocked
+
+				So(errors.Is(tc.call(f, validUserID), admindomain.ErrForbiddenUserAction), ShouldBeTrue)
+				So(f.granted, ShouldBeFalse)
+			})
+
+			Convey("When the actor cannot be loaded, the error is wrapped and nothing is written", func() {
+				f.users.getUserDataByID = func(_ context.Context, _ string) (*admindomain.UserData, error) {
+					return nil, testutil.ErrDBUnexpected
+				}
+
+				err := tc.call(f, validUserID)
+
+				So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+				So(err.Error(), ShouldContainSubstring, "load actor")
+				So(f.granted, ShouldBeFalse)
+			})
+		})
+	}
 }

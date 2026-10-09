@@ -281,3 +281,44 @@ func TestCheckIfCourseExistsByID(t *testing.T) {
 		})
 	})
 }
+
+func TestCheckIfCourseExistsActiveByID(t *testing.T) {
+	Convey("Given a course repository", t, func() {
+		var row *testutil.MockRow
+		var gotQuery string
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, sql string, _ ...any) pgx.Row {
+				gotQuery = sql
+				return row
+			},
+		})
+
+		Convey("When the course is published and not deleted", func() {
+			row = &testutil.MockRow{ScanFn: func(dest ...any) error {
+				*testutil.CastBool(dest[0], 0) = true
+				return nil
+			}}
+			exists, err := repo.CheckIfCourseExistsActiveByID(context.Background(), "course-123")
+			So(err, ShouldBeNil)
+			So(exists, ShouldBeTrue)
+			So(gotQuery, ShouldContainSubstring, "status = 'published'")
+			So(gotQuery, ShouldContainSubstring, "deleted_at IS NULL")
+		})
+
+		Convey("When the course is not active", func() {
+			row = &testutil.MockRow{ScanFn: func(dest ...any) error {
+				*testutil.CastBool(dest[0], 0) = false
+				return nil
+			}}
+			exists, err := repo.CheckIfCourseExistsActiveByID(context.Background(), "course-123")
+			So(err, ShouldBeNil)
+			So(exists, ShouldBeFalse)
+		})
+
+		Convey("When the database returns an unexpected error", func() {
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
+			_, err := repo.CheckIfCourseExistsActiveByID(context.Background(), "course-123")
+			testutil.AssertUnexpectedDBError(err, "db error")
+		})
+	})
+}

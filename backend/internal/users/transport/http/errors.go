@@ -27,7 +27,7 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 		errors.Is(err, usersdomain.ErrTimezoneInvalid),
 		errors.Is(err, usersdomain.ErrDateOfBirthInvalid):
 		h.handleErrorRespond(r, "validation_error", func() error {
-			return helpers.ErrorResponse(w, http.StatusUnprocessableEntity, err.Error())
+			return helpers.ErrorResponse(w, http.StatusUnprocessableEntity, helpers.RootError(err).Error())
 		})
 
 	default:

@@ -28,7 +28,7 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 
 	case errors.Is(err, reviewdomain.ErrNoPermission):
 		h.handleErrorRespond(r, "no_permission", func() error {
-			return helpers.ErrorResponse(w, http.StatusForbidden, err.Error())
+			return helpers.ErrorResponse(w, http.StatusForbidden, helpers.RootError(err).Error())
 		})
 
 	case errors.Is(err, reviewdomain.ErrInvalidRating),
@@ -37,10 +37,9 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 		errors.Is(err, reviewdomain.ErrInvalidCourseID),
 		errors.Is(err, reviewdomain.ErrInvalidArticleID),
 		errors.Is(err, reviewdomain.ErrInvalidReviewID),
-		errors.Is(err, reviewdomain.ErrInvalidUserID),
 		errors.Is(err, reviewdomain.ErrAlreadyReviewed):
 		h.handleErrorRespond(r, "validation_error", func() error {
-			return helpers.ErrorResponse(w, http.StatusUnprocessableEntity, err.Error())
+			return helpers.ErrorResponse(w, http.StatusUnprocessableEntity, helpers.RootError(err).Error())
 		})
 
 	default:

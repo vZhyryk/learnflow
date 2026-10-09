@@ -1,11 +1,26 @@
 package authrepository
 
 import (
+	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/infrastructure/convert"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// lockNotAvailableCode is the SQLSTATE PostgreSQL returns when FOR UPDATE NOWAIT hits a row locked by another transaction.
+const lockNotAvailableCode = "55P03"
+
+// mapLockNotAvailable turns a lock_not_available error into ErrRequestInProgress and passes any other error through.
+func mapLockNotAvailable(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == lockNotAvailableCode {
+		return authdomain.ErrRequestInProgress
+	}
+
+	return err
+}
 
 type rowScanner interface {
 	Scan(dest ...any) error
@@ -88,7 +103,7 @@ func scanUserSession(row rowScanner) (*authdomain.UserSession, error) {
 		&session.LastSeenIP,
 	)
 	if err != nil {
-		return nil, err
+		return nil, mapLockNotAvailable(err)
 	}
 	return session, nil
 }
@@ -106,7 +121,7 @@ func scanToken(row rowScanner) (*authdomain.TokenBase, error) {
 		&token.InvalidatedByUserID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, mapLockNotAvailable(err)
 	}
 	return token, nil
 }
@@ -125,7 +140,7 @@ func scanEmailChangeToken(row rowScanner) (*authdomain.EmailChangeToken, error) 
 		&token.InvalidatedByUserID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, mapLockNotAvailable(err)
 	}
 	return token, nil
 }

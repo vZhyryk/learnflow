@@ -30,6 +30,7 @@ type AnnouncementRepository interface {
 type AdminActionRepository interface {
 	CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error
 	GetInstanceAdminActions(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
+	GetAdminActions(ctx context.Context, filter auditdomain.AdminActionFilter, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
 	GetFailedJobs(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error)
 }
 
@@ -85,7 +86,8 @@ type Service interface {
 	ChangeUserField(ctx context.Context, userID, adminID string, operationName UserAdminOperation) error
 	GrantUserCourseAccess(ctx context.Context, userID, courseID, adminID string, operationName auditdomain.AdminActionType) error
 	GrantUserContentAccess(ctx context.Context, userID, contentItemID, adminID string, operationName auditdomain.AdminActionType) error
-	GetInstanceAdminActions(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) (actions []*auditdomain.AdminAction, count int, err error)
+	GetInstanceAdminActions(ctx context.Context, actorID string, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) (actions []*auditdomain.AdminAction, count int, err error)
+	GetAdminActions(ctx context.Context, actorID string, filter auditdomain.AdminActionFilter, params pagination.Params) (actions []*auditdomain.AdminAction, count int, err error)
 	GetFailedJobs(ctx context.Context, params pagination.Params) (failedJobs []*auditdomain.FailedJob, count int, err error)
 	SetExpiredNowAnnouncement(ctx context.Context, announcementID, userID string) error
 }

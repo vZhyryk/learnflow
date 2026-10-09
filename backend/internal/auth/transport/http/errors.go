@@ -69,10 +69,29 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 		h.handleErrorRespond(r, "invalid_account_state", func() error {
 			return helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "if your account is eligible, you will receive an email"}, nil)
 		})
-
+	case errors.Is(err, authdomain.ErrRequestInProgress):
+		w.Header().Set("Retry-After", "1")
+		h.handleErrorRespond(r, "request_in_progress", func() error {
+			return helpers.ErrorResponse(w, http.StatusConflict, "another request is in progress, retry shortly")
+		})
 	default:
 		h.handleServerError(w, r, err)
 	}
+}
+
+// handleRecoverAccountError handles errors of the token-based recovery endpoint. Unlike the init endpoint (which answers
+// 200 for every account state to avoid account enumeration), the caller here holds a one-time token, so telling them
+// the account was not recovered reveals nothing: it answers 403.
+func (h *Handler) handleRecoverAccountError(w http.ResponseWriter, r *http.Request, err error) {
+	if !errors.Is(err, authdomain.ErrInvalidAccountState) && !errors.Is(err, authdomain.ErrDeletedByAdmin) {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
+
+	h.logAuthFailure(r, r.URL.Path, "account_not_recoverable", userIDProps(r))
+	h.handleErrorRespond(r, "account_not_recoverable", func() error {
+		return helpers.ForbiddenResponse(w, helpers.Envelope{"error": "account cannot be recovered", "code": "account_not_recoverable"})
+	})
 }
 
 // handleServerError logs err and answers 503 when the Redis blocklist could not be updated, 500 otherwise.

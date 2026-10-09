@@ -64,7 +64,8 @@ func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockToke
 
 func newSuccessfulMockBlocklist() *mockBlocklist {
 	return &mockBlocklist{
-		blockToken: func(_ context.Context, _ string, _ time.Duration) error { return nil },
+		blockToken:       func(_ context.Context, _ string, _ time.Duration) error { return nil },
+		revokeUserTokens: func(_ context.Context, _ string, _ time.Duration) error { return nil },
 	}
 }
 

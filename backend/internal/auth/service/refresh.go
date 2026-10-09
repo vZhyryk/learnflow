@@ -72,6 +72,11 @@ func (s *Service) checkRefreshSessionPrevHash(ctx context.Context, refreshHashHe
 	}
 
 	if prevSession != nil {
+		// Tokens first: a Redis failure then fails the request before any session is touched.
+		if tokensErr := s.revokeAllUserTokens(ctx, "refresh", prevSession.UserID); tokensErr != nil {
+			return tokensErr
+		}
+
 		revokeErr := s.sessionRepo.RevokeAllUserSessions(ctx, prevSession.UserID, nil, authdomain.RevokeReasonSuspiciousActivity)
 		if revokeErr != nil {
 			return fmt.Errorf("refresh: revoke all sessions (reuse): %w", revokeErr)

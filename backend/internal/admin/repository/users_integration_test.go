@@ -228,3 +228,41 @@ func TestAdminProtectionAndAudit_Integration(t *testing.T) {
 		})
 	})
 }
+
+func TestGrantUserAccess_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+
+	Convey("Given an admin repository backed by real Postgres", t, func() {
+		Convey("A course grant is accepted once and a repeat hits the partial unique index → ErrAccessAlreadyGranted", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				userID := testutil.InsertRandomTestUser(t, tx)
+				courseID := testutil.InsertTestCourse(t, tx)
+
+				So(repo.GrantUserCourseAccess(ctx, userID, courseID), ShouldBeNil)
+				So(errors.Is(repo.GrantUserCourseAccess(ctx, userID, courseID), admindomain.ErrAccessAlreadyGranted), ShouldBeTrue)
+			})
+		})
+
+		Convey("A content item grant is accepted once and a repeat hits the partial unique index → ErrAccessAlreadyGranted", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				userID := testutil.InsertRandomTestUser(t, tx)
+				itemID := testutil.InsertTestContentItem(t, tx)
+
+				So(repo.GrantUserContentAccess(ctx, userID, itemID), ShouldBeNil)
+				So(errors.Is(repo.GrantUserContentAccess(ctx, userID, itemID), admindomain.ErrAccessAlreadyGranted), ShouldBeTrue)
+			})
+		})
+
+		Convey("The same course can be granted to two different users", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				courseID := testutil.InsertTestCourse(t, tx)
+
+				So(repo.GrantUserCourseAccess(ctx, testutil.InsertRandomTestUser(t, tx), courseID), ShouldBeNil)
+				So(repo.GrantUserCourseAccess(ctx, testutil.InsertRandomTestUser(t, tx), courseID), ShouldBeNil)
+			})
+		})
+	})
+}

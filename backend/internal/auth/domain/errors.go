@@ -64,6 +64,8 @@ var (
 	ErrInvalidUILanguage = errors.New("invalid UI language")
 	// ErrBlocklistUnavailable is returned when the Redis blocklist cannot be updated; the DB change is rolled back.
 	ErrBlocklistUnavailable = errors.New("blocklist unavailable")
+	// ErrRequestInProgress is returned when a row-level lock (FOR UPDATE NOWAIT) is held by a concurrent request.
+	ErrRequestInProgress = errors.New("another request for this resource is in progress")
 	// ErrDeletedByAdmin is returned when account recovery is requested for an account an admin deleted.
 	ErrDeletedByAdmin = errors.New("account deleted by admin")
 )

@@ -54,6 +54,12 @@ func TestGetUserSessionByRefreshToken(t *testing.T) {
 			So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
 		})
 
+		Convey("When the row is locked by a concurrent request (55P03)", func() {
+			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return &pgconn.PgError{Code: "55P03"} }}
+			_, err := repo.GetUserSessionByRefreshToken(context.Background(), "refresh-token-hash")
+			So(errors.Is(err, authdomain.ErrRequestInProgress), ShouldBeTrue)
+		})
+
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDBUnexpected }}
 			_, err := repo.GetUserSessionByRefreshToken(context.Background(), "refresh-token-hash")

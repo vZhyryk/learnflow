@@ -32,7 +32,7 @@ func TestAuthenticateUserBlocklist_Integration(t *testing.T) {
 
 		ctx := context.Background()
 		t.Cleanup(func() {
-			client.Del(ctx, rediskeys.UserBlocked(userID), rediskeys.JTIBlocked(claims.ID)) //nolint:errcheck // best-effort cleanup
+			client.Del(ctx, rediskeys.UserBlocked(userID), rediskeys.JTIBlocked(claims.ID), rediskeys.TokensRevokedBefore(userID)) //nolint:errcheck // best-effort cleanup
 		})
 
 		var gotUser *authdomain.User
@@ -68,6 +68,28 @@ func TestAuthenticateUserBlocklist_Integration(t *testing.T) {
 
 			So(serve(), ShouldEqual, http.StatusOK)
 			So(called, ShouldBeTrue)
+		})
+
+		Convey("When all of the user's tokens were revoked after this one was issued, it is rejected with 401", func() {
+			So(route.App.Redis.RevokeUserTokens(ctx, userID, time.Minute), ShouldBeNil)
+
+			So(serve(), ShouldEqual, http.StatusUnauthorized)
+			So(called, ShouldBeFalse)
+		})
+
+		Convey("When the revocation happened before this token was issued, it is accepted", func() {
+			olderCutoff := time.Now().Add(-time.Hour).Unix()
+			So(client.Set(ctx, rediskeys.TokensRevokedBefore(userID), olderCutoff, time.Minute).Err(), ShouldBeNil)
+
+			So(serve(), ShouldEqual, http.StatusOK)
+			So(called, ShouldBeTrue)
+		})
+
+		Convey("When another user's tokens were revoked, this token is accepted", func() {
+			So(route.App.Redis.RevokeUserTokens(ctx, userID+"-other", time.Minute), ShouldBeNil)
+			t.Cleanup(func() { client.Del(ctx, rediskeys.TokensRevokedBefore(userID+"-other")) }) //nolint:errcheck // best-effort cleanup
+
+			So(serve(), ShouldEqual, http.StatusOK)
 		})
 
 		Convey("When the token's jti is blocklisted, it is rejected with 401", func() {

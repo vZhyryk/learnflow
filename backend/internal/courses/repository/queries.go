@@ -98,4 +98,8 @@ const (
 	checkIfCourseExistsByID = `
 		SELECT EXISTS(SELECT 1 FROM courses WHERE id = $1 AND deleted_at IS NULL)
 	`
+
+	checkIfCourseExistsActiveByID = `
+		SELECT EXISTS(SELECT 1 FROM courses WHERE id = $1 AND deleted_at IS NULL AND status = 'published')
+	`
 )

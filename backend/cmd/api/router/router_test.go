@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	appcontext "learnflow_backend/internal/shared/context"
-	"learnflow_backend/internal/shared/tokens"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -40,7 +39,7 @@ func TestBodyRateLimitKey(t *testing.T) {
 
 			key := route.bodyRateLimitKey(r, extractEmail)
 
-			So(key, ShouldEqual, tokens.MakeHash("ada@example.com"))
+			So(key, ShouldEqual, route.rateLimitDigest("ada@example.com"))
 			rest, err := io.ReadAll(r.Body)
 			So(err, ShouldBeNil)
 			So(string(rest), ShouldEqual, `{"email":"ada@example.com"}`)
@@ -69,7 +68,7 @@ func TestBodyRateLimitKey(t *testing.T) {
 		Convey("When the body is one byte under the limit, it is still parsed", func() {
 			r := newBodyRequest(strings.NewReader("email" + strings.Repeat("x", rateLimitBodyLimit-1-len("email"))))
 
-			So(route.bodyRateLimitKey(r, extractEmail), ShouldEqual, tokens.MakeHash("ada@example.com"))
+			So(route.bodyRateLimitKey(r, extractEmail), ShouldEqual, route.rateLimitDigest("ada@example.com"))
 		})
 
 		Convey("When reading the body fails, the key is empty", func() {
@@ -87,7 +86,13 @@ func TestGetEmailAndTokenFromBody(t *testing.T) {
 		Convey("returns the hash of the email field", func() {
 			r := newBodyRequest(strings.NewReader(`{"email":"ada@example.com"}`))
 
-			So(route.getEmailFromBody(r), ShouldEqual, tokens.MakeHash("ada@example.com"))
+			So(route.getEmailFromBody(r), ShouldEqual, route.rateLimitDigest("ada@example.com"))
+		})
+
+		Convey("ignores case and surrounding spaces, so spelling variants share one bucket", func() {
+			r := newBodyRequest(strings.NewReader(`{"email":"  Ada@Example.COM "}`))
+
+			So(route.getEmailFromBody(r), ShouldEqual, route.rateLimitDigest("ada@example.com"))
 		})
 
 		Convey("falls back to the IP for malformed JSON", func() {
@@ -107,7 +112,7 @@ func TestGetEmailAndTokenFromBody(t *testing.T) {
 		Convey("returns the hash of the token field", func() {
 			r := newBodyRequest(strings.NewReader(`{"token":"raw-token"}`))
 
-			So(route.getTokenFromBody(r), ShouldEqual, tokens.MakeHash("raw-token"))
+			So(route.getTokenFromBody(r), ShouldEqual, route.rateLimitDigest("raw-token"))
 		})
 
 		Convey("falls back to the IP for malformed JSON", func() {
@@ -173,6 +178,25 @@ func TestBuildChains(t *testing.T) {
 
 			So(called, ShouldBeFalse)
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
+		})
+	})
+}
+
+func TestRateLimitDigest(t *testing.T) {
+	Convey("rateLimitDigest", t, func() {
+		route := newTestRouteHandler()
+		route.App.Config.Secret.JWTSecret = "first-secret-that-is-long-enough-32b"
+
+		Convey("When the value is the same, the digest is stable and hex SHA-256 sized", func() {
+			So(route.rateLimitDigest("ada@example.com"), ShouldEqual, route.rateLimitDigest("ada@example.com"))
+			So(route.rateLimitDigest("ada@example.com"), ShouldHaveLength, 64)
+		})
+
+		Convey("When the server secret differs, the digest differs, so it cannot be rebuilt from a dictionary of emails", func() {
+			first := route.rateLimitDigest("ada@example.com")
+			route.App.Config.Secret.JWTSecret = "second-secret-that-is-long-enough-32"
+
+			So(route.rateLimitDigest("ada@example.com"), ShouldNotEqual, first)
 		})
 	})
 }

@@ -8,6 +8,10 @@ const (
 	JTIBlockedPrefix = "blocklist:"
 	// UserRoleRevokedPrefix prefixes the key that makes RequireRole reject a user whose role was just revoked.
 	UserRoleRevokedPrefix = "role_revoked:"
+	// TokensRevokedBeforePrefix prefixes the key holding the unix second up to which a user's access tokens are revoked.
+	TokensRevokedBeforePrefix = "tokens_revoked_before:"
+	// RateLimitPrefix prefixes the token-bucket key of a rate limiter.
+	RateLimitPrefix = "ratelimit:"
 )
 
 // UserBlocked returns the Redis key marking userID as blocked.
@@ -23,4 +27,14 @@ func JTIBlocked(jti string) string {
 // UserRoleRevoked returns the Redis key marking userID's role as revoked.
 func UserRoleRevoked(userID string) string {
 	return UserRoleRevokedPrefix + userID
+}
+
+// TokensRevokedBefore returns the Redis key whose value is the unix second up to which userID's tokens are revoked.
+func TokensRevokedBefore(userID string) string {
+	return TokensRevokedBeforePrefix + userID
+}
+
+// RateLimit returns the Redis key of the bucket of the limiter called name for the given client key.
+func RateLimit(name, key string) string {
+	return RateLimitPrefix + name + ":" + key
 }

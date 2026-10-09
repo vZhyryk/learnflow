@@ -352,8 +352,16 @@ func mockAuditDeletedByAdmin(deleted bool, err error) *mockAudit {
 
 // mockBlocklist implements authdomain.TokenBlocklist via function fields.
 type mockBlocklist struct {
-	blockToken  func(ctx context.Context, jti string, ttl time.Duration) error
-	unBlockUser func(ctx context.Context, userID string) error
+	blockToken       func(ctx context.Context, jti string, ttl time.Duration) error
+	revokeUserTokens func(ctx context.Context, userID string, ttl time.Duration) error
+	unBlockUser      func(ctx context.Context, userID string) error
+}
+
+func (m *mockBlocklist) RevokeUserTokens(ctx context.Context, userID string, ttl time.Duration) error {
+	if m.revokeUserTokens == nil {
+		panic("mockBlocklist.revokeUserTokens not set")
+	}
+	return m.revokeUserTokens(ctx, userID, ttl)
 }
 
 func (m *mockBlocklist) BlockToken(ctx context.Context, jti string, ttl time.Duration) error {

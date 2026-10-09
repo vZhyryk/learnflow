@@ -52,7 +52,7 @@ func TestBlocklistUnreachableRedis(t *testing.T) {
 		})
 
 		Convey("IsBlocked reports false with the error, so callers can fail closed", func() {
-			blocked, err := ri.IsBlocked(ctx, "user-1", "jti-1")
+			blocked, err := ri.IsBlocked(ctx, "user-1", "jti-1", time.Now())
 			So(blocked, ShouldBeFalse)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "redis.IsBlocked")

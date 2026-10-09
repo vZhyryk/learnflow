@@ -48,6 +48,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, adminChain, staticChain ali
 
 	mux.Handle("POST /api/v1/admin/users/{id}/course-access", adminChain.ThenFunc(h.grantUserAccess))
 
+	mux.Handle("GET /api/v1/admin/audit", adminChain.ThenFunc(h.getAdminActions))
 	mux.Handle("GET /api/v1/admin/audit/actions", adminChain.ThenFunc(h.getInstanceAdminActions))
 	mux.Handle("GET /api/v1/admin/dlq", adminChain.ThenFunc(h.getFailedJobs))
 }

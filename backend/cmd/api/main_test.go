@@ -9,7 +9,10 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-const validJWTSecret = "0123456789abcdef0123456789abcdef"
+const (
+	validJWTSecret    = "0123456789abcdef0123456789abcdef"
+	previousJWTSecret = "fedcba9876543210fedcba9876543210"
+)
 
 func setValidJWTEnv(t *testing.T) {
 	t.Helper()
@@ -23,12 +26,12 @@ func TestGetJWTConfig(t *testing.T) {
 	Convey("getJWTConfig", t, func() {
 		Convey("When all values are valid, it fills the config", func() {
 			setValidJWTEnv(t)
-			t.Setenv("JWT_SECRET_PREV", "previous-secret")
+			t.Setenv("JWT_SECRET_PREV", previousJWTSecret)
 			cfg := &app.Config{}
 
 			So(getJWTConfig(cfg), ShouldBeNil)
 			So(cfg.Secret.JWTSecret, ShouldEqual, validJWTSecret)
-			So(cfg.Secret.JWTSecretPrev, ShouldEqual, "previous-secret")
+			So(cfg.Secret.JWTSecretPrev, ShouldEqual, previousJWTSecret)
 			So(cfg.Secret.JWTIssuer, ShouldEqual, "learnflow")
 			So(cfg.Secret.JWTAudience, ShouldEqual, "learnflow-users")
 		})
@@ -36,10 +39,11 @@ func TestGetJWTConfig(t *testing.T) {
 		cases := map[string]struct {
 			key, value, wantErr string
 		}{
-			"empty secret":   {"JWT_SECRET", "", "JWT_SECRET cannot be empty"},
-			"short secret":   {"JWT_SECRET", strings.Repeat("a", 31), "at least 32 bytes"},
-			"empty issuer":   {"JWT_ISSUER", "", "JWT_ISSUER cannot be empty"},
-			"empty audience": {"JWT_AUDIENCE", "", "JWT_AUDIENCE cannot be empty"},
+			"empty secret":      {"JWT_SECRET", "", "JWT_SECRET cannot be empty"},
+			"short secret":      {"JWT_SECRET", strings.Repeat("a", 31), "at least 32 bytes"},
+			"short prev secret": {"JWT_SECRET_PREV", strings.Repeat("a", 31), "JWT_SECRET_PREV must be at least 32 bytes"},
+			"empty issuer":      {"JWT_ISSUER", "", "JWT_ISSUER cannot be empty"},
+			"empty audience":    {"JWT_AUDIENCE", "", "JWT_AUDIENCE cannot be empty"},
 		}
 		for name, tc := range cases {
 			Convey("When "+name+", it fails startup", func() {

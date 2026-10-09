@@ -8,12 +8,15 @@ import (
 	authdomain "learnflow_backend/internal/auth/domain"
 	authrepository "learnflow_backend/internal/auth/repository"
 	"learnflow_backend/internal/infrastructure/db"
+	redisinfra "learnflow_backend/internal/infrastructure/redis"
+	"learnflow_backend/internal/shared/rediskeys"
 	"learnflow_backend/internal/shared/testutil"
 	"learnflow_backend/internal/shared/tokens"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -21,10 +24,16 @@ import (
 func newRefreshIntegrationService(t *testing.T, pool *pgxpool.Pool) (*Service, *authrepository.Repository) {
 	t.Helper()
 
+	redisClient := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+	t.Cleanup(func() { redisClient.Close() }) //nolint:errcheck // Close's error is never actionable in test cleanup
+
 	repo := authrepository.NewRepository(pool)
 	srv, err := New(
 		Repos{UserRepo: repo, SessionRepo: repo, TokenRepo: repo, Transactor: db.NewTransactor(pool)},
-		Utils{Token: tokens.NewTokens("refresh-integration-secret-0123456789", "", "learnflow-test", "learnflow-test")},
+		Utils{
+			Token:     tokens.NewTokens("refresh-integration-secret-0123456789", "", "learnflow-test", "learnflow-test"),
+			Blocklist: redisinfra.NewInstance(redisClient),
+		},
 		Options{BcryptCost: 4},
 	)
 	if err != nil {
@@ -98,6 +107,19 @@ func TestRefreshReplayRevokesAllSessions_Integration(t *testing.T) {
 			var reason string
 			So(pool.QueryRow(ctx, `SELECT revoke_reason FROM user_sessions WHERE user_id = $1 AND revoked_at IS NOT NULL LIMIT 1`, userID).Scan(&reason), ShouldBeNil)
 			So(reason, ShouldEqual, string(authdomain.RevokeReasonSuspiciousActivity))
+		})
+
+		Convey("When the rotated-out token is replayed, the user's already issued access tokens are revoked too", func() {
+			_, err := srv.Refresh(ctx, req)
+			So(err, ShouldBeNil)
+
+			_, err = srv.Refresh(ctx, authdomain.RefreshRequest{RefreshToken: rotatedRaw, UserAgent: "attacker", IPAddress: "203.0.113.9"})
+			So(errors.Is(err, authdomain.ErrSessionRevoked), ShouldBeTrue)
+
+			redisClient := redis.NewClient(&redis.Options{Addr: "localhost:6379"})
+			defer redisClient.Close()                                                         //nolint:errcheck // Close's error is never actionable in test cleanup
+			t.Cleanup(func() { redisClient.Del(ctx, rediskeys.TokensRevokedBefore(userID)) }) //nolint:errcheck // best-effort cleanup
+			So(redisClient.Exists(ctx, rediskeys.TokensRevokedBefore(userID)).Val(), ShouldEqual, 1)
 		})
 	})
 }

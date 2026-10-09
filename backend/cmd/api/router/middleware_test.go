@@ -350,7 +350,7 @@ func TestNewRouteRateLimiter(t *testing.T) {
 			called = true
 			w.WriteHeader(http.StatusOK)
 		})
-		limiter := route.NewRouteRateLimiter(1, time.Second, 1, func(_ *http.Request) string {
+		limiter := route.NewRouteRateLimiter("test", 1, time.Second, 1, func(_ *http.Request) string {
 			return "test-key"
 		})
 

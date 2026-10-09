@@ -258,13 +258,36 @@ func TestResetPasswordSuccess(t *testing.T) {
 					return nil
 				},
 			}
-			srv := newTestService(uRepo, sRepo, tRepo, nil, nil)
+			var revokedTokensUserID string
+			blocklist := newSuccessfulMockBlocklist()
+			blocklist.revokeUserTokens = func(_ context.Context, userID string, _ time.Duration) error {
+				revokedTokensUserID = userID
+				return nil
+			}
+			srv := newTestService(uRepo, sRepo, tRepo, nil, blocklist)
 
 			err := srv.ResetPassword(context.Background(), authdomain.ResetPasswordRequest{Token: "tok", NewPassword: "new-password"})
 
 			So(err, ShouldBeNil)
 			So(gotRevokeUserID, ShouldEqual, TestUserID)
 			So(gotReason, ShouldEqual, authdomain.RevokeReasonPasswordReset)
+			So(revokedTokensUserID, ShouldEqual, TestUserID)
+		})
+
+		Convey("When the Redis revocation fails, the reset fails with ErrBlocklistUnavailable", func() {
+			blocklist := newSuccessfulMockBlocklist()
+			blocklist.revokeUserTokens = func(_ context.Context, _ string, _ time.Duration) error {
+				return testutil.ErrRedisUnavailable
+			}
+			srv := newTestService(
+				&mockUserRepo{getUserByID: validResetPasswordGetUserByID, updatePasswordHash: testutil.AlwaysNil2},
+				&mockSessionRepo{revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error { return nil }},
+				&mockTokenRepo{getPasswordResetToken: validResetPasswordToken, markPasswordResetTokenUsed: testutil.AlwaysNil},
+				nil, blocklist)
+
+			err := srv.ResetPassword(context.Background(), authdomain.ResetPasswordRequest{Token: "tok", NewPassword: "new-password"})
+
+			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
 		})
 	})
 }

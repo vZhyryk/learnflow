@@ -52,6 +52,30 @@ const (
 	TargetExpense      AdminTargetType = "expense"
 )
 
+var adminActionTypes = map[AdminActionType]struct{}{
+	ActionAssignSubadmin:    {},
+	ActionRevokeSubadmin:    {},
+	ActionDeleteUser:        {},
+	ActionRestoreUser:       {},
+	ActionBlockUser:         {},
+	ActionUnblockUser:       {},
+	ActionConfirmBooking:    {},
+	ActionCancelBooking:     {},
+	ActionGrantItemAccess:   {},
+	ActionIssueRefund:       {},
+	ActionRecordExpense:     {},
+	ActionRescheduleBooking: {},
+	ActionCloseSupportChat:  {},
+	ActionCreateGiftCoupon:  {},
+	ActionRevokeGiftCoupon:  {},
+	ActionPublishItem:       {},
+	ActionDeleteItem:        {},
+	ActionArchiveItem:       {},
+	ActionCreateItem:        {},
+	ActionUpdateItem:        {},
+	ActionApproveItem:       {},
+}
+
 var adminTargetTypes = map[AdminTargetType]struct{}{
 	TargetUser:         {},
 	TargetBooking:      {},
@@ -111,6 +135,34 @@ func (req *GetInstanceAdminActionsRequest) validateItemType() error {
 	if _, exists := adminTargetTypes[req.TargetType]; !exists {
 		return ErrInvalidItemType
 	}
+	return nil
+}
+
+// AdminActionFilter narrows the general audit journal; a zero field is not applied.
+// From is inclusive and To is exclusive.
+type AdminActionFilter struct {
+	AdminUserID string
+	ActionType  AdminActionType
+	From        *time.Time
+	To          *time.Time
+}
+
+// Validate checks the admin id, the action type and that the date range is not empty or reversed.
+func (f *AdminActionFilter) Validate() error {
+	if f.AdminUserID != "" && !validator.IsValidUUID(f.AdminUserID) {
+		return ErrInvalidAdminUserID
+	}
+
+	if f.ActionType != "" {
+		if _, exists := adminActionTypes[f.ActionType]; !exists {
+			return ErrInvalidActionType
+		}
+	}
+
+	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
+		return ErrInvalidDateRange
+	}
+
 	return nil
 }
 

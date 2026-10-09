@@ -25,6 +25,16 @@ func (s *Service) revokeUserSessions(ctx context.Context, caller, jti string, ac
 	return nil
 }
 
+// revokeAllUserTokens invalidates every access token issued to userID so far (tokens issued later keep working).
+// Redis cannot roll back, so callers run it as the last fallible step; a failure is reported as ErrBlocklistUnavailable.
+func (s *Service) revokeAllUserTokens(ctx context.Context, caller, userID string) error {
+	if err := s.blocklist.RevokeUserTokens(ctx, userID, tokens.BlockMarkTTL); err != nil {
+		return fmt.Errorf("%s: revoke tokens: %w: %w", caller, authdomain.ErrBlocklistUnavailable, err)
+	}
+
+	return nil
+}
+
 func (s *Service) emitTokenEvent(
 	ctx context.Context,
 	userID string,

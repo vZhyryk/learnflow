@@ -310,3 +310,31 @@ func TestGrantUserAccessWithoutUserPanics(t *testing.T) {
 		So(func() { testutil.ServeHTTP(gf.mux, gf.newReq(grantBody("course"), nil)) }, ShouldPanic)
 	})
 }
+
+func TestGrantUserAccessErrorsHideInternalNames(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		code int
+		want string
+	}{
+		{"conflict", admindomain.ErrAccessAlreadyGranted, http.StatusConflict, admindomain.ErrAccessAlreadyGranted.Error()},
+		{"wrong state", admindomain.ErrInvalidUserState, http.StatusConflict, admindomain.ErrInvalidUserState.Error()},
+		{"validation", admindomain.ErrInvalidID, http.StatusUnprocessableEntity, "invalid request data"},
+		{"forbidden", admindomain.ErrForbiddenUserAction, http.StatusForbidden, admindomain.ErrForbiddenUserAction.Error()},
+	}
+
+	for _, tc := range cases {
+		Convey("POST course-access, wrapped "+tc.name+" error → fixed message, no method names", t, func() {
+			gf := newGrantFixture()
+			gf.svcErr = fmt.Errorf("service.ChangeUserField: repository.GetUser: %w", tc.err)
+
+			w := testutil.ServeHTTP(gf.mux, withUser(gf.newReq(grantBody("course"), nil)))
+
+			So(w.Code, ShouldEqual, tc.code)
+			So(w.Body.String(), ShouldContainSubstring, tc.want)
+			So(w.Body.String(), ShouldNotContainSubstring, "service.")
+			So(w.Body.String(), ShouldNotContainSubstring, "repository.")
+		})
+	}
+}

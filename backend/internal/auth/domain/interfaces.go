@@ -10,9 +10,10 @@ type Transactor interface {
 	InTransaction(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
-// TokenBlocklist revokes access tokens that are still valid: one token by jti, or every token of a user.
+// TokenBlocklist revokes access tokens that are still valid: one token by jti, or every token issued to a user so far.
 type TokenBlocklist interface {
 	BlockToken(ctx context.Context, jti string, ttl time.Duration) error
+	RevokeUserTokens(ctx context.Context, userID string, ttl time.Duration) error
 	UnBlockUser(ctx context.Context, userID string) error
 }
 

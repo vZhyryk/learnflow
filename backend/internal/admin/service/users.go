@@ -79,6 +79,23 @@ func canChangeUser(actor, target *admindomain.UserData, operationName admindomai
 	}
 }
 
+// canGrantAccess reports whether actor may give target free access: an admin may grant to anyone,
+// a subadmin only to plain users, so access cannot be handed to admins or to other subadmins.
+func canGrantAccess(actor, target *admindomain.UserData) bool {
+	if !isActiveAccount(actor) {
+		return false
+	}
+
+	switch actor.Role {
+	case admindomain.RoleAdmin:
+		return true
+	case admindomain.RoleSubAdmin:
+		return target.Role == admindomain.RoleUser
+	default:
+		return false
+	}
+}
+
 // ChangeUserField applies the named account operation and records it in admin_actions atomically.
 func (srv *Service) ChangeUserField(ctx context.Context, userID, adminID string, operationName admindomain.UserAdminOperation) error {
 	operation, ok := srv.operations[operationName]
@@ -278,6 +295,30 @@ func (srv *Service) GrantUserContentAccess(ctx context.Context, userID, contentI
 	})
 }
 
+// authorizeGrant loads the acting admin and the target user, checks that the actor may grant access to the target
+// and that the target is a live account with an email, and returns the target.
+func (srv *Service) authorizeGrant(ctx context.Context, userID, adminID, method string) (*admindomain.UserData, error) {
+	actor, err := srv.userRepo.GetUserDataByID(ctx, adminID)
+	if err != nil {
+		return nil, fmt.Errorf("service.%s: load actor: %w", method, err)
+	}
+
+	user, err := srv.userRepo.GetUserDataByID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("service.%s: get user: %w", method, err)
+	}
+
+	if !canGrantAccess(actor, user) {
+		return nil, admindomain.ErrForbiddenUserAction
+	}
+
+	if user.DeletedAt != nil || user.Email == nil {
+		return nil, admindomain.ErrInvalidUserState
+	}
+
+	return user, nil
+}
+
 func (srv *Service) grantAccess(ctx context.Context, userID, adminID string, action auditdomain.AdminActionType, spec grantSpec) error {
 	if !validator.IsValidUUID(userID) {
 		return admindomain.ErrInvalidID
@@ -292,15 +333,12 @@ func (srv *Service) grantAccess(ctx context.Context, userID, adminID string, act
 			return fmt.Errorf("service.%s: lookup item: %w", spec.method, err)
 		}
 
-		user, err := srv.userRepo.GetUserDataByID(ctx, userID)
+		user, err := srv.authorizeGrant(ctx, userID, adminID, spec.method)
 		if err != nil {
-			return fmt.Errorf("service.%s: get user: %w", spec.method, err)
-		}
-		if user.DeletedAt != nil || user.Email == nil {
-			return admindomain.ErrInvalidUserState
+			return err
 		}
 
-		if err := spec.grant(ctx, userID, spec.itemID); err != nil {
+		if err = spec.grant(ctx, userID, spec.itemID); err != nil {
 			return fmt.Errorf("service.%s: %w", spec.method, err)
 		}
 

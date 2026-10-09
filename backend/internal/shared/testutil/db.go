@@ -140,3 +140,35 @@ func InsertTestContentItem(t *testing.T, q db.QueryRunner) string {
 	}
 	return id
 }
+
+// DeleteAdminActionsByTarget removes the admin_actions rows of targetID from committed test data.
+// The table is append-only (trigger admin_actions_append_only), so the trigger is disabled and re-enabled
+// inside one transaction; the table lock keeps other sessions from seeing it disabled.
+func DeleteAdminActionsByTarget(t *testing.T, pool *pgxpool.Pool, targetID string) {
+	t.Helper()
+
+	ctx := context.Background()
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatalf("testutil.DeleteAdminActionsByTarget: begin: %v", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op after Commit
+
+	steps := []struct {
+		query string
+		args  []any
+	}{
+		{"ALTER TABLE admin_actions DISABLE TRIGGER admin_actions_append_only", nil},
+		{"DELETE FROM admin_actions WHERE target_id = $1", []any{targetID}},
+		{"ALTER TABLE admin_actions ENABLE TRIGGER admin_actions_append_only", nil},
+	}
+	for _, step := range steps {
+		if _, err := tx.Exec(ctx, step.query, step.args...); err != nil {
+			t.Fatalf("testutil.DeleteAdminActionsByTarget: %v", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatalf("testutil.DeleteAdminActionsByTarget: commit: %v", err)
+	}
+}

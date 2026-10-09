@@ -2,6 +2,7 @@ package reviewhttp_test
 
 import (
 	"context"
+	"fmt"
 	reviewdomain "learnflow_backend/internal/review/domain"
 	"learnflow_backend/internal/shared/testutil"
 	"net/http"
@@ -49,6 +50,12 @@ func TestCreateCourseReview(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
+		Convey("invalid user id (set by the server, not the client) → 500", func() {
+			svcErr = reviewdomain.ErrInvalidUserID
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusInternalServerError)
+		})
+
 		Convey("no permission → 403", func() {
 			svcErr = reviewdomain.ErrNoPermission
 			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
@@ -72,6 +79,36 @@ func TestCreateCourseReview(t *testing.T) {
 			So(func() {
 				mux.ServeHTTP(&errWriter{}, withValidUUIDUser(newReq(validBody, nil)))
 			}, ShouldNotPanic)
+		})
+	})
+}
+
+func TestCreateCourseReviewWrappedErrors(t *testing.T) {
+	Convey("POST /api/v1/courses/reviews — wrapped service errors", t, func() {
+		var svcErr error
+		svc := &mockService{
+			createCourseReview: func(_ context.Context, _ reviewdomain.CreateCourseReviewRequest) error {
+				return svcErr
+			},
+		}
+
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/courses/reviews")
+		mux, newReq := f.mux, f.newReq
+		validBody := `{"course_id":"` + validCourseID + `","rating":5}`
+
+		Convey("wrapped service error → 422 with the sentinel text only, no method names", func() {
+			svcErr = fmt.Errorf("service.CreateCourseReview: repository.Create: %w", reviewdomain.ErrAlreadyReviewed)
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
+			So(w.Body.String(), ShouldContainSubstring, reviewdomain.ErrAlreadyReviewed.Error())
+			So(w.Body.String(), ShouldNotContainSubstring, "service.")
+		})
+
+		Convey("wrapped no-permission error → 403 with the sentinel text only", func() {
+			svcErr = fmt.Errorf("service.CreateCourseReview: check access: %w", reviewdomain.ErrNoPermission)
+			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
+			So(w.Code, ShouldEqual, http.StatusForbidden)
+			So(w.Body.String(), ShouldNotContainSubstring, "service.")
 		})
 	})
 }
