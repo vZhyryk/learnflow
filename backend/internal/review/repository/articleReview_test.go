@@ -99,18 +99,18 @@ func fakeArticleReviewN(n int) *reviewdomain.ArticleReview {
 }
 
 func bindArticleReview(
-	call func(*Repository, context.Context, pagination.Params, string, reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error),
-) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*reviewdomain.ArticleReview, error) {
-	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*reviewdomain.ArticleReview, error) {
+	call func(*Repository, context.Context, pagination.Params, string, reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, int, error),
+) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*reviewdomain.ArticleReview, int, error) {
+	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*reviewdomain.ArticleReview, int, error) {
 		repo := newTestRepo(runner)
-		return func(ctx context.Context, params pagination.Params, stringArg string) ([]*reviewdomain.ArticleReview, error) {
+		return func(ctx context.Context, params pagination.Params, stringArg string) ([]*reviewdomain.ArticleReview, int, error) {
 			return call(repo, ctx, params, stringArg, reviewdomain.ReviewFilter{})
 		}
 	}
 }
 
 func TestGetArticleReviewList(t *testing.T) {
-	testutil.TestListMethodWithStringArg(t, "GetArticleReviewList", bindArticleReview((*Repository).GetArticleReviewList), fakeArticleReviewN, fakeArticleReviewScan)
+	testutil.TestCountListMethodWithStringArg(t, "GetArticleReviewList", bindArticleReview((*Repository).GetArticleReviewList), fakeArticleReviewN, fakeArticleReviewScan)
 }
 
 func TestGetArticleReviewByID(t *testing.T) {

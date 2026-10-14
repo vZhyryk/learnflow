@@ -119,6 +119,7 @@ func TestHandleOutboxEntryUnknownEventType(t *testing.T) {
 
 			So(gotQuery, ShouldEqual, queryMarkFailed)
 			So(gotArgs[0], ShouldEqual, "entry-1")
+			So(gotArgs[2], ShouldEqual, failImmediately)
 		})
 	})
 }
@@ -155,6 +156,7 @@ func TestHandleOutboxEntryPublishFails(t *testing.T) {
 			So(gotQuery, ShouldEqual, queryMarkFailed)
 			So(gotArgs[0], ShouldEqual, "entry-1")
 			So(gotArgs[1], ShouldContainSubstring, testutil.ErrRedisUnavailable.Error())
+			So(gotArgs[2], ShouldEqual, p.maxAttemptsCount)
 		})
 	})
 }
@@ -186,7 +188,7 @@ func TestHandleOutboxEntryMarkFailedNoRowsAffected(t *testing.T) {
 			p := newTestOutboxPoller(runner, publisher)
 
 			// Nothing to assert beyond "this does not panic" — a zero-rows update is only logged.
-			p.handleEntry(context.Background(), PollerEntry[OutboxPoller]{ID: "entry-1", EventType: events.EventUserRegistered})
+			p.handleEntries(context.Background(), []PollerEntry[OutboxPoller]{{ID: "entry-1", EventType: events.EventUserRegistered}})
 		})
 	})
 }
@@ -210,14 +212,14 @@ func TestHandleOutboxEntrySuccess(t *testing.T) {
 			}
 			p := newTestOutboxPoller(runner, publisher)
 
-			p.handleEntry(context.Background(), PollerEntry[OutboxPoller]{
+			p.handleEntries(context.Background(), []PollerEntry[OutboxPoller]{{
 				ID: "entry-1", EventType: events.EventUserRegistered, PayloadJSON: `{"a":"b"}`,
-			})
+			}})
 
 			So(publishedType, ShouldEqual, events.EventUserRegistered)
 			So(publishedPayload, ShouldResemble, json.RawMessage(`{"a":"b"}`))
 			So(gotQuery, ShouldEqual, queryMarkPublished)
-			So(gotArgs[0], ShouldEqual, "entry-1")
+			So(gotArgs[0], ShouldResemble, []string{"entry-1"})
 		})
 	})
 }
@@ -249,7 +251,67 @@ func TestHandleOutboxEntryMarkPublishedExecFails(t *testing.T) {
 			p := newTestOutboxPoller(runner, publisher)
 
 			// Nothing to assert beyond "this does not panic" — the Exec error is only logged.
-			p.handleEntry(context.Background(), PollerEntry[OutboxPoller]{ID: "entry-1", EventType: events.EventUserRegistered})
+			p.handleEntries(context.Background(), []PollerEntry[OutboxPoller]{{ID: "entry-1", EventType: events.EventUserRegistered}})
+		})
+	})
+}
+
+func TestHandleOutboxEntriesBatchesMarkPublished(t *testing.T) {
+	Convey("Given an OutboxPoller", t, func() {
+		Convey("When several entries are published and one fails", func() {
+			var execQueries []string
+			var markPublishedArgs []any
+			runner := &testutil.MockQueryRunner{
+				ExecFn: func(_ context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+					execQueries = append(execQueries, sql)
+					if sql == queryMarkPublished {
+						markPublishedArgs = args
+						return pgconn.NewCommandTag("UPDATE 2"), nil
+					}
+					return pgconn.NewCommandTag("UPDATE 1"), nil
+				},
+			}
+			publishCalls := 0
+			publisher := &mockPublisher{
+				publish: func(_ context.Context, _ events.EventType, _ any) error {
+					publishCalls++
+					if publishCalls == 2 {
+						return testutil.ErrRedisUnavailable
+					}
+					return nil
+				},
+			}
+			p := newTestOutboxPoller(runner, publisher)
+
+			p.handleEntries(context.Background(), []PollerEntry[OutboxPoller]{
+				{ID: "e1", EventType: events.EventUserRegistered, PayloadJSON: `{}`},
+				{ID: "e2", EventType: events.EventUserRegistered, PayloadJSON: `{}`},
+				{ID: "e3", EventType: events.EventUserRegistered, PayloadJSON: `{}`},
+			})
+
+			So(markPublishedArgs, ShouldResemble, []any{[]string{"e1", "e3"}})
+			So(execQueries, ShouldHaveLength, 2)
+			So(execQueries[0], ShouldEqual, queryMarkFailed)
+			So(execQueries[1], ShouldEqual, queryMarkPublished)
+		})
+	})
+}
+
+func TestHandleOutboxEntriesNothingPublished(t *testing.T) {
+	Convey("Given an OutboxPoller", t, func() {
+		Convey("When nothing was published, no mark-published UPDATE runs", func() {
+			var execCalls int
+			runner := &testutil.MockQueryRunner{
+				ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+					execCalls++
+					return pgconn.CommandTag{}, nil
+				},
+			}
+			p := newTestOutboxPoller(runner, availablePublisher())
+
+			p.handleEntries(context.Background(), nil)
+
+			So(execCalls, ShouldEqual, 0)
 		})
 	})
 }

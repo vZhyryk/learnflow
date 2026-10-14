@@ -9,7 +9,7 @@ import (
 
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	ua := r.UserAgent()
+	ua := clientUserAgent(r)
 
 	var req authdomain.RefreshRequest
 	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, func() {

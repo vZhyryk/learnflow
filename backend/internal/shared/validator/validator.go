@@ -65,6 +65,11 @@ func IsValidLastName(value string) bool {
 	return utf8.RuneCountInString(value) <= 100
 }
 
+// IsValidCity reports whether value is at most 100 runes.
+func IsValidCity(value string) bool {
+	return utf8.RuneCountInString(value) <= 100
+}
+
 // IsValidPhoneNumber reports whether value is at most 20 bytes (varchar(20)).
 func IsValidPhoneNumber(value string) bool {
 	return len(value) <= 20

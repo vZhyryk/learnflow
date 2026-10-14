@@ -371,16 +371,18 @@ func TestGetAllContentItemsByStatus_Integration(t *testing.T) {
 			params := pagination.NewParams(1, 100)
 
 			Convey("GetAllDraftContentItems returns only the draft, excluding soft-deleted", func() {
-				got, err := repo.GetAllDraftContentItems(ctx, params)
+				got, total, err := repo.GetAllDraftContentItems(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := contentItemIDs(got)
 				So(ids, ShouldContain, draft.ID)
 				So(ids, ShouldNotContain, deleted.ID)
 			})
 
 			Convey("GetAllPublishedContentItems returns only the published content item", func() {
-				got, err := repo.GetAllPublishedContentItems(ctx, params)
+				got, total, err := repo.GetAllPublishedContentItems(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := contentItemIDs(got)
 				So(ids, ShouldContain, published.ID)
 				So(ids, ShouldNotContain, draft.ID)
@@ -392,14 +394,16 @@ func TestGetAllContentItemsByStatus_Integration(t *testing.T) {
 				// admin "including soft-deleted ones" query per db-conventions.md.
 				So(repo.DeleteContentItem(ctx, archived.ID, archived.CreatedByUserID), ShouldBeNil)
 
-				got, err := repo.GetAllArchivedContentItems(ctx, params)
+				got, total, err := repo.GetAllArchivedContentItems(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				So(contentItemIDs(got), ShouldContain, archived.ID)
 			})
 
 			Convey("GetAllContentItems returns every content item regardless of status, including soft-deleted", func() {
-				got, err := repo.GetAllContentItems(ctx, params)
+				got, total, err := repo.GetAllContentItems(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := contentItemIDs(got)
 				So(ids, ShouldContain, draft.ID)
 				So(ids, ShouldContain, published.ID)
@@ -408,9 +412,11 @@ func TestGetAllContentItemsByStatus_Integration(t *testing.T) {
 			})
 
 			Convey("Pagination limits the returned page size", func() {
-				got, err := repo.GetAllContentItems(ctx, pagination.NewParams(1, 2))
+				got, total, err := repo.GetAllContentItems(ctx, pagination.NewParams(1, 2))
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				So(len(got), ShouldEqual, 2)
+				So(total, ShouldBeGreaterThanOrEqualTo, 4)
 			})
 		})
 	})

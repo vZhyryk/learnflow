@@ -16,15 +16,18 @@ import (
 )
 
 // RecoverPanic recovers from panics, logs the error, and returns a 500 response.
+// It must run after SetIPAddress and SetRequestID so the log entry can carry both.
 func (routes *RouteHandler) RecoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				w.Header().Set("Connection", "close")
 				routes.App.Logger.Error(fmt.Errorf("panic: %v", err), map[string]any{
-					"method": r.Method,
-					"url":    r.URL.Path,
-					"stack":  string(debug.Stack()),
+					"method":     r.Method,
+					"url":        r.URL.Path,
+					"ip":         appcontext.IPAddressFromContext(r.Context()),
+					"request_id": appcontext.RequestIDFromContext(r.Context()),
+					"stack":      string(debug.Stack()),
 				})
 
 				helpers.LogRespondError(routes.App.Logger, r, "panic_response_write", map[string]any{"method": r.Method, "url": r.URL.Path}, func() error {
@@ -302,7 +305,8 @@ func parseIP(s string) string {
 
 const requestIDHeader = "X-Request-ID"
 
-// SetRequestID generates or retrieves a request ID and stores it in context and response headers.
+// SetRequestID generates a fresh request ID and stores it in context and response headers.
+// An incoming X-Request-ID is deliberately ignored: it is client-controlled and would reach logs unvalidated.
 func (routes *RouteHandler) SetRequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestID := appcontext.NewRequestID()

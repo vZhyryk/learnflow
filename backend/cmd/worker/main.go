@@ -55,8 +55,10 @@ func main() {
 		worker.NewAnnouncementDeliveryPoller(dbInstance, app.Publisher, app.Logger, transactor),
 		worker.NewOutboxCleanupWorker(dbInstance, app.Logger, cleanUpPollInterval),
 		worker.NewAnnouncementCleanUpWorker(dbInstance, app.Logger, cleanUpPollInterval),
+		worker.NewSessionCleanupWorker(dbInstance, app.Logger, cleanUpPollInterval),
 		worker.NewAnnouncementFanOutWorker(dbInstance, redisClient.Raw(), app.Logger, adminRepo, contentRepo, courseRepo, articleRepo),
 	}, worker.NewEmailWorkers(dbInstance, redisClient.Raw(), app.Logger, app.Mailer, baseURL)...)
+	workers = append(workers, worker.NewTokenCleanupWorkers(dbInstance, app.Logger, cleanUpPollInterval)...)
 
 	for _, w := range workers {
 		app.Wg.Add(1)
@@ -83,6 +85,10 @@ func getAppConfig(environment string) (Config, error) {
 	var err error
 	cfg.Database, err = bootstrap.LoadDatabaseConfig()
 	if err != nil {
+		return cfg, err
+	}
+
+	if err := bootstrap.ValidateRedisConfig(environment); err != nil {
 		return cfg, err
 	}
 

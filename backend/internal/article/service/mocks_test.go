@@ -14,10 +14,10 @@ type mockArticleRepo struct {
 	archiveArticle           func(ctx context.Context, ArticleID, userID string) error
 	deleteArticle            func(ctx context.Context, ArticleID, userID string) error
 	updateArticle            func(ctx context.Context, Article *articledomain.Article, userID string) error
-	getAllPublishedArticles  func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
-	getAllDraftArticles      func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
-	getAllArchivedArticles   func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
-	getAllArticles           func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error)
+	getAllPublishedArticles  func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error)
+	getAllDraftArticles      func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error)
+	getAllArchivedArticles   func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error)
+	getAllArticles           func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error)
 	getArticleByID           func(ctx context.Context, ArticleID string) (*articledomain.Article, error)
 	getArticleBySlug         func(ctx context.Context, slug string) (*articledomain.Article, error)
 	checkIfArticleExistsByID func(ctx context.Context, articleID string) (bool, error)
@@ -58,28 +58,28 @@ func (m *mockArticleRepo) UpdateArticle(ctx context.Context, article *articledom
 
 	return m.updateArticle(ctx, article, userID)
 }
-func (m *mockArticleRepo) GetAllPublishedArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error) {
+func (m *mockArticleRepo) GetAllPublishedArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error) {
 	if m.getAllPublishedArticles == nil {
 		panic("mockArticleRepo.getAllPublishedArticles not set")
 	}
 
 	return m.getAllPublishedArticles(ctx, params)
 }
-func (m *mockArticleRepo) GetAllDraftArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error) {
+func (m *mockArticleRepo) GetAllDraftArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error) {
 	if m.getAllDraftArticles == nil {
 		panic("mockArticleRepo.getAllDraftArticles not set")
 	}
 
 	return m.getAllDraftArticles(ctx, params)
 }
-func (m *mockArticleRepo) GetAllArchivedArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error) {
+func (m *mockArticleRepo) GetAllArchivedArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error) {
 	if m.getAllArchivedArticles == nil {
 		panic("mockArticleRepo.getAllArchivedArticles not set")
 	}
 
 	return m.getAllArchivedArticles(ctx, params)
 }
-func (m *mockArticleRepo) GetAllArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error) {
+func (m *mockArticleRepo) GetAllArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error) {
 	if m.getAllArticles == nil {
 		panic("mockArticleRepo.getAllArticles not set")
 	}

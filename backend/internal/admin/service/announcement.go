@@ -2,6 +2,7 @@ package adminservice
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	admindomain "learnflow_backend/internal/admin/domain"
 	auditdomain "learnflow_backend/internal/audit/domain"
@@ -59,6 +60,10 @@ func (srv *Service) UpdateAnnouncement(ctx context.Context, req admindomain.Upda
 		}
 
 		if err := srv.announRepo.UpdateAnnouncement(ctx, announcement); err != nil {
+			// The row was read above, so "not found" here means a concurrent approve won the race.
+			if errors.Is(err, admindomain.ErrAnnouncementNotFound) {
+				return admindomain.ErrAnnouncementApproved
+			}
 			return fmt.Errorf("service.UpdateAnnouncement: %w", err)
 		}
 
@@ -103,53 +108,53 @@ func (srv *Service) ApproveAnnouncement(ctx context.Context, announcementID, use
 }
 
 // GetAnnouncements returns a paginated list of all announcements.
-func (srv *Service) GetAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
-	list, err := srv.announRepo.GetAnnouncements(ctx, params)
+func (srv *Service) GetAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
+	list, total, err := srv.announRepo.GetAnnouncements(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("service.GetAnnouncements: %w", err)
+		return nil, 0, fmt.Errorf("service.GetAnnouncements: %w", err)
 	}
 
-	return list, nil
+	return list, total, nil
 }
 
 // GetUnApprovedAnnouncements returns a paginated list of announcements pending approval.
-func (srv *Service) GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
-	list, err := srv.announRepo.GetUnApprovedAnnouncements(ctx, params)
+func (srv *Service) GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
+	list, total, err := srv.announRepo.GetUnApprovedAnnouncements(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("service.GetUnApprovedAnnouncements: %w", err)
+		return nil, 0, fmt.Errorf("service.GetUnApprovedAnnouncements: %w", err)
 	}
 
-	return list, nil
+	return list, total, nil
 }
 
 // GetApprovedAnnouncements returns a paginated list of approved announcements.
-func (srv *Service) GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
-	list, err := srv.announRepo.GetApprovedAnnouncements(ctx, params)
+func (srv *Service) GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
+	list, total, err := srv.announRepo.GetApprovedAnnouncements(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("service.GetApprovedAnnouncements: %w", err)
+		return nil, 0, fmt.Errorf("service.GetApprovedAnnouncements: %w", err)
 	}
 
-	return list, nil
+	return list, total, nil
 }
 
 // GetPublicAnnouncements returns a paginated list of approved banner announcements visible to userID.
-func (srv *Service) GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
-	list, err := srv.announRepo.GetPublicAnnouncements(ctx, params, userID)
+func (srv *Service) GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, int, error) {
+	list, total, err := srv.announRepo.GetPublicAnnouncements(ctx, params, userID)
 	if err != nil {
-		return nil, fmt.Errorf("service.GetPublicAnnouncements: %w", err)
+		return nil, 0, fmt.Errorf("service.GetPublicAnnouncements: %w", err)
 	}
 
-	return list, nil
+	return list, total, nil
 }
 
 // GetExpiredAnnouncements returns a paginated list of expired announcements.
-func (srv *Service) GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
-	list, err := srv.announRepo.GetExpiredAnnouncements(ctx, params)
+func (srv *Service) GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
+	list, total, err := srv.announRepo.GetExpiredAnnouncements(ctx, params)
 	if err != nil {
-		return nil, fmt.Errorf("service.GetExpiredAnnouncements: %w", err)
+		return nil, 0, fmt.Errorf("service.GetExpiredAnnouncements: %w", err)
 	}
 
-	return list, nil
+	return list, total, nil
 }
 
 // SetExpiredNowAnnouncement ends an announcement early by setting expires_at to now and audits it as an update.

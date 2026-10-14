@@ -27,7 +27,7 @@ type CourseReviewRepository interface {
 	CreateCourseReview(ctx context.Context, courseReview *CourseReview) (*CourseReview, error)
 	UpdateCourseReview(ctx context.Context, courseReview *CourseReview) error
 	DeleteCourseReview(ctx context.Context, reviewID, userID string) error
-	GetCourseReviewList(ctx context.Context, params pagination.Params, courseID string, filter ReviewFilter) ([]*CourseReview, error)
+	GetCourseReviewList(ctx context.Context, params pagination.Params, courseID string, filter ReviewFilter) ([]*CourseReview, int, error)
 	GetCourseReviewByID(ctx context.Context, reviewID string) (*CourseReview, error)
 	GetCourseReviewByUserAndCourseID(ctx context.Context, userID, courseID string) (*CourseReview, error)
 	GetCourseReviewStats(ctx context.Context, courseID string) (rating float64, count int, err error)
@@ -38,7 +38,7 @@ type ContentReviewRepository interface {
 	CreateContentReview(ctx context.Context, contentReview *ContentReview) (*ContentReview, error)
 	UpdateContentReview(ctx context.Context, contentReview *ContentReview) error
 	DeleteContentReview(ctx context.Context, reviewID, userID string) error
-	GetContentReviewList(ctx context.Context, params pagination.Params, contentID string, filter ReviewFilter) ([]*ContentReview, error)
+	GetContentReviewList(ctx context.Context, params pagination.Params, contentID string, filter ReviewFilter) ([]*ContentReview, int, error)
 	GetContentReviewByID(ctx context.Context, reviewID string) (*ContentReview, error)
 	GetContentReviewByUserAndContentID(ctx context.Context, userID, contentID string) (*ContentReview, error)
 	GetContentReviewStats(ctx context.Context, contentID string) (rating float64, count int, err error)
@@ -49,7 +49,7 @@ type ArticleReviewRepository interface {
 	CreateArticleReview(ctx context.Context, articleReview *ArticleReview) (*ArticleReview, error)
 	UpdateArticleReview(ctx context.Context, articleReview *ArticleReview) error
 	DeleteArticleReview(ctx context.Context, reviewID, userID string) error
-	GetArticleReviewList(ctx context.Context, params pagination.Params, articleID string, filter ReviewFilter) ([]*ArticleReview, error)
+	GetArticleReviewList(ctx context.Context, params pagination.Params, articleID string, filter ReviewFilter) ([]*ArticleReview, int, error)
 	GetArticleReviewByID(ctx context.Context, reviewID string) (*ArticleReview, error)
 	GetArticleReviewByUserAndArticleID(ctx context.Context, userID, articleID string) (*ArticleReview, error)
 	GetArticleReviewStats(ctx context.Context, articleID string) (rating float64, count int, err error)
@@ -57,12 +57,12 @@ type ArticleReviewRepository interface {
 
 // Service defines the review module's business logic operations.
 type Service interface {
-	CreateCourseReview(ctx context.Context, req CreateCourseReviewRequest) error
-	CreateContentReview(ctx context.Context, req CreateContentReviewRequest) error
-	CreateArticleReview(ctx context.Context, req CreateArticleReviewRequest) error
-	CreateCourseReviewAdmin(ctx context.Context, req CreateCourseReviewRequest) error
-	CreateContentReviewAdmin(ctx context.Context, req CreateContentReviewRequest) error
-	CreateArticleReviewAdmin(ctx context.Context, req CreateArticleReviewRequest) error
+	CreateCourseReview(ctx context.Context, req CreateCourseReviewRequest) (string, error)
+	CreateContentReview(ctx context.Context, req CreateContentReviewRequest) (string, error)
+	CreateArticleReview(ctx context.Context, req CreateArticleReviewRequest) (string, error)
+	CreateCourseReviewAdmin(ctx context.Context, req CreateCourseReviewRequest) (string, error)
+	CreateContentReviewAdmin(ctx context.Context, req CreateContentReviewRequest) (string, error)
+	CreateArticleReviewAdmin(ctx context.Context, req CreateArticleReviewRequest) (string, error)
 
 	UpdateCourseReview(ctx context.Context, req UpdateCourseReviewRequest) error
 	UpdateContentReview(ctx context.Context, req UpdateContentReviewRequest) error
@@ -71,9 +71,9 @@ type Service interface {
 	UpdateContentReviewAdmin(ctx context.Context, req UpdateContentReviewRequest) error
 	UpdateArticleReviewAdmin(ctx context.Context, req UpdateArticleReviewRequest) error
 
-	GetCourseReviews(ctx context.Context, params pagination.Params, courseID string, filter ReviewFilter) ([]*CourseReview, error)
-	GetContentReviews(ctx context.Context, params pagination.Params, contentID string, filter ReviewFilter) ([]*ContentReview, error)
-	GetArticleReviews(ctx context.Context, params pagination.Params, articleID string, filter ReviewFilter) ([]*ArticleReview, error)
+	GetCourseReviews(ctx context.Context, params pagination.Params, courseID string, filter ReviewFilter) ([]*CourseReview, int, error)
+	GetContentReviews(ctx context.Context, params pagination.Params, contentID string, filter ReviewFilter) ([]*ContentReview, int, error)
+	GetArticleReviews(ctx context.Context, params pagination.Params, articleID string, filter ReviewFilter) ([]*ArticleReview, int, error)
 	GetContentReviewStats(ctx context.Context, contentID string) (rating float64, count int, err error)
 	GetCourseReviewStats(ctx context.Context, courseID string) (rating float64, count int, err error)
 	GetArticleReviewStats(ctx context.Context, articleID string) (rating float64, count int, err error)

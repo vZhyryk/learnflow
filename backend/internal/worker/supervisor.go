@@ -27,7 +27,11 @@ func RunWithRecovery(ctx context.Context, log *logger.Logger, w Worker) {
 		if ctx.Err() != nil {
 			return
 		}
-		time.Sleep(restartBackoff)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(restartBackoff):
+		}
 	}
 }
 

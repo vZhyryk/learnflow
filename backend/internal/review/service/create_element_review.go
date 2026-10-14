@@ -9,8 +9,10 @@ import (
 )
 
 // CreateCourseReview creates a course review by a user with access to the course.
-func (s *Service) CreateCourseReview(ctx context.Context, req reviewdomain.CreateCourseReviewRequest) error {
-	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+func (s *Service) CreateCourseReview(ctx context.Context, req reviewdomain.CreateCourseReviewRequest) (string, error) {
+	var reviewID string
+
+	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		hasAccess, err := s.accessChecker.HasAccessCourse(ctx, req.UserID, req.CourseID)
 		if err != nil {
 			return fmt.Errorf("service.CreateCourseReview: check course access: %w", err)
@@ -36,16 +38,26 @@ func (s *Service) CreateCourseReview(ctx context.Context, req reviewdomain.Creat
 			Comment:  req.Comment,
 		}
 
-		if _, err = s.courseRepo.CreateCourseReview(ctx, review); err != nil {
+		created, err := s.courseRepo.CreateCourseReview(ctx, review)
+		if err != nil {
 			return fmt.Errorf("service.CreateCourseReview: %w", err)
 		}
+
+		reviewID = created.ID
 		return nil
 	})
+	if err != nil {
+		return "", err
+	}
+
+	return reviewID, nil
 }
 
 // CreateContentReview creates a content review by a user with access to the content item.
-func (s *Service) CreateContentReview(ctx context.Context, req reviewdomain.CreateContentReviewRequest) error {
-	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+func (s *Service) CreateContentReview(ctx context.Context, req reviewdomain.CreateContentReviewRequest) (string, error) {
+	var reviewID string
+
+	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		hasAccess, err := s.accessChecker.HasAccessContent(ctx, req.UserID, req.ContentID)
 		if err != nil {
 			return fmt.Errorf("service.CreateContentReview: check content access: %w", err)
@@ -76,11 +88,18 @@ func (s *Service) CreateContentReview(ctx context.Context, req reviewdomain.Crea
 		}
 		return nil
 	})
+	if err != nil {
+		return "", err
+	}
+
+	return reviewID, nil
 }
 
 // CreateCourseReviewAdmin creates a course review authored by the admin, bypassing access checks.
-func (s *Service) CreateCourseReviewAdmin(ctx context.Context, req reviewdomain.CreateCourseReviewRequest) error {
-	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+func (s *Service) CreateCourseReviewAdmin(ctx context.Context, req reviewdomain.CreateCourseReviewRequest) (string, error) {
+	var reviewID string
+
+	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		existingReview, err := s.courseRepo.GetCourseReviewByUserAndCourseID(ctx, req.UserID, req.CourseID)
 		if err != nil && !errors.Is(err, reviewdomain.ErrReviewNotFound) {
 			return fmt.Errorf("service.CreateCourseReviewAdmin: check existing review: %w", err)
@@ -101,6 +120,8 @@ func (s *Service) CreateCourseReviewAdmin(ctx context.Context, req reviewdomain.
 			return fmt.Errorf("service.CreateCourseReviewAdmin: %w", err)
 		}
 
+		reviewID = cReview.ID
+
 		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
 			AdminUserID: req.UserID,
 			ActionType:  auditdomain.ActionCreateItem,
@@ -108,11 +129,18 @@ func (s *Service) CreateCourseReviewAdmin(ctx context.Context, req reviewdomain.
 			TargetID:    cReview.ID,
 		})
 	})
+	if err != nil {
+		return "", err
+	}
+
+	return reviewID, nil
 }
 
 // CreateContentReviewAdmin creates a content review authored by the admin, bypassing access checks.
-func (s *Service) CreateContentReviewAdmin(ctx context.Context, req reviewdomain.CreateContentReviewRequest) error {
-	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+func (s *Service) CreateContentReviewAdmin(ctx context.Context, req reviewdomain.CreateContentReviewRequest) (string, error) {
+	var reviewID string
+
+	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		existingReview, err := s.contentRepo.GetContentReviewByUserAndContentID(ctx, req.UserID, req.ContentID)
 		if err != nil && !errors.Is(err, reviewdomain.ErrReviewNotFound) {
 			return fmt.Errorf("service.CreateContentReviewAdmin: check existing review: %w", err)
@@ -133,6 +161,8 @@ func (s *Service) CreateContentReviewAdmin(ctx context.Context, req reviewdomain
 			return fmt.Errorf("service.CreateContentReviewAdmin: %w", err)
 		}
 
+		reviewID = cReview.ID
+
 		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
 			AdminUserID: req.UserID,
 			ActionType:  auditdomain.ActionCreateItem,
@@ -140,11 +170,18 @@ func (s *Service) CreateContentReviewAdmin(ctx context.Context, req reviewdomain
 			TargetID:    cReview.ID,
 		})
 	})
+	if err != nil {
+		return "", err
+	}
+
+	return reviewID, nil
 }
 
 // CreateArticleReview creates an article review by a user.
-func (s *Service) CreateArticleReview(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) error {
-	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+func (s *Service) CreateArticleReview(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) (string, error) {
+	var reviewID string
+
+	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		existingReview, err := s.articleRepo.GetArticleReviewByUserAndArticleID(ctx, req.UserID, req.ArticleID)
 		if err != nil && !errors.Is(err, reviewdomain.ErrReviewNotFound) {
 			return fmt.Errorf("service.CreateArticleReview: check existing review: %w", err)
@@ -161,16 +198,26 @@ func (s *Service) CreateArticleReview(ctx context.Context, req reviewdomain.Crea
 			Comment:   req.Comment,
 		}
 
-		if _, err = s.articleRepo.CreateArticleReview(ctx, review); err != nil {
+		created, err := s.articleRepo.CreateArticleReview(ctx, review)
+		if err != nil {
 			return fmt.Errorf("service.CreateArticleReview: %w", err)
 		}
+
+		reviewID = created.ID
 		return nil
 	})
+	if err != nil {
+		return "", err
+	}
+
+	return reviewID, nil
 }
 
 // CreateArticleReviewAdmin creates an article review authored by the admin.
-func (s *Service) CreateArticleReviewAdmin(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) error {
-	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+func (s *Service) CreateArticleReviewAdmin(ctx context.Context, req reviewdomain.CreateArticleReviewRequest) (string, error) {
+	var reviewID string
+
+	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		existingReview, err := s.articleRepo.GetArticleReviewByUserAndArticleID(ctx, req.UserID, req.ArticleID)
 		if err != nil && !errors.Is(err, reviewdomain.ErrReviewNotFound) {
 			return fmt.Errorf("service.CreateArticleReviewAdmin: check existing review: %w", err)
@@ -190,6 +237,8 @@ func (s *Service) CreateArticleReviewAdmin(ctx context.Context, req reviewdomain
 		if err != nil {
 			return fmt.Errorf("service.CreateArticleReviewAdmin: %w", err)
 		}
+		reviewID = cReview.ID
+
 		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
 			AdminUserID: req.UserID,
 			ActionType:  auditdomain.ActionCreateItem,
@@ -197,4 +246,9 @@ func (s *Service) CreateArticleReviewAdmin(ctx context.Context, req reviewdomain
 			TargetID:    cReview.ID,
 		})
 	})
+	if err != nil {
+		return "", err
+	}
+
+	return reviewID, nil
 }

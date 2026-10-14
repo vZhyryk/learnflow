@@ -103,19 +103,6 @@ func (rep *Repository) UpdateSessionToken(ctx context.Context, sessionID, tokenH
 	return nil
 }
 
-// UpdateFailedLoginAttempts increments the failed attempt counter and locks the session when the limit is reached.
-func (rep *Repository) UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error {
-	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateFailedLoginAttemptsSQL, sessionID, loginCountLimit, lockInterval)
-	if err != nil {
-		return fmt.Errorf("repository.UpdateFailedLoginAttempts: %w", err)
-	}
-
-	if tag.RowsAffected() == 0 {
-		return authdomain.ErrSessionNotFound
-	}
-	return nil
-}
-
 // GetAllSessionsByUserID returns all sessions belonging to the given user.
 func (rep *Repository) GetAllSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
 	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getAllUserSessionSQL, "GetAllSessionsByUserID", nil, scanUserSession, []any{userID})

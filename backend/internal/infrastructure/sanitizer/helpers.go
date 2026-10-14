@@ -8,11 +8,27 @@ import (
 	"strings"
 )
 
-// IsSensitiveKey reports whether key matches any known sensitive key after normalisation.
+// sensitiveKeySuffixes catch variants the exact list misses (raw_token, old_password, refresh_hash...).
+var sensitiveKeySuffixes = []string{
+	"password", "passwd", "secret", "token", "apikey",
+	"passwordhash", "tokenhash", "refreshhash",
+}
+
+// IsSensitiveKey reports whether key matches a known sensitive key, exactly or by a sensitive suffix,
+// after normalisation.
 func (s *Sanitizer) IsSensitiveKey(key string) bool {
 	key = normalizeSensitiveKey(key)
-	_, ok := s.normalizedSensitiveKeys[key]
-	return ok
+	if _, ok := s.normalizedSensitiveKeys[key]; ok {
+		return true
+	}
+
+	for _, suffix := range sensitiveKeySuffixes {
+		if strings.HasSuffix(key, suffix) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func normalizeSensitiveKeys(keys map[string]struct{}) map[string]struct{} {

@@ -14,10 +14,10 @@ type mockContentItemRepo struct {
 	archiveContentItem           func(ctx context.Context, contentItemID, userID string) error
 	deleteContentItem            func(ctx context.Context, contentItemID, userID string) error
 	updateContentItem            func(ctx context.Context, contentItem *contentdomain.ContentItem, userID string) error
-	getAllPublishedContentItems  func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
-	getAllDraftContentItems      func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
-	getAllArchivedContentItems   func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
-	getAllContentItems           func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error)
+	getAllPublishedContentItems  func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error)
+	getAllDraftContentItems      func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error)
+	getAllArchivedContentItems   func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error)
+	getAllContentItems           func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error)
 	getContentItemByID           func(ctx context.Context, contentItemID string) (*contentdomain.ContentItem, error)
 	getContentItemBySlug         func(ctx context.Context, slug string) (*contentdomain.ContentItem, error)
 	checkIfContentItemExistsByID func(ctx context.Context, contentItemID string) (bool, error)
@@ -58,28 +58,28 @@ func (m *mockContentItemRepo) UpdateContentItem(ctx context.Context, contentItem
 
 	return m.updateContentItem(ctx, contentItem, userID)
 }
-func (m *mockContentItemRepo) GetAllPublishedContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error) {
+func (m *mockContentItemRepo) GetAllPublishedContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error) {
 	if m.getAllPublishedContentItems == nil {
 		panic("mockContentItemRepo.GetAllPublishedContentItems not set")
 	}
 
 	return m.getAllPublishedContentItems(ctx, params)
 }
-func (m *mockContentItemRepo) GetAllDraftContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error) {
+func (m *mockContentItemRepo) GetAllDraftContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error) {
 	if m.getAllDraftContentItems == nil {
 		panic("mockContentItemRepo.GetAllDraftContentItems not set")
 	}
 
 	return m.getAllDraftContentItems(ctx, params)
 }
-func (m *mockContentItemRepo) GetAllArchivedContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error) {
+func (m *mockContentItemRepo) GetAllArchivedContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error) {
 	if m.getAllArchivedContentItems == nil {
 		panic("mockContentItemRepo.GetAllArchivedContentItems not set")
 	}
 
 	return m.getAllArchivedContentItems(ctx, params)
 }
-func (m *mockContentItemRepo) GetAllContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error) {
+func (m *mockContentItemRepo) GetAllContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error) {
 	if m.getAllContentItems == nil {
 		panic("mockContentItemRepo.GetAllContentItems not set")
 	}

@@ -18,10 +18,10 @@ type ArticleRepository interface {
 	ArchiveArticle(ctx context.Context, articleID, userID string) error
 	DeleteArticle(ctx context.Context, articleID, userID string) error
 	UpdateArticle(ctx context.Context, article *Article, userID string) error
-	GetAllPublishedArticles(ctx context.Context, params pagination.Params) ([]*Article, error)
-	GetAllDraftArticles(ctx context.Context, params pagination.Params) ([]*Article, error)
-	GetAllArchivedArticles(ctx context.Context, params pagination.Params) ([]*Article, error)
-	GetAllArticles(ctx context.Context, params pagination.Params) ([]*Article, error)
+	GetAllPublishedArticles(ctx context.Context, params pagination.Params) ([]*Article, int, error)
+	GetAllDraftArticles(ctx context.Context, params pagination.Params) ([]*Article, int, error)
+	GetAllArchivedArticles(ctx context.Context, params pagination.Params) ([]*Article, int, error)
+	GetAllArticles(ctx context.Context, params pagination.Params) ([]*Article, int, error)
 	GetArticleByID(ctx context.Context, articleID string) (*Article, error)
 	GetArticleBySlug(ctx context.Context, slug string) (*Article, error)
 	CheckIfArticleExistsByID(ctx context.Context, articleID string) (bool, error)
@@ -40,5 +40,5 @@ type Service interface {
 	GetArticleBySlug(ctx context.Context, slug string) (*Article, error)
 	PublishArticle(ctx context.Context, articleID, userID string) error
 	UpdateArticle(ctx context.Context, req UpdateArticleRequest, userID string) error
-	GetAllArticles(ctx context.Context, getType ArticleStatus, params pagination.Params) (articleList []*Article, err error)
+	GetAllArticles(ctx context.Context, getType ArticleStatus, params pagination.Params) (articleList []*Article, total int, err error)
 }

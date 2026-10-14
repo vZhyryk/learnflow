@@ -1,6 +1,10 @@
 package reviewrepository
 
-import "fmt"
+import (
+	"fmt"
+	reviewdomain "learnflow_backend/internal/review/domain"
+	"strings"
+)
 
 const filterPlace = "{Filter}"
 
@@ -93,6 +97,24 @@ const (
 		LIMIT $2 OFFSET $3
 	`
 
+	countCourseReviewsByCourseIDSQL = `
+		SELECT COUNT(*)
+		FROM course_reviews WHERE course_id = $1 AND deleted_at IS NULL
+		` + filterPlace + `
+	`
+
+	countContentReviewsByContentIDSQL = `
+		SELECT COUNT(*)
+		FROM content_reviews WHERE content_item_id = $1 AND deleted_at IS NULL
+		` + filterPlace + `
+	`
+
+	countArticleReviewsByArticleIDSQL = `
+		SELECT COUNT(*)
+		FROM article_reviews WHERE article_id = $1 AND deleted_at IS NULL
+		` + filterPlace + `
+	`
+
 	getCourseReviewByIDSQL = `
 		SELECT ` + courseReviewColumns + `
 		FROM course_reviews WHERE id = $1 AND deleted_at IS NULL
@@ -157,21 +179,28 @@ const (
 	articleReviewsUserArticleUniqueConstraint = "idx_article_reviews_user_id_article_id_active_unique"
 )
 
-// GenerateFilterQuery returns the SQL comparison operator for a rating filter op.
-func (rep *Repository) GenerateFilterQuery(op string) string {
-	var val string
+// ratingOperator maps a rating filter op to its SQL comparison operator, or "" when op is unknown.
+func ratingOperator(op string) string {
 	switch op {
 	case "eq":
-		val = "="
+		return "="
 	case "gt":
-		val = ">"
+		return ">"
 	case "lt":
-		val = "<"
+		return "<"
 	case "gte":
-		val = ">="
+		return ">="
 	case "lte":
-		val = "<="
+		return "<="
 	default:
+		return ""
+	}
+}
+
+// GenerateFilterQuery returns the rating condition plus ordering and pagination for a rating filter op.
+func (rep *Repository) GenerateFilterQuery(op string) string {
+	val := ratingOperator(op)
+	if val == "" {
 		return ""
 	}
 
@@ -180,4 +209,19 @@ func (rep *Repository) GenerateFilterQuery(op string) string {
 		ORDER BY created_at DESC
 		LIMIT $3 OFFSET $4
 	`, val)
+}
+
+// applyFilter fills the {Filter} placeholder of a list template (rating condition, ordering, pagination)
+// and of its count template (rating condition only), and returns the shared args for both queries.
+func (rep *Repository) applyFilter(listSQL, countSQL, id string, filter reviewdomain.ReviewFilter) (query, countQuery string, args []any) {
+	args = []any{id}
+	idx := strings.Index(listSQL, filterPlace)
+	if val := ratingOperator(filter.Op); filter.IsUsed() && idx >= 0 && val != "" {
+		args = append(args, filter.Rating)
+		query = listSQL[:idx] + rep.GenerateFilterQuery(filter.Op)
+		countQuery = strings.Replace(countSQL, filterPlace, fmt.Sprintf("AND rating %s $2", val), 1)
+		return query, countQuery, args
+	}
+
+	return strings.Replace(listSQL, filterPlace, "", 1), strings.Replace(countSQL, filterPlace, "", 1), args
 }

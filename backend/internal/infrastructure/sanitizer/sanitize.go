@@ -1,8 +1,6 @@
 package sanitizer
 
 import (
-	"learnflow_backend/internal/infrastructure/stringsx"
-	"net/url"
 	"reflect"
 )
 
@@ -56,28 +54,4 @@ func (s *Sanitizer) SanitizeReflect(v any) any {
 	}
 
 	return v
-}
-
-// SanitizeURL redacts sensitive query parameters from raw and truncates the result.
-func (s *Sanitizer) SanitizeURL(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil {
-		str, ok := s.Sanitize(raw).(string)
-		if !ok {
-			return ""
-		}
-
-		return str
-	}
-
-	q := u.Query()
-	for key := range q {
-		if s.IsSensitiveKey(key) {
-			q.Set(key, s.redactedValue)
-		}
-	}
-
-	u.RawQuery = q.Encode()
-
-	return stringsx.TruncateString(u.String(), s.maxStringLen)
 }

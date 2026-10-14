@@ -14,11 +14,6 @@ import (
 // Envelope is the standard HTTP response wrapper.
 type Envelope map[string]any
 
-// NewEnvelope wraps a map into an Envelope response.
-func NewEnvelope(uEnvelopeData map[string]any) Envelope {
-	return uEnvelopeData
-}
-
 // WriteJSON marshals data to JSON and writes it to the response with the given status and headers.
 func WriteJSON(w http.ResponseWriter, status int, data Envelope, headers http.Header) error {
 	js, err := json.MarshalIndent(data, "", "\t")

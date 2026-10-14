@@ -152,3 +152,34 @@ func TestMustInitInfraExitsOnDatabaseFailure(t *testing.T) {
 		})
 	})
 }
+
+func TestValidateRedisConfig(t *testing.T) {
+	Convey("ValidateRedisConfig", t, func() {
+		Convey("outside production any config is accepted", func() {
+			t.Setenv("REDIS_PASSWORD", "")
+			So(bootstrap.ValidateRedisConfig("dev"), ShouldBeNil)
+		})
+
+		Convey("in production a missing password fails", func() {
+			t.Setenv("REDIS_PASSWORD", "")
+			t.Setenv("REDIS_TLS", "true")
+			err := bootstrap.ValidateRedisConfig("production")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "REDIS_PASSWORD")
+		})
+
+		Convey("in production an unset REDIS_TLS fails", func() {
+			t.Setenv("REDIS_PASSWORD", "secret")
+			os.Unsetenv("REDIS_TLS") //nolint:errcheck,gosec // test setup
+			err := bootstrap.ValidateRedisConfig("production")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "REDIS_TLS")
+		})
+
+		Convey("in production password and explicit TLS pass", func() {
+			t.Setenv("REDIS_PASSWORD", "secret")
+			t.Setenv("REDIS_TLS", "false")
+			So(bootstrap.ValidateRedisConfig("production"), ShouldBeNil)
+		})
+	})
+}

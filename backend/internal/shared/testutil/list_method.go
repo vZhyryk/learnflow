@@ -117,3 +117,79 @@ func TestListMethodWithStringArg[T any](
 			makeFake, scanFake)
 	})
 }
+
+// TestCountListMethod is TestListMethod for a list method that also returns the total row
+// count (repository.GetCountAndParseListWithArgs): it adds the count-query-failure branch and
+// checks the total is passed through.
+func TestCountListMethod[T any](
+	t *testing.T,
+	methodName string,
+	bind func(*MockQueryRunner) func(context.Context, pagination.Params) ([]T, int, error),
+	makeFake func(n int) T,
+	scanFake func(T) func(dest ...any) error,
+) {
+	TestCountListMethodWithStringArg(t, methodName,
+		func(runner *MockQueryRunner) func(context.Context, pagination.Params, string) ([]T, int, error) {
+			call := bind(runner)
+			return func(ctx context.Context, p pagination.Params, _ string) ([]T, int, error) {
+				return call(ctx, p)
+			}
+		}, makeFake, scanFake)
+}
+
+// TestCountListMethodWithStringArg is TestCountListMethod for a method that takes an extra string
+// argument (e.g. a parent entity ID) alongside pagination.Params.
+func TestCountListMethodWithStringArg[T any](
+	t *testing.T,
+	methodName string,
+	bind func(*MockQueryRunner) func(context.Context, pagination.Params, string) ([]T, int, error),
+	makeFake func(n int) T,
+	scanFake func(T) func(dest ...any) error,
+) {
+	const wantTotal = 42
+
+	Convey("Given a repository", t, func() {
+		var rows *MockRows
+		var queryErr, countErr error
+		boundCall := bind(&MockQueryRunner{
+			QueryRowFn: func(_ context.Context, _ string, _ ...any) pgx.Row {
+				return &MockRow{ScanFn: func(dest ...any) error {
+					if countErr != nil {
+						return countErr
+					}
+					*CastInt(dest[0], 0) = wantTotal
+					return nil
+				}}
+			},
+			QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
+				return rows, queryErr
+			},
+		})
+		const id = "test_id"
+		call := func(ctx context.Context, p pagination.Params) ([]T, error) {
+			items, _, err := boundCall(ctx, p, id)
+			return items, err
+		}
+
+		Convey("When the count query fails", func() {
+			countErr = ErrDBUnexpected
+			_, _, err := boundCall(context.Background(), pagination.NewParams(1, 20), id)
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "repository."+methodName+" count")
+		})
+
+		Convey("When the page is empty, it returns a non-nil empty slice and the total", func() {
+			rows = &MockRows{}
+			items, total, err := boundCall(context.Background(), pagination.NewParams(1, 20), id)
+			So(err, ShouldBeNil)
+			So(items, ShouldNotBeNil)
+			So(items, ShouldBeEmpty)
+			So(total, ShouldEqual, wantTotal)
+		})
+
+		listMethodScenarios(methodName, call,
+			func(r *MockRows) { rows = r },
+			func(e error) { queryErr = e },
+			makeFake, scanFake)
+	})
+}

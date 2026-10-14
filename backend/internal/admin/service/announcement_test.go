@@ -120,6 +120,18 @@ func TestUpdateAnnouncement(t *testing.T) {
 			err := srv.UpdateAnnouncement(context.Background(), admindomain.UpdateAnnouncementRequest{ID: "announcement-123"})
 			So(errors.Is(err, admindomain.ErrAnnouncementApproved), ShouldBeTrue)
 		})
+
+		Convey("When a concurrent approve wins between the read and the update", func() {
+			repo.getAnnouncementByID = func(_ context.Context, _ string) (*admindomain.Announcement, error) {
+				return &admindomain.Announcement{ID: "announcement-123"}, nil
+			}
+			repo.updateAnnouncement = func(_ context.Context, _ *admindomain.Announcement) error {
+				return admindomain.ErrAnnouncementNotFound
+			}
+
+			err := srv.UpdateAnnouncement(context.Background(), admindomain.UpdateAnnouncementRequest{ID: "announcement-123"})
+			So(errors.Is(err, admindomain.ErrAnnouncementApproved), ShouldBeTrue)
+		})
 	})
 }
 
@@ -300,22 +312,23 @@ func TestGetAnnouncements(t *testing.T) {
 		params := pagination.NewParams(1, 20)
 
 		Convey("When the repository returns an error", func() {
-			repo.getAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return nil, testutil.ErrDBUnexpected
+			repo.getAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return nil, 0, testutil.ErrDBUnexpected
 			}
-			_, err := srv.GetAnnouncements(context.Background(), params)
+			_, _, err := srv.GetAnnouncements(context.Background(), params)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
 
 		Convey("When it succeeds", func() {
 			want := []*admindomain.Announcement{{ID: "announcement-1"}}
-			repo.getAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return want, nil
+			repo.getAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return want, 7, nil
 			}
-			got, err := srv.GetAnnouncements(context.Background(), params)
+			got, total, err := srv.GetAnnouncements(context.Background(), params)
 			So(err, ShouldBeNil)
 			So(got, ShouldResemble, want)
+			So(total, ShouldEqual, 7)
 		})
 	})
 }
@@ -327,22 +340,23 @@ func TestGetUnApprovedAnnouncements(t *testing.T) {
 		params := pagination.NewParams(1, 20)
 
 		Convey("When the repository returns an error", func() {
-			repo.getUnApprovedAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return nil, testutil.ErrDBUnexpected
+			repo.getUnApprovedAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return nil, 0, testutil.ErrDBUnexpected
 			}
-			_, err := srv.GetUnApprovedAnnouncements(context.Background(), params)
+			_, _, err := srv.GetUnApprovedAnnouncements(context.Background(), params)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
 
 		Convey("When it succeeds", func() {
 			want := []*admindomain.Announcement{{ID: "announcement-1"}}
-			repo.getUnApprovedAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return want, nil
+			repo.getUnApprovedAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return want, 7, nil
 			}
-			got, err := srv.GetUnApprovedAnnouncements(context.Background(), params)
+			got, total, err := srv.GetUnApprovedAnnouncements(context.Background(), params)
 			So(err, ShouldBeNil)
 			So(got, ShouldResemble, want)
+			So(total, ShouldEqual, 7)
 		})
 	})
 }
@@ -354,22 +368,23 @@ func TestGetApprovedAnnouncements(t *testing.T) {
 		params := pagination.NewParams(1, 20)
 
 		Convey("When the repository returns an error", func() {
-			repo.getApprovedAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return nil, testutil.ErrDBUnexpected
+			repo.getApprovedAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return nil, 0, testutil.ErrDBUnexpected
 			}
-			_, err := srv.GetApprovedAnnouncements(context.Background(), params)
+			_, _, err := srv.GetApprovedAnnouncements(context.Background(), params)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
 
 		Convey("When it succeeds", func() {
 			want := []*admindomain.Announcement{{ID: "announcement-1"}}
-			repo.getApprovedAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return want, nil
+			repo.getApprovedAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return want, 7, nil
 			}
-			got, err := srv.GetApprovedAnnouncements(context.Background(), params)
+			got, total, err := srv.GetApprovedAnnouncements(context.Background(), params)
 			So(err, ShouldBeNil)
 			So(got, ShouldResemble, want)
+			So(total, ShouldEqual, 7)
 		})
 	})
 }
@@ -381,10 +396,10 @@ func TestGetPublicAnnouncements(t *testing.T) {
 		params := pagination.NewParams(1, 20)
 
 		Convey("When the repository returns an error", func() {
-			repo.getPublicAnnouncements = func(_ context.Context, _ pagination.Params, _ string) ([]*admindomain.AnnouncementPublic, error) {
-				return nil, testutil.ErrDBUnexpected
+			repo.getPublicAnnouncements = func(_ context.Context, _ pagination.Params, _ string) ([]*admindomain.AnnouncementPublic, int, error) {
+				return nil, 0, testutil.ErrDBUnexpected
 			}
-			_, err := srv.GetPublicAnnouncements(context.Background(), params, "user-1")
+			_, _, err := srv.GetPublicAnnouncements(context.Background(), params, "user-1")
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "service.GetPublicAnnouncements")
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
@@ -394,13 +409,14 @@ func TestGetPublicAnnouncements(t *testing.T) {
 			var gotUserID string
 			var gotParams pagination.Params
 			want := []*admindomain.AnnouncementPublic{{ID: "announcement-1"}}
-			repo.getPublicAnnouncements = func(_ context.Context, p pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
+			repo.getPublicAnnouncements = func(_ context.Context, p pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, int, error) {
 				gotParams, gotUserID = p, userID
-				return want, nil
+				return want, 7, nil
 			}
-			got, err := srv.GetPublicAnnouncements(context.Background(), params, "user-1")
+			got, total, err := srv.GetPublicAnnouncements(context.Background(), params, "user-1")
 			So(err, ShouldBeNil)
 			So(got, ShouldResemble, want)
+			So(total, ShouldEqual, 7)
 			So(gotUserID, ShouldEqual, "user-1")
 			So(gotParams, ShouldResemble, params)
 		})
@@ -414,22 +430,23 @@ func TestGetExpiredAnnouncements(t *testing.T) {
 		params := pagination.NewParams(1, 20)
 
 		Convey("When the repository returns an error", func() {
-			repo.getExpiredAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return nil, testutil.ErrDBUnexpected
+			repo.getExpiredAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return nil, 0, testutil.ErrDBUnexpected
 			}
-			_, err := srv.GetExpiredAnnouncements(context.Background(), params)
+			_, _, err := srv.GetExpiredAnnouncements(context.Background(), params)
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 		})
 
 		Convey("When it succeeds", func() {
 			want := []*admindomain.Announcement{{ID: "announcement-1"}}
-			repo.getExpiredAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return want, nil
+			repo.getExpiredAnnouncements = func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return want, 7, nil
 			}
-			got, err := srv.GetExpiredAnnouncements(context.Background(), params)
+			got, total, err := srv.GetExpiredAnnouncements(context.Background(), params)
 			So(err, ShouldBeNil)
 			So(got, ShouldResemble, want)
+			So(total, ShouldEqual, 7)
 		})
 	})
 }

@@ -16,9 +16,9 @@ func TestListCourseReviews(t *testing.T) {
 		var svcErr error
 		var gotFilter reviewdomain.ReviewFilter
 		svc := &mockService{
-			getCourseReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error) {
+			getCourseReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, int, error) {
 				gotFilter = f
-				return []*reviewdomain.CourseReview{}, svcErr
+				return []*reviewdomain.CourseReview{}, 2, svcErr
 			},
 		}
 
@@ -74,9 +74,9 @@ func TestListContentReviews(t *testing.T) {
 		var svcErr error
 		var gotFilter reviewdomain.ReviewFilter
 		svc := &mockService{
-			getContentReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error) {
+			getContentReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, int, error) {
 				gotFilter = f
-				return []*reviewdomain.ContentReview{}, svcErr
+				return []*reviewdomain.ContentReview{}, 2, svcErr
 			},
 		}
 
@@ -126,9 +126,9 @@ func TestListCourseReviewsAdmin(t *testing.T) {
 		var svcErr error
 		var gotFilter reviewdomain.ReviewFilter
 		svc := &mockService{
-			getCourseReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error) {
+			getCourseReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, int, error) {
 				gotFilter = f
-				return []*reviewdomain.CourseReview{}, svcErr
+				return []*reviewdomain.CourseReview{}, 2, svcErr
 			},
 		}
 
@@ -176,9 +176,9 @@ func TestListContentReviewsAdmin(t *testing.T) {
 		var svcErr error
 		var gotFilter reviewdomain.ReviewFilter
 		svc := &mockService{
-			getContentReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error) {
+			getContentReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, int, error) {
 				gotFilter = f
-				return []*reviewdomain.ContentReview{}, svcErr
+				return []*reviewdomain.ContentReview{}, 2, svcErr
 			},
 		}
 
@@ -220,9 +220,9 @@ func TestListArticleReviews(t *testing.T) {
 		var svcErr error
 		var gotFilter reviewdomain.ReviewFilter
 		svc := &mockService{
-			getArticleReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
+			getArticleReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, int, error) {
 				gotFilter = f
-				return []*reviewdomain.ArticleReview{}, svcErr
+				return []*reviewdomain.ArticleReview{}, 2, svcErr
 			},
 		}
 
@@ -266,9 +266,9 @@ func TestListArticleReviewsAdmin(t *testing.T) {
 		var svcErr error
 		var gotFilter reviewdomain.ReviewFilter
 		svc := &mockService{
-			getArticleReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
+			getArticleReviews: func(_ context.Context, _ pagination.Params, _ string, f reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, int, error) {
 				gotFilter = f
-				return []*reviewdomain.ArticleReview{}, svcErr
+				return []*reviewdomain.ArticleReview{}, 2, svcErr
 			},
 		}
 

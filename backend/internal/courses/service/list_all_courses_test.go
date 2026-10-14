@@ -10,12 +10,12 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func getCoursesError(_ context.Context, _ pagination.Params) ([]*coursedomain.Course, error) {
-	return nil, testutil.ErrDBUnexpected
+func getCoursesError(_ context.Context, _ pagination.Params) ([]*coursedomain.Course, int, error) {
+	return nil, 0, testutil.ErrDBUnexpected
 }
 
-func getValidList(_ context.Context, _ pagination.Params) ([]*coursedomain.Course, error) {
-	return []*coursedomain.Course{{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"}}, nil
+func getValidList(_ context.Context, _ pagination.Params) ([]*coursedomain.Course, int, error) {
+	return []*coursedomain.Course{{ID: "1"}, {ID: "2"}, {ID: "3"}, {ID: "4"}}, 4, nil
 }
 
 // testGetAllCoursesByType covers the shared shape of GetAllCourses for a given status:
@@ -23,16 +23,17 @@ func getValidList(_ context.Context, _ pagination.Params) ([]*coursedomain.Cours
 // error and success paths. Shared here instead of writing the same four Convey blocks
 // four times over (mirrors testExecCourseMethod/testCourseListMethod in the repository
 // layer's own test file).
-func testGetAllCoursesByType(t *testing.T, scenario string, status coursedomain.CourseStatus, wireMock func(*mockCourseRepoRepo, func(context.Context, pagination.Params) ([]*coursedomain.Course, error))) {
+func testGetAllCoursesByType(t *testing.T, scenario string, status coursedomain.CourseStatus, wireMock func(*mockCourseRepoRepo, func(context.Context, pagination.Params) ([]*coursedomain.Course, int, error))) {
 	Convey("GetAllCourses Course", t, func() {
 		Convey(scenario+" - error", func() {
 			cRepo := &mockCourseRepoRepo{}
 			wireMock(cRepo, getCoursesError)
 
 			srv := newTestService(cRepo)
-			course, err := srv.GetAllCourses(context.Background(), status, pagination.Params{})
+			course, gotTotal, err := srv.GetAllCourses(context.Background(), status, pagination.Params{})
 			So(err.Error(), ShouldContainSubstring, "db connection lost")
 			So(course, ShouldBeNil)
+			So(gotTotal, ShouldEqual, 0)
 		})
 
 		Convey(scenario+" - success", func() {
@@ -40,35 +41,36 @@ func testGetAllCoursesByType(t *testing.T, scenario string, status coursedomain.
 			wireMock(cRepo, getValidList)
 
 			srv := newTestService(cRepo)
-			courses, err := srv.GetAllCourses(context.Background(), status, pagination.Params{})
+			courses, total, err := srv.GetAllCourses(context.Background(), status, pagination.Params{})
 			So(err, ShouldBeNil)
 			So(courses, ShouldNotBeNil)
 			So(courses, ShouldNotBeEmpty)
 			So(len(courses), ShouldEqual, 4)
+			So(total, ShouldEqual, 4)
 		})
 	})
 }
 
 func TestGetAllCoursesArchived(t *testing.T) {
-	testGetAllCoursesByType(t, "GetAllArchivedCourses", coursedomain.ArchivedStatus, func(r *mockCourseRepoRepo, fn func(context.Context, pagination.Params) ([]*coursedomain.Course, error)) {
+	testGetAllCoursesByType(t, "GetAllArchivedCourses", coursedomain.ArchivedStatus, func(r *mockCourseRepoRepo, fn func(context.Context, pagination.Params) ([]*coursedomain.Course, int, error)) {
 		r.getAllArchivedCourses = fn
 	})
 }
 
 func TestGetAllCoursesPublished(t *testing.T) {
-	testGetAllCoursesByType(t, "GetAllPublishedCourses", coursedomain.PublishedStatus, func(r *mockCourseRepoRepo, fn func(context.Context, pagination.Params) ([]*coursedomain.Course, error)) {
+	testGetAllCoursesByType(t, "GetAllPublishedCourses", coursedomain.PublishedStatus, func(r *mockCourseRepoRepo, fn func(context.Context, pagination.Params) ([]*coursedomain.Course, int, error)) {
 		r.getAllPublishedCourses = fn
 	})
 }
 
 func TestGetAllCoursesDraft(t *testing.T) {
-	testGetAllCoursesByType(t, "GetAllDraftCourses", coursedomain.DraftStatus, func(r *mockCourseRepoRepo, fn func(context.Context, pagination.Params) ([]*coursedomain.Course, error)) {
+	testGetAllCoursesByType(t, "GetAllDraftCourses", coursedomain.DraftStatus, func(r *mockCourseRepoRepo, fn func(context.Context, pagination.Params) ([]*coursedomain.Course, int, error)) {
 		r.getAllDraftCourses = fn
 	})
 }
 
 func TestGetAllCoursesDefault(t *testing.T) {
-	testGetAllCoursesByType(t, "default", coursedomain.CourseStatus(""), func(r *mockCourseRepoRepo, fn func(context.Context, pagination.Params) ([]*coursedomain.Course, error)) {
+	testGetAllCoursesByType(t, "default", coursedomain.CourseStatus(""), func(r *mockCourseRepoRepo, fn func(context.Context, pagination.Params) ([]*coursedomain.Course, int, error)) {
 		r.getAllCourses = fn
 	})
 }

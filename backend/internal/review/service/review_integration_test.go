@@ -48,7 +48,7 @@ func TestCreateCourseReview_ServiceIntegration(t *testing.T) {
 				userID := testutil.InsertRandomTestUser(t, tx)
 				testutil.GrantCourseAccess(t, tx, userID, courseID, testutil.AccessGrant{})
 
-				err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{
+				_, err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{
 					CourseID: courseID, UserID: userID, Rating: 5,
 				})
 
@@ -65,7 +65,7 @@ func TestCreateCourseReview_ServiceIntegration(t *testing.T) {
 				courseID := testutil.InsertTestCourse(t, tx)
 				userID := testutil.InsertRandomTestUser(t, tx)
 
-				err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{
+				_, err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{
 					CourseID: courseID, UserID: userID, Rating: 5,
 				})
 
@@ -85,7 +85,7 @@ func TestCreateCourseReview_ServiceIntegration(t *testing.T) {
 					AccessType: "purchased", CreatedAt: &created, GrantedAt: &granted, ExpiresAt: &expires,
 				})
 
-				err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{
+				_, err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{
 					CourseID: courseID, UserID: userID, Rating: 5,
 				})
 
@@ -99,9 +99,9 @@ func TestCreateCourseReview_ServiceIntegration(t *testing.T) {
 				courseID := testutil.InsertTestCourse(t, tx)
 				userID := testutil.InsertRandomTestUser(t, tx)
 				testutil.GrantCourseAccess(t, tx, userID, courseID, testutil.AccessGrant{})
-				So(srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: userID, Rating: 3}), ShouldBeNil)
+				So(createdErr(srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: userID, Rating: 3})), ShouldBeNil)
 
-				err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: userID, Rating: 4})
+				_, err := srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: userID, Rating: 4})
 
 				So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 			})
@@ -120,7 +120,7 @@ func TestCreateContentReview_ServiceIntegration(t *testing.T) {
 				userID := testutil.InsertRandomTestUser(t, tx)
 				testutil.GrantContentAccess(t, tx, userID, contentID, testutil.AccessGrant{})
 
-				err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
+				_, err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
 					ContentID: contentID, UserID: userID, Rating: 4,
 				})
 
@@ -140,7 +140,7 @@ func TestCreateContentReview_ServiceIntegration(t *testing.T) {
 				userID := testutil.InsertRandomTestUser(t, tx)
 				testutil.GrantCourseAccess(t, tx, userID, courseID, testutil.AccessGrant{})
 
-				err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
+				_, err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
 					ContentID: contentID, UserID: userID, Rating: 5,
 				})
 
@@ -154,7 +154,7 @@ func TestCreateContentReview_ServiceIntegration(t *testing.T) {
 				contentID := testutil.InsertTestContentItem(t, tx)
 				userID := testutil.InsertRandomTestUser(t, tx)
 
-				err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
+				_, err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
 					ContentID: contentID, UserID: userID, Rating: 5,
 				})
 
@@ -170,7 +170,7 @@ func TestCreateContentReview_ServiceIntegration(t *testing.T) {
 				userID := testutil.InsertRandomTestUser(t, tx)
 				testutil.GrantCourseAccess(t, tx, userID, unrelatedCourseID, testutil.AccessGrant{})
 
-				err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
+				_, err := srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
 					ContentID: contentID, UserID: userID, Rating: 5,
 				})
 
@@ -187,7 +187,7 @@ func TestCreateContentReview_ServiceIntegration(t *testing.T) {
 				_, err := tx.Exec(ctx, `UPDATE user_content_access SET status = 'revoked' WHERE user_id = $1 AND content_item_id = $2`, userID, contentID)
 				So(err, ShouldBeNil)
 
-				err = srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
+				_, err = srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{
 					ContentID: contentID, UserID: userID, Rating: 5,
 				})
 
@@ -206,7 +206,7 @@ func TestUpdateContentReview_ServiceIntegration(t *testing.T) {
 			contentID := testutil.InsertTestContentItem(t, tx)
 			ownerID := testutil.InsertRandomTestUser(t, tx)
 			testutil.GrantContentAccess(t, tx, ownerID, contentID, testutil.AccessGrant{})
-			So(srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{ContentID: contentID, UserID: ownerID, Rating: 2}), ShouldBeNil)
+			So(createdErr(srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{ContentID: contentID, UserID: ownerID, Rating: 2})), ShouldBeNil)
 			created, err := repo.GetContentReviewByUserAndContentID(ctx, ownerID, contentID)
 			So(err, ShouldBeNil)
 
@@ -257,7 +257,7 @@ func TestDeleteContentReview_ServiceIntegration(t *testing.T) {
 			contentID := testutil.InsertTestContentItem(t, tx)
 			ownerID := testutil.InsertRandomTestUser(t, tx)
 			testutil.GrantContentAccess(t, tx, ownerID, contentID, testutil.AccessGrant{})
-			So(srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{ContentID: contentID, UserID: ownerID, Rating: 2}), ShouldBeNil)
+			So(createdErr(srv.CreateContentReview(ctx, reviewdomain.CreateContentReviewRequest{ContentID: contentID, UserID: ownerID, Rating: 2})), ShouldBeNil)
 			created, err := repo.GetContentReviewByUserAndContentID(ctx, ownerID, contentID)
 			So(err, ShouldBeNil)
 
@@ -292,7 +292,7 @@ func TestUpdateCourseReview_ServiceIntegration(t *testing.T) {
 			courseID := testutil.InsertTestCourse(t, tx)
 			ownerID := testutil.InsertRandomTestUser(t, tx)
 			testutil.GrantCourseAccess(t, tx, ownerID, courseID, testutil.AccessGrant{})
-			So(srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: ownerID, Rating: 2}), ShouldBeNil)
+			So(createdErr(srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: ownerID, Rating: 2})), ShouldBeNil)
 			created, err := repo.GetCourseReviewByUserAndCourseID(ctx, ownerID, courseID)
 			So(err, ShouldBeNil)
 
@@ -343,7 +343,7 @@ func TestDeleteCourseReview_ServiceIntegration(t *testing.T) {
 			courseID := testutil.InsertTestCourse(t, tx)
 			ownerID := testutil.InsertRandomTestUser(t, tx)
 			testutil.GrantCourseAccess(t, tx, ownerID, courseID, testutil.AccessGrant{})
-			So(srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: ownerID, Rating: 2}), ShouldBeNil)
+			So(createdErr(srv.CreateCourseReview(ctx, reviewdomain.CreateCourseReviewRequest{CourseID: courseID, UserID: ownerID, Rating: 2})), ShouldBeNil)
 			created, err := repo.GetCourseReviewByUserAndCourseID(ctx, ownerID, courseID)
 			So(err, ShouldBeNil)
 
@@ -368,3 +368,6 @@ func TestDeleteCourseReview_ServiceIntegration(t *testing.T) {
 		})
 	})
 }
+
+// createdErr drops the created review ID so a Create* call can be asserted as a single value.
+func createdErr(_ string, err error) error { return err }

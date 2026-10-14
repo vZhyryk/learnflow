@@ -62,23 +62,23 @@ func (rep *Repository) UpdateCourse(ctx context.Context, course *coursedomain.Co
 }
 
 // GetAllPublishedCourses returns every non-deleted published course.
-func (rep *Repository) GetAllPublishedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllPublishedCoursesSQL, "GetAllPublishedCourses", &params, scanCourse)
+func (rep *Repository) GetAllPublishedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllPublishedCoursesSQL, countPublishedCoursesSQL, "GetAllPublishedCourses", params, scanCourse, nil)
 }
 
 // GetAllDraftCourses returns every non-deleted draft course.
-func (rep *Repository) GetAllDraftCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllDraftCoursesSQL, "GetAllDraftCourses", &params, scanCourse)
+func (rep *Repository) GetAllDraftCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllDraftCoursesSQL, countDraftCoursesSQL, "GetAllDraftCourses", params, scanCourse, nil)
 }
 
 // GetAllArchivedCourses returns every archived course, including soft-deleted ones.
-func (rep *Repository) GetAllArchivedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllArchivedCoursesSQL, "GetAllArchivedCourses", &params, scanCourse)
+func (rep *Repository) GetAllArchivedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllArchivedCoursesSQL, countArchivedCoursesSQL, "GetAllArchivedCourses", params, scanCourse, nil)
 }
 
 // GetAllCourses returns every course regardless of status, including soft-deleted ones.
-func (rep *Repository) GetAllCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
-	return repository.GetAndParseList(ctx, &rep.BaseRepository, getAllCoursesSQL, "GetAllCourses", &params, scanCourse)
+func (rep *Repository) GetAllCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllCoursesSQL, countAllCoursesSQL, "GetAllCourses", params, scanCourse, nil)
 }
 
 // GetCourseByID retrieves a non-deleted course by ID.

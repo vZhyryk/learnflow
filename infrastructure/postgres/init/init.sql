@@ -711,7 +711,8 @@ CREATE TABLE announcement_email_deliveries (
     status          text        NOT NULL DEFAULT 'pending' CONSTRAINT announcement_email_deliveries_status_check CHECK (status IN ('pending', 'sent', 'failed')),
     last_error      text,
     created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now()
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT announcement_email_deliveries_attempt_count_check CHECK (attempt_count >= 0)
 );
 
 CREATE INDEX idx_announcement_email_deliveries_pending

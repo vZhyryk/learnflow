@@ -8,20 +8,20 @@ import (
 )
 
 // GetAllCourses returns courses filtered by status, or every course if getType is empty/unknown.
-func (s *Service) GetAllCourses(ctx context.Context, getType coursedomain.CourseStatus, params pagination.Params) (courseList []*coursedomain.Course, err error) {
+func (s *Service) GetAllCourses(ctx context.Context, getType coursedomain.CourseStatus, params pagination.Params) (courseList []*coursedomain.Course, total int, err error) {
 	switch getType {
 	case coursedomain.ArchivedStatus:
-		courseList, err = s.courseRepo.GetAllArchivedCourses(ctx, params)
+		courseList, total, err = s.courseRepo.GetAllArchivedCourses(ctx, params)
 	case coursedomain.PublishedStatus:
-		courseList, err = s.courseRepo.GetAllPublishedCourses(ctx, params)
+		courseList, total, err = s.courseRepo.GetAllPublishedCourses(ctx, params)
 	case coursedomain.DraftStatus:
-		courseList, err = s.courseRepo.GetAllDraftCourses(ctx, params)
+		courseList, total, err = s.courseRepo.GetAllDraftCourses(ctx, params)
 	default:
-		courseList, err = s.courseRepo.GetAllCourses(ctx, params)
+		courseList, total, err = s.courseRepo.GetAllCourses(ctx, params)
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("service.GetAllCourses: %w", err)
+		return nil, 0, fmt.Errorf("service.GetAllCourses: %w", err)
 	}
-	return courseList, nil
+	return courseList, total, nil
 }

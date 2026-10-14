@@ -79,19 +79,16 @@ func TestLoginUserLookup(t *testing.T) {
 // TestLoginConstantTimeUserEnumeration is a regression test for the timing-attack
 // mitigation documented on Login/loginGetUser: when the email does not exist, a dummy
 // bcrypt comparison must still run so the response time matches the "wrong password"
-// path. It spies on the package-level bcryptCompareHashAndPassword hook to assert the
+// path. It spies on the service's compareHash field to assert the
 // dummy comparison actually executes, rather than asserting on wall-clock timing (flaky).
 func TestLoginConstantTimeUserEnumeration(t *testing.T) {
 	Convey("Given an auth service", t, func() {
-		original := bcryptCompareHashAndPassword
-		Reset(func() { bcryptCompareHashAndPassword = original })
-
 		var calls int
 		var lastHash []byte
-		bcryptCompareHashAndPassword = func(hashedPassword, password []byte) error {
+		spy := func(hashedPassword, password []byte) error {
 			calls++
 			lastHash = hashedPassword
-			return original(hashedPassword, password)
+			return bcrypt.CompareHashAndPassword(hashedPassword, password)
 		}
 
 		Convey("When the email does not exist, the dummy bcrypt comparison still runs", func() {
@@ -101,6 +98,7 @@ func TestLoginConstantTimeUserEnumeration(t *testing.T) {
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
+			srv.compareHash = spy
 
 			_, err := srv.Login(context.Background(), validLoginReq())
 
@@ -118,6 +116,7 @@ func TestLoginConstantTimeUserEnumeration(t *testing.T) {
 				incrementFailedLogin: func(context.Context, string, string, int) error { return nil },
 			}
 			srv := newTestService(uRepo, validLoginSessionRepo(), nil, nil, nil)
+			srv.compareHash = spy
 
 			_, err := srv.Login(context.Background(), validLoginReq())
 
@@ -147,17 +146,15 @@ func TestLoginAccountLocked(t *testing.T) {
 		})
 
 		Convey("When the account is locked, a dummy bcrypt keeps the timing like a wrong password and the attempt is not counted", func() {
-			original := bcryptCompareHashAndPassword
-			Reset(func() { bcryptCompareHashAndPassword = original })
 			var compared int
-			bcryptCompareHashAndPassword = func(hashedPassword, password []byte) error {
-				compared++
-				return original(hashedPassword, password)
-			}
 			lockedUntil := time.Now().UTC().Add(10 * time.Minute)
 			user := newLoginTestUser(validLoginReq().Password, authdomain.StatusActive)
 			user.LoginLockedUntil = &lockedUntil
 			srv := newTestService(&mockUserRepo{getUserByEmail: loginGetUserByEmail(user)}, nil, nil, nil, nil)
+			srv.compareHash = func(hashedPassword, password []byte) error {
+				compared++
+				return bcrypt.CompareHashAndPassword(hashedPassword, password)
+			}
 
 			_, err := srv.Login(context.Background(), validLoginReq())
 

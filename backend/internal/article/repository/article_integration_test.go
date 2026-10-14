@@ -358,16 +358,18 @@ func TestGetAllArticlesByStatus_Integration(t *testing.T) {
 			params := pagination.NewParams(1, 100)
 
 			Convey("GetAllDraftArticles returns only the draft, excluding soft-deleted", func() {
-				got, err := repo.GetAllDraftArticles(ctx, params)
+				got, total, err := repo.GetAllDraftArticles(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := ArticleIDs(got)
 				So(ids, ShouldContain, draft.ID)
 				So(ids, ShouldNotContain, deleted.ID)
 			})
 
 			Convey("GetAllPublishedArticles returns only the published article", func() {
-				got, err := repo.GetAllPublishedArticles(ctx, params)
+				got, total, err := repo.GetAllPublishedArticles(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := ArticleIDs(got)
 				So(ids, ShouldContain, published.ID)
 				So(ids, ShouldNotContain, draft.ID)
@@ -379,14 +381,16 @@ func TestGetAllArticlesByStatus_Integration(t *testing.T) {
 				// admin "including soft-deleted ones" query per db-conventions.md.
 				So(repo.DeleteArticle(ctx, archived.ID, archived.CreatedByUserID), ShouldBeNil)
 
-				got, err := repo.GetAllArchivedArticles(ctx, params)
+				got, total, err := repo.GetAllArchivedArticles(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				So(ArticleIDs(got), ShouldContain, archived.ID)
 			})
 
 			Convey("GetAllArticles returns every article regardless of status, including soft-deleted", func() {
-				got, err := repo.GetAllArticles(ctx, params)
+				got, total, err := repo.GetAllArticles(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := ArticleIDs(got)
 				So(ids, ShouldContain, draft.ID)
 				So(ids, ShouldContain, published.ID)
@@ -395,9 +399,11 @@ func TestGetAllArticlesByStatus_Integration(t *testing.T) {
 			})
 
 			Convey("Pagination limits the returned page size", func() {
-				got, err := repo.GetAllArticles(ctx, pagination.NewParams(1, 2))
+				got, total, err := repo.GetAllArticles(ctx, pagination.NewParams(1, 2))
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				So(len(got), ShouldEqual, 2)
+				So(total, ShouldBeGreaterThanOrEqualTo, 4)
 			})
 		})
 	})

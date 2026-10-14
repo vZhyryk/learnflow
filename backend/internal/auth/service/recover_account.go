@@ -102,13 +102,7 @@ func (s *Service) issueRecoveryToken(ctx context.Context, user *authdomain.User)
 			if err != nil {
 				return nil, fmt.Errorf("init_recover_account: create token: %w", err)
 			}
-			return events.TokenPayload{
-				UserID:    user.ID,
-				Email:     user.Email,
-				ExpiresAt: expiresAt,
-				RawToken:  rawToken,
-				UserName:  userProfile.GetFirstName(),
-			}, nil
+			return newTokenPayload(user.ID, user.Email, rawToken, expiresAt, userProfile), nil
 		},
 	)
 }

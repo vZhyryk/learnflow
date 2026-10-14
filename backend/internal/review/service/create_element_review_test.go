@@ -25,7 +25,7 @@ func TestCreateCourseReviewAccess(t *testing.T) {
 				return false, nil
 			}
 
-			err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
+			_, err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrNoPermission), ShouldBeTrue)
 		})
@@ -35,7 +35,7 @@ func TestCreateCourseReviewAccess(t *testing.T) {
 				return false, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
+			_, err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -57,7 +57,7 @@ func TestCreateCourseReviewLookup(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
+			_, err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -67,7 +67,7 @@ func TestCreateCourseReviewLookup(t *testing.T) {
 				return &reviewdomain.CourseReview{}, nil
 			}
 
-			err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
+			_, err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
@@ -93,18 +93,19 @@ func TestCreateCourseReviewPersistence(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
+			_, err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
 
-		Convey("success", func() {
+		Convey("success returns the created review ID", func() {
 			cRepo.createCourseReview = func(_ context.Context, _ *reviewdomain.CourseReview) (*reviewdomain.CourseReview, error) {
-				return &reviewdomain.CourseReview{}, nil
+				return &reviewdomain.CourseReview{ID: "review-42"}, nil
 			}
 
-			err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
+			id, err := srv.CreateCourseReview(context.Background(), reviewdomain.CreateCourseReviewRequest{})
 			So(err, ShouldBeNil)
+			So(id, ShouldEqual, "review-42")
 		})
 	})
 }
@@ -124,7 +125,7 @@ func TestCreateContentReviewAccess(t *testing.T) {
 				return false, nil
 			}
 
-			err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
+			_, err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrNoPermission), ShouldBeTrue)
 		})
@@ -134,7 +135,7 @@ func TestCreateContentReviewAccess(t *testing.T) {
 				return false, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
+			_, err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -156,7 +157,7 @@ func TestCreateContentReviewLookup(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
+			_, err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -166,7 +167,7 @@ func TestCreateContentReviewLookup(t *testing.T) {
 				return &reviewdomain.ContentReview{}, nil
 			}
 
-			err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
+			_, err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
@@ -192,7 +193,7 @@ func TestCreateContentReviewPersistence(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
+			_, err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -202,7 +203,7 @@ func TestCreateContentReviewPersistence(t *testing.T) {
 				return &reviewdomain.ContentReview{}, nil
 			}
 
-			err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
+			_, err := srv.CreateContentReview(context.Background(), reviewdomain.CreateContentReviewRequest{})
 			So(err, ShouldBeNil)
 		})
 	})
@@ -218,7 +219,7 @@ func TestCreateCourseReviewAdminLookup(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateCourseReviewAdmin(context.Background(), reviewdomain.CreateCourseReviewRequest{})
+			_, err := srv.CreateCourseReviewAdmin(context.Background(), reviewdomain.CreateCourseReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -228,7 +229,7 @@ func TestCreateCourseReviewAdminLookup(t *testing.T) {
 				return &reviewdomain.CourseReview{}, nil
 			}
 
-			err := srv.CreateCourseReviewAdmin(context.Background(), reviewdomain.CreateCourseReviewRequest{})
+			_, err := srv.CreateCourseReviewAdmin(context.Background(), reviewdomain.CreateCourseReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
@@ -249,7 +250,7 @@ func TestCreateCourseReviewAdminPersistence(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateCourseReviewAdmin(context.Background(), reviewdomain.CreateCourseReviewRequest{})
+			_, err := srv.CreateCourseReviewAdmin(context.Background(), reviewdomain.CreateCourseReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -259,7 +260,7 @@ func TestCreateCourseReviewAdminPersistence(t *testing.T) {
 				return &reviewdomain.CourseReview{}, nil
 			}
 
-			err := srv.CreateCourseReviewAdmin(context.Background(), reviewdomain.CreateCourseReviewRequest{})
+			_, err := srv.CreateCourseReviewAdmin(context.Background(), reviewdomain.CreateCourseReviewRequest{})
 			So(err, ShouldBeNil)
 		})
 	})
@@ -275,7 +276,7 @@ func TestCreateContentReviewAdminLookup(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateContentReviewAdmin(context.Background(), reviewdomain.CreateContentReviewRequest{})
+			_, err := srv.CreateContentReviewAdmin(context.Background(), reviewdomain.CreateContentReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -285,7 +286,7 @@ func TestCreateContentReviewAdminLookup(t *testing.T) {
 				return &reviewdomain.ContentReview{}, nil
 			}
 
-			err := srv.CreateContentReviewAdmin(context.Background(), reviewdomain.CreateContentReviewRequest{})
+			_, err := srv.CreateContentReviewAdmin(context.Background(), reviewdomain.CreateContentReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
@@ -306,7 +307,7 @@ func TestCreateContentReviewAdminPersistence(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateContentReviewAdmin(context.Background(), reviewdomain.CreateContentReviewRequest{})
+			_, err := srv.CreateContentReviewAdmin(context.Background(), reviewdomain.CreateContentReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -316,7 +317,7 @@ func TestCreateContentReviewAdminPersistence(t *testing.T) {
 				return &reviewdomain.ContentReview{}, nil
 			}
 
-			err := srv.CreateContentReviewAdmin(context.Background(), reviewdomain.CreateContentReviewRequest{})
+			_, err := srv.CreateContentReviewAdmin(context.Background(), reviewdomain.CreateContentReviewRequest{})
 			So(err, ShouldBeNil)
 		})
 	})
@@ -332,7 +333,7 @@ func TestCreateArticleReviewLookup(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			_, err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -342,7 +343,7 @@ func TestCreateArticleReviewLookup(t *testing.T) {
 				return &reviewdomain.ArticleReview{}, nil
 			}
 
-			err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			_, err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
@@ -363,7 +364,7 @@ func TestCreateArticleReviewPersistence(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			_, err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -373,7 +374,7 @@ func TestCreateArticleReviewPersistence(t *testing.T) {
 				return &reviewdomain.ArticleReview{}, nil
 			}
 
-			err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			_, err := srv.CreateArticleReview(context.Background(), reviewdomain.CreateArticleReviewRequest{})
 			So(err, ShouldBeNil)
 		})
 	})
@@ -389,7 +390,7 @@ func TestCreateArticleReviewAdminLookup(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			_, err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -399,7 +400,7 @@ func TestCreateArticleReviewAdminLookup(t *testing.T) {
 				return &reviewdomain.ArticleReview{}, nil
 			}
 
-			err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			_, err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, reviewdomain.ErrAlreadyReviewed), ShouldBeTrue)
 		})
@@ -420,7 +421,7 @@ func TestCreateArticleReviewAdminPersistence(t *testing.T) {
 				return nil, testutil.ErrDBUnexpected
 			}
 
-			err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			_, err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
 			So(err, ShouldNotBeNil)
 			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
 		})
@@ -430,7 +431,7 @@ func TestCreateArticleReviewAdminPersistence(t *testing.T) {
 				return &reviewdomain.ArticleReview{}, nil
 			}
 
-			err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
+			_, err := srv.CreateArticleReviewAdmin(context.Background(), reviewdomain.CreateArticleReviewRequest{})
 			So(err, ShouldBeNil)
 		})
 	})

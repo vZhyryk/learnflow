@@ -210,11 +210,11 @@ func TestUpdateArticle(t *testing.T) {
 // bindArticleList adapts a repository list method into the shape testutil.TestListMethod
 // expects: build a repo around the given runner, return the bound method.
 func bindArticleList(
-	call func(*Repository, context.Context, pagination.Params) ([]*articledomain.Article, error),
-) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*articledomain.Article, error) {
-	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*articledomain.Article, error) {
+	call func(*Repository, context.Context, pagination.Params) ([]*articledomain.Article, int, error),
+) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*articledomain.Article, int, error) {
+	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*articledomain.Article, int, error) {
 		repo := newTestRepo(runner)
-		return func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, error) {
+		return func(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error) {
 			return call(repo, ctx, params)
 		}
 	}
@@ -228,22 +228,22 @@ func fakeArticleN(n int) *articledomain.Article {
 }
 
 func TestGetAllPublishedArticles(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllPublishedArticles",
+	testutil.TestCountListMethod(t, "GetAllPublishedArticles",
 		bindArticleList((*Repository).GetAllPublishedArticles), fakeArticleN, fakeArticleScan)
 }
 
 func TestGetAllDraftArticles(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllDraftArticles",
+	testutil.TestCountListMethod(t, "GetAllDraftArticles",
 		bindArticleList((*Repository).GetAllDraftArticles), fakeArticleN, fakeArticleScan)
 }
 
 func TestGetAllArchivedArticles(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllArchivedArticles",
+	testutil.TestCountListMethod(t, "GetAllArchivedArticles",
 		bindArticleList((*Repository).GetAllArchivedArticles), fakeArticleN, fakeArticleScan)
 }
 
 func TestGetAllArticles(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllArticles",
+	testutil.TestCountListMethod(t, "GetAllArticles",
 		bindArticleList((*Repository).GetAllArticles), fakeArticleN, fakeArticleScan)
 }
 

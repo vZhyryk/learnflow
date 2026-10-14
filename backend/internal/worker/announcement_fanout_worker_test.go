@@ -239,10 +239,10 @@ func TestAnnouncementFanOutWorkerProcessAndHandleFailureSuccess(t *testing.T) {
 					return &testutil.MockRows{Rows: nil}, nil
 				},
 			}
-			w := newTestAnnouncementFanOutWorker(runner, nil, &mockAnnouncementRepo{}, defaultTestEntityConfigs())
+			w := newTestAnnouncementFanOutWorker(runner, testutil.UnreachableRedis(), &mockAnnouncementRepo{}, defaultTestEntityConfigs())
 
-			// Nothing to assert beyond "this does not panic and doesn't call DLQ/Del" —
-			// no redisClient is set, so a Del call here would panic on a nil client.
+			// Nothing to assert beyond "this does not panic" — the key-finalize error against the
+			// unreachable Redis is only logged.
 			w.processAndHandleFailure(context.Background(), &events.AnnouncementPayload{AnnouncementID: "ann-1"}, &admindomain.Announcement{ID: "ann-1"}, "key")
 		})
 	})

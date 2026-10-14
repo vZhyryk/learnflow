@@ -280,3 +280,73 @@ func TestRefreshReplayRevokeTokensFails(t *testing.T) {
 		})
 	})
 }
+
+func newRefreshGraceFixture(lastSeenAgo time.Duration) (authdomain.RefreshRequest, *authdomain.User, *authdomain.UserSession) {
+	req, user, session := newRefreshTestFixtures()
+	rotatedAt := time.Now().UTC().Add(-lastSeenAgo)
+	session.LastSeenAt = &rotatedAt
+	return req, user, session
+}
+
+func TestRefreshReuseInsideGraceWindow(t *testing.T) {
+	validReq, activeUser, session := newRefreshGraceFixture(5 * time.Second)
+
+	Convey("Given a session rotated moments ago", t, func() {
+		Convey("When the previous token is replayed inside the grace window, it rotates again without revoking", func() {
+			var rotatedSession string
+			revoked := false
+			sRepo := &mockSessionRepo{
+				getUserSessionByRefreshToken: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
+					return nil, authdomain.ErrSessionNotFound
+				},
+				getSessionByPrevHash: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
+					return session, nil
+				},
+				updateSessionToken: func(_ context.Context, sessionID, _, _, _ string) error {
+					rotatedSession = sessionID
+					return nil
+				},
+				revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error {
+					revoked = true
+					return nil
+				},
+			}
+			uRepo := &mockUserRepo{
+				getUserByID: func(_ context.Context, _ string) (*authdomain.User, error) { return activeUser, nil },
+			}
+			srv := newTestService(uRepo, sRepo, nil, nil, nil)
+
+			got, err := srv.Refresh(context.Background(), validReq)
+
+			So(err, ShouldBeNil)
+			So(got.RefreshToken, ShouldNotBeEmpty)
+			So(rotatedSession, ShouldEqual, session.ID)
+			So(revoked, ShouldBeFalse)
+		})
+	})
+}
+
+func TestRefreshReuseAfterGraceWindow(t *testing.T) {
+	validReq, _, session := newRefreshGraceFixture(refreshReuseGrace + time.Minute)
+
+	Convey("Given a session rotated a while ago", t, func() {
+		Convey("When the previous token is replayed after the grace window, every session is revoked", func() {
+			revoked := false
+			sRepo := &mockSessionRepo{
+				getSessionByPrevHash: func(_ context.Context, _ string) (*authdomain.UserSession, error) {
+					return session, nil
+				},
+				revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error {
+					revoked = true
+					return nil
+				},
+			}
+			srv := newTestService(&mockUserRepo{}, sRepo, nil, nil, newSuccessfulMockBlocklist())
+
+			_, err := srv.Refresh(context.Background(), validReq)
+
+			So(errors.Is(err, authdomain.ErrSessionRevoked), ShouldBeTrue)
+			So(revoked, ShouldBeTrue)
+		})
+	})
+}

@@ -96,35 +96,6 @@ func TestSanitizeString(t *testing.T) {
 	})
 }
 
-// --- SanitizeURL ---
-
-func TestSanitizeURL(t *testing.T) {
-	s := newS()
-
-	Convey("SanitizeURL", t, func() {
-		Convey("URL with sensitive query param: original value is removed", func() {
-			raw := "https://api.example.com/v1?token=abc123&page=2"
-			result := s.SanitizeURL(raw)
-			So(result, ShouldNotContainSubstring, "abc123")
-			So(result, ShouldContainSubstring, "page=2")
-			So(result, ShouldContainSubstring, "token=")
-		})
-
-		Convey("URL without sensitive params is unchanged (except possible reordering)", func() {
-			raw := "https://api.example.com/v1?page=1&sort=asc"
-			result := s.SanitizeURL(raw)
-			So(result, ShouldContainSubstring, "page=1")
-			So(result, ShouldContainSubstring, "sort=asc")
-		})
-
-		Convey("string with invalid URL escape falls back to string sanitization", func() {
-			// "%zz" is an invalid percent-encoded sequence that url.Parse rejects
-			result := s.SanitizeURL("https://host/%zz?token=leak")
-			So(result, ShouldNotContainSubstring, "leak")
-		})
-	})
-}
-
 // --- Sanitize (type dispatch) ---
 
 func TestSanitize(t *testing.T) {
@@ -409,5 +380,27 @@ func TestSanitizeReflectContainers(t *testing.T) {
 			So(s.Sanitize(map[string]int{}), ShouldResemble, map[string]any{})
 			So(s.Sanitize([]int{}), ShouldResemble, []any{})
 		})
+	})
+}
+
+// --- IsSensitiveKey suffix matching ---
+
+func TestIsSensitiveKeySuffix(t *testing.T) {
+	s := newS()
+
+	Convey("IsSensitiveKey", t, func() {
+		for _, key := range []string{"raw_token", "old_password", "new_password", "refresh_hash", "X-Csrf-Token", "stripe_secret"} {
+			k := key
+			Convey(k+" is sensitive", func() {
+				So(s.IsSensitiveKey(k), ShouldBeTrue)
+			})
+		}
+
+		for _, key := range []string{"user_id", "email", "token_version", "path", "method"} {
+			k := key
+			Convey(k+" is not sensitive", func() {
+				So(s.IsSensitiveKey(k), ShouldBeFalse)
+			})
+		}
 	})
 }

@@ -17,12 +17,13 @@ func (h *Handler) createCourseReviewAdmin(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := h.svc.CreateCourseReviewAdmin(ctx, req); err != nil {
+	reviewID, err := h.svc.CreateCourseReviewAdmin(ctx, req)
+	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
 	}
 
-	err := helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"message": "Course review created successfully"}, nil)
+	err = helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"review_id": reviewID}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
@@ -38,12 +39,13 @@ func (h *Handler) createContentReviewAdmin(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := h.svc.CreateContentReviewAdmin(ctx, req); err != nil {
+	reviewID, err := h.svc.CreateContentReviewAdmin(ctx, req)
+	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
 	}
 
-	err := helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"message": "Content review created successfully"}, nil)
+	err = helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"review_id": reviewID}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
@@ -59,12 +61,13 @@ func (h *Handler) createCourseReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.CreateCourseReview(ctx, req); err != nil {
+	reviewID, err := h.svc.CreateCourseReview(ctx, req)
+	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
 	}
 
-	err := helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"message": "Course review created successfully"}, nil)
+	err = helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"review_id": reviewID}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
@@ -80,12 +83,13 @@ func (h *Handler) createContentReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.CreateContentReview(ctx, req); err != nil {
+	reviewID, err := h.svc.CreateContentReview(ctx, req)
+	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
 	}
 
-	err := helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"message": "Content review created successfully"}, nil)
+	err = helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"review_id": reviewID}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
@@ -101,12 +105,13 @@ func (h *Handler) createArticleReviewAdmin(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := h.svc.CreateArticleReviewAdmin(ctx, req); err != nil {
+	reviewID, err := h.svc.CreateArticleReviewAdmin(ctx, req)
+	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
 	}
 
-	err := helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"message": "Article review created successfully"}, nil)
+	err = helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"review_id": reviewID}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
@@ -122,12 +127,13 @@ func (h *Handler) createArticleReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.CreateArticleReview(ctx, req); err != nil {
+	reviewID, err := h.svc.CreateArticleReview(ctx, req)
+	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
 	}
 
-	err := helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"message": "Article review created successfully"}, nil)
+	err = helpers.WriteJSON(w, http.StatusCreated, helpers.Envelope{"review_id": reviewID}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}

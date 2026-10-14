@@ -61,18 +61,6 @@ const (
 		WHERE id = $1 AND revoked_at IS NULL AND expires_at > now()
 	`
 
-	updateFailedLoginAttemptsSQL = `
-		UPDATE user_sessions
-		SET failed_attempt_count = failed_attempt_count + 1,
-		last_attempt_at = now(),
-		locked_until = CASE
-			WHEN failed_attempt_count + 1 >= $2
-			THEN now() + $3::interval
-			ELSE locked_until
-		END
-		WHERE id = $1
-	`
-
 	/* Token */
 	tokenColumns = ` id, user_id, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id `
 

@@ -15,10 +15,6 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
-	if user.ID != req.UserID {
-		h.handleErrorResponse(w, r, authdomain.ErrUserNotFound)
-		return
-	}
 	req.UserID = user.ID
 
 	err := h.svc.ChangePassword(ctx, req)

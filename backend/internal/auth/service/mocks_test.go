@@ -162,10 +162,8 @@ type mockSessionRepo struct {
 	getUserSessionByRefreshToken func(ctx context.Context, refreshTokenHash string) (*authdomain.UserSession, error)
 	revokeUserSession            func(ctx context.Context, sessionID, revokedBy string, reason authdomain.RevokeReason) error
 	revokeAllUserSessions        func(ctx context.Context, userID string, revokedBy *string, reason authdomain.RevokeReason) error
-	getActiveSessionsByUserID    func(ctx context.Context, userID string) ([]*authdomain.UserSession, error)
 	getSessionByPrevHash         func(ctx context.Context, prevRefreshTokenHash string) (*authdomain.UserSession, error)
 	updateSessionToken           func(ctx context.Context, sessionID, hash, ua, ip string) error
-	updateFailedLoginAttempts    func(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error
 }
 
 func (m *mockSessionRepo) CreateUserSession(ctx context.Context, s *authdomain.UserSession) (*authdomain.UserSession, error) {
@@ -196,25 +194,11 @@ func (m *mockSessionRepo) RevokeAllUserSessions(ctx context.Context, userID stri
 	return m.revokeAllUserSessions(ctx, userID, revokedByUserID, revokeReason)
 }
 
-func (m *mockSessionRepo) GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
-	if m.getActiveSessionsByUserID == nil {
-		panic("mockSessionRepo.getActiveSessionsByUserID not set")
-	}
-	return m.getActiveSessionsByUserID(ctx, userID)
-}
-
 func (m *mockSessionRepo) UpdateSessionToken(ctx context.Context, sessionID, tokenHash, userAgent, ipAddress string) error {
 	if m.updateSessionToken == nil {
 		panic("mockSessionRepo.updateSessionToken not set")
 	}
 	return m.updateSessionToken(ctx, sessionID, tokenHash, userAgent, ipAddress)
-}
-
-func (m *mockSessionRepo) UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error {
-	if m.updateFailedLoginAttempts == nil {
-		panic("mockSessionRepo.updateFailedLoginAttempts not set")
-	}
-	return m.updateFailedLoginAttempts(ctx, sessionID, lockInterval, loginCountLimit)
 }
 
 func (m *mockSessionRepo) GetSessionByPrevHash(ctx context.Context, prevRefreshTokenHash string) (*authdomain.UserSession, error) {

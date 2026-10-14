@@ -21,7 +21,7 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 
 	if user != nil {
 		// Dummy bcrypt (same cost as hashing a new password) keeps this path as slow as a fresh registration.
-		bcryptCompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck,gosec // discarded intentionally, only used to consume constant time
+		s.compareHash(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck,gosec // discarded intentionally, only used to consume constant time
 		return "", s.handleGetUserByEmailRegisterError(ctx, user)
 	}
 
@@ -71,13 +71,7 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 				return nil, fmt.Errorf("register: create verification token: %w", err)
 			}
 
-			return events.TokenPayload{
-				UserID:    id,
-				Email:     user.Email,
-				ExpiresAt: expiresAt,
-				RawToken:  rawToken,
-				UserName:  userProfile.GetFirstName(),
-			}, nil
+			return newTokenPayload(id, user.Email, rawToken, expiresAt, userProfile), nil
 		})
 	})
 

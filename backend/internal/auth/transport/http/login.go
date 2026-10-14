@@ -9,7 +9,7 @@ import (
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	ua := r.UserAgent()
+	ua := clientUserAgent(r)
 
 	var req authdomain.LoginRequest
 	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, func() {

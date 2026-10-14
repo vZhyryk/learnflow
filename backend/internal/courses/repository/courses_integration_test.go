@@ -369,16 +369,18 @@ func TestGetAllCoursesByStatus_Integration(t *testing.T) {
 			params := pagination.NewParams(1, 100)
 
 			Convey("GetAllDraftCourses returns only the draft, excluding soft-deleted", func() {
-				got, err := repo.GetAllDraftCourses(ctx, params)
+				got, total, err := repo.GetAllDraftCourses(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := courseIDs(got)
 				So(ids, ShouldContain, draft.ID)
 				So(ids, ShouldNotContain, deleted.ID)
 			})
 
 			Convey("GetAllPublishedCourses returns only the published course", func() {
-				got, err := repo.GetAllPublishedCourses(ctx, params)
+				got, total, err := repo.GetAllPublishedCourses(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := courseIDs(got)
 				So(ids, ShouldContain, published.ID)
 				So(ids, ShouldNotContain, draft.ID)
@@ -390,14 +392,16 @@ func TestGetAllCoursesByStatus_Integration(t *testing.T) {
 				// admin "including soft-deleted ones" query per db-conventions.md.
 				So(repo.DeleteCourse(ctx, archived.ID, archived.CreatedByUserID), ShouldBeNil)
 
-				got, err := repo.GetAllArchivedCourses(ctx, params)
+				got, total, err := repo.GetAllArchivedCourses(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				So(courseIDs(got), ShouldContain, archived.ID)
 			})
 
 			Convey("GetAllCourses returns every course regardless of status, including soft-deleted", func() {
-				got, err := repo.GetAllCourses(ctx, params)
+				got, total, err := repo.GetAllCourses(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := courseIDs(got)
 				So(ids, ShouldContain, draft.ID)
 				So(ids, ShouldContain, published.ID)
@@ -406,9 +410,11 @@ func TestGetAllCoursesByStatus_Integration(t *testing.T) {
 			})
 
 			Convey("Pagination limits the returned page size", func() {
-				got, err := repo.GetAllCourses(ctx, pagination.NewParams(1, 2))
+				got, total, err := repo.GetAllCourses(ctx, pagination.NewParams(1, 2))
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				So(len(got), ShouldEqual, 2)
+				So(total, ShouldBeGreaterThanOrEqualTo, 4)
 			})
 		})
 	})

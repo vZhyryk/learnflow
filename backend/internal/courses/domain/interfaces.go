@@ -18,10 +18,10 @@ type CourseRepository interface {
 	ArchiveCourse(ctx context.Context, courseID, userID string) error
 	DeleteCourse(ctx context.Context, courseID, userID string) error
 	UpdateCourse(ctx context.Context, course *Course, userID string) error
-	GetAllPublishedCourses(ctx context.Context, params pagination.Params) ([]*Course, error)
-	GetAllDraftCourses(ctx context.Context, params pagination.Params) ([]*Course, error)
-	GetAllArchivedCourses(ctx context.Context, params pagination.Params) ([]*Course, error)
-	GetAllCourses(ctx context.Context, params pagination.Params) ([]*Course, error)
+	GetAllPublishedCourses(ctx context.Context, params pagination.Params) ([]*Course, int, error)
+	GetAllDraftCourses(ctx context.Context, params pagination.Params) ([]*Course, int, error)
+	GetAllArchivedCourses(ctx context.Context, params pagination.Params) ([]*Course, int, error)
+	GetAllCourses(ctx context.Context, params pagination.Params) ([]*Course, int, error)
 	GetCourseByID(ctx context.Context, courseID string) (*Course, error)
 	GetCourseBySlug(ctx context.Context, slug string) (*Course, error)
 	CheckIfCourseExistsByID(ctx context.Context, courseID string) (bool, error)
@@ -40,5 +40,5 @@ type Service interface {
 	GetCourseBySlug(ctx context.Context, slug string) (*Course, error)
 	PublishCourse(ctx context.Context, courseID, userID string) error
 	UpdateCourse(ctx context.Context, req UpdateCourseRequest, userID string) error
-	GetAllCourses(ctx context.Context, getType CourseStatus, params pagination.Params) (courseList []*Course, err error)
+	GetAllCourses(ctx context.Context, getType CourseStatus, params pagination.Params) (courseList []*Course, total int, err error)
 }

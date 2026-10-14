@@ -48,13 +48,7 @@ func (s *Service) InitiateEmailChange(ctx context.Context, req authdomain.Reques
 					return nil, fmt.Errorf("init_email_change: create token: %w", err)
 				}
 
-				return events.TokenPayload{
-					UserID:    req.UserID,
-					Email:     req.NewEmail,
-					ExpiresAt: expiresAt,
-					RawToken:  rawToken,
-					UserName:  userProfile.GetFirstName(),
-				}, nil
+				return newTokenPayload(req.UserID, req.NewEmail, rawToken, expiresAt, userProfile), nil
 			})
 	})
 }

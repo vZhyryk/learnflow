@@ -40,12 +40,13 @@ const (
     	UPDATE announcement_email_deliveries
     	SET status = 'sent',
 		updated_at = now()
-    	WHERE id = $1
+    	WHERE id = ANY($1::uuid[])
 	`
 
 	queryMarkAnnouncementFailed = `
     	UPDATE announcement_email_deliveries
-    	SET status = 'failed',
+    	SET status = CASE WHEN attempt_count + 1 >= $3 THEN 'failed' ELSE 'pending' END,
+		attempt_count = attempt_count + 1,
 		updated_at = now(),
 		last_error = $2
     	WHERE id = $1
@@ -112,7 +113,7 @@ func scanAnnouncementDeliveryPoller(row repository.RowScanner) (PollerEntry[Anno
 // announcement_email_deliveries rows and publishes them to Redis, polling on a ticker
 // until ctx is cancelled.
 func NewAnnouncementDeliveryPoller(queryRunner db.QueryRunner, publisher events.Publisher, jsonLogger *logger.Logger, transactor Transactor) *Poller[AnnouncementDeliveryPoller] {
-	return NewPoller[AnnouncementDeliveryPoller](queryRunner, publisher, jsonLogger, transactor, "announcementDeliveryPoller", 5*time.Second, SQLList[AnnouncementDeliveryPoller]{
+	return NewPoller[AnnouncementDeliveryPoller](queryRunner, publisher, jsonLogger, transactor, "announcementDeliveryPoller", 5*time.Second, 3, SQLList[AnnouncementDeliveryPoller]{
 		selectSQL:      querySelectAnnouncements,
 		markSuccessSQL: queryMarkAnnouncementSend,
 		markFailedSQL:  queryMarkAnnouncementFailed,

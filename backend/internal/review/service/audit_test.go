@@ -42,7 +42,8 @@ func courseActionCases() []adminActionCase {
 		{
 			name: "course review create (admin)",
 			run: func(actions *mockAdminActionRepo) error {
-				return courseSvc(repo, actions).CreateCourseReviewAdmin(ctx, reviewdomain.CreateCourseReviewRequest{UserID: "admin-1"})
+				_, err := courseSvc(repo, actions).CreateCourseReviewAdmin(ctx, reviewdomain.CreateCourseReviewRequest{UserID: "admin-1"})
+				return err
 			},
 			want: reviewAction(auditdomain.ActionCreateItem),
 		},
@@ -84,7 +85,8 @@ func contentActionCases() []adminActionCase {
 		{
 			name: "content review create (admin)",
 			run: func(actions *mockAdminActionRepo) error {
-				return contentSvc(repo, actions).CreateContentReviewAdmin(ctx, reviewdomain.CreateContentReviewRequest{UserID: "admin-1"})
+				_, err := contentSvc(repo, actions).CreateContentReviewAdmin(ctx, reviewdomain.CreateContentReviewRequest{UserID: "admin-1"})
+				return err
 			},
 			want: reviewAction(auditdomain.ActionCreateItem),
 		},
@@ -126,7 +128,8 @@ func articleActionCases() []adminActionCase {
 		{
 			name: "article review create (admin)",
 			run: func(actions *mockAdminActionRepo) error {
-				return articleSvc(repo, actions).CreateArticleReviewAdmin(ctx, reviewdomain.CreateArticleReviewRequest{UserID: "admin-1"})
+				_, err := articleSvc(repo, actions).CreateArticleReviewAdmin(ctx, reviewdomain.CreateArticleReviewRequest{UserID: "admin-1"})
+				return err
 			},
 			want: reviewAction(auditdomain.ActionCreateItem),
 		},

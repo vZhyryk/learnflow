@@ -126,13 +126,13 @@ func unblocksUser(action auditdomain.AdminActionType) bool {
 	return action == auditdomain.ActionUnblockUser || action == auditdomain.ActionRestoreUser
 }
 
-// isUserRevokeOperation reports whether the action must also end the user's sessions and mark their role revoked.
-func isUserRevokeOperation(action auditdomain.AdminActionType) bool {
+// revokesSubadmin reports whether the action must also end the user's sessions and mark their role revoked.
+func revokesSubadmin(action auditdomain.AdminActionType) bool {
 	return action == auditdomain.ActionRevokeSubadmin
 }
 
-// isUserAssignOperation reports whether the action must also clear the user's role-revoked mark.
-func isUserAssignOperation(action auditdomain.AdminActionType) bool {
+// assignsSubadmin reports whether the action must also clear the user's role-revoked mark.
+func assignsSubadmin(action auditdomain.AdminActionType) bool {
 	return action == auditdomain.ActionAssignSubadmin
 }
 
@@ -188,11 +188,11 @@ func (srv *Service) applyChangeEffects(ctx context.Context, action auditdomain.A
 		return blocklistError("clear user_blocked", srv.blocklist.UnBlockUser(ctx, userID))
 	}
 
-	if isUserRevokeOperation(action) {
+	if revokesSubadmin(action) {
 		return srv.revokeSessionsAndMark(ctx, userID, adminID, "set user_role_revoked", srv.blocklist.RevokeUserRole)
 	}
 
-	if isUserAssignOperation(action) {
+	if assignsSubadmin(action) {
 		return blocklistError("clear user_role_revoked", srv.blocklist.ClearUserRoleRevoked(ctx, userID))
 	}
 
@@ -263,8 +263,8 @@ type grantSpec struct {
 }
 
 // GrantUserCourseAccess gives a user free access to a course, audits it and queues the notification email.
-func (srv *Service) GrantUserCourseAccess(ctx context.Context, userID, courseID, adminID string, operationName auditdomain.AdminActionType) error {
-	return srv.grantAccess(ctx, userID, adminID, operationName, grantSpec{
+func (srv *Service) GrantUserCourseAccess(ctx context.Context, userID, courseID, adminID string, action auditdomain.AdminActionType) error {
+	return srv.grantAccess(ctx, userID, adminID, action, grantSpec{
 		method:     "GrantUserCourseAccess",
 		itemType:   admindomain.CourseItemType,
 		itemID:     courseID,
@@ -275,8 +275,8 @@ func (srv *Service) GrantUserCourseAccess(ctx context.Context, userID, courseID,
 }
 
 // GrantUserContentAccess gives a user free access to a content item, audits it and queues the notification email.
-func (srv *Service) GrantUserContentAccess(ctx context.Context, userID, contentItemID, adminID string, operationName auditdomain.AdminActionType) error {
-	return srv.grantAccess(ctx, userID, adminID, operationName, grantSpec{
+func (srv *Service) GrantUserContentAccess(ctx context.Context, userID, contentItemID, adminID string, action auditdomain.AdminActionType) error {
+	return srv.grantAccess(ctx, userID, adminID, action, grantSpec{
 		method:     "GrantUserContentAccess",
 		itemType:   admindomain.ContentItemType,
 		itemID:     contentItemID,

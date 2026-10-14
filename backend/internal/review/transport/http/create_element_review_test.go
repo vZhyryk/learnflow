@@ -19,8 +19,8 @@ func TestCreateCourseReview(t *testing.T) {
 	Convey("POST /api/v1/courses/reviews", t, func() {
 		var svcErr error
 		svc := &mockService{
-			createCourseReview: func(_ context.Context, _ reviewdomain.CreateCourseReviewRequest) error {
-				return svcErr
+			createCourseReview: func(_ context.Context, _ reviewdomain.CreateCourseReviewRequest) (string, error) {
+				return "review-1", svcErr
 			},
 		}
 
@@ -72,7 +72,7 @@ func TestCreateCourseReview(t *testing.T) {
 			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
 			So(w.Code, ShouldEqual, http.StatusCreated)
 			body := decodeBody(t, w.Body.Bytes())
-			So(body["message"], ShouldEqual, "Course review created successfully")
+			So(body["review_id"], ShouldEqual, "review-1")
 		})
 
 		Convey("Valid request and the success response write fails → does not panic", func() {
@@ -87,8 +87,8 @@ func TestCreateCourseReviewWrappedErrors(t *testing.T) {
 	Convey("POST /api/v1/courses/reviews — wrapped service errors", t, func() {
 		var svcErr error
 		svc := &mockService{
-			createCourseReview: func(_ context.Context, _ reviewdomain.CreateCourseReviewRequest) error {
-				return svcErr
+			createCourseReview: func(_ context.Context, _ reviewdomain.CreateCourseReviewRequest) (string, error) {
+				return "review-1", svcErr
 			},
 		}
 
@@ -117,8 +117,8 @@ func TestCreateContentReview(t *testing.T) {
 	Convey("POST /api/v1/content/reviews", t, func() {
 		var svcErr error
 		svc := &mockService{
-			createContentReview: func(_ context.Context, _ reviewdomain.CreateContentReviewRequest) error {
-				return svcErr
+			createContentReview: func(_ context.Context, _ reviewdomain.CreateContentReviewRequest) (string, error) {
+				return "review-1", svcErr
 			},
 		}
 
@@ -153,7 +153,7 @@ func TestCreateContentReview(t *testing.T) {
 			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
 			So(w.Code, ShouldEqual, http.StatusCreated)
 			body := decodeBody(t, w.Body.Bytes())
-			So(body["message"], ShouldEqual, "Content review created successfully")
+			So(body["review_id"], ShouldEqual, "review-1")
 		})
 
 		Convey("Valid request and the success response write fails → does not panic", func() {
@@ -169,9 +169,9 @@ func TestCreateCourseReviewAdmin(t *testing.T) {
 		var svcErr error
 		var gotAdminID string
 		svc := &mockService{
-			createCourseReviewAdmin: func(_ context.Context, req reviewdomain.CreateCourseReviewRequest) error {
+			createCourseReviewAdmin: func(_ context.Context, req reviewdomain.CreateCourseReviewRequest) (string, error) {
 				gotAdminID = req.UserID
-				return svcErr
+				return "review-1", svcErr
 			},
 		}
 
@@ -207,7 +207,7 @@ func TestCreateCourseReviewAdmin(t *testing.T) {
 			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
 			So(w.Code, ShouldEqual, http.StatusCreated)
 			body := decodeBody(t, w.Body.Bytes())
-			So(body["message"], ShouldEqual, "Course review created successfully")
+			So(body["review_id"], ShouldEqual, "review-1")
 		})
 
 		Convey("Valid request → passes the authenticated user as adminID, not a user_id from the body", func() {
@@ -229,9 +229,9 @@ func TestCreateContentReviewAdmin(t *testing.T) {
 		var svcErr error
 		var gotAdminID string
 		svc := &mockService{
-			createContentReviewAdmin: func(_ context.Context, req reviewdomain.CreateContentReviewRequest) error {
+			createContentReviewAdmin: func(_ context.Context, req reviewdomain.CreateContentReviewRequest) (string, error) {
 				gotAdminID = req.UserID
-				return svcErr
+				return "review-1", svcErr
 			},
 		}
 
@@ -261,7 +261,7 @@ func TestCreateContentReviewAdmin(t *testing.T) {
 			w := testutil.ServeHTTP(mux, withValidUUIDUser(newReq(validBody, nil)))
 			So(w.Code, ShouldEqual, http.StatusCreated)
 			body := decodeBody(t, w.Body.Bytes())
-			So(body["message"], ShouldEqual, "Content review created successfully")
+			So(body["review_id"], ShouldEqual, "review-1")
 		})
 
 		Convey("Valid request → passes the authenticated user as adminID, not a user_id from the body", func() {

@@ -209,11 +209,11 @@ func TestUpdateContentItem(t *testing.T) {
 // bindContentItemList adapts a repository list method into the shape testutil.TestListMethod
 // expects: build a repo around the given runner, return the bound method.
 func bindContentItemList(
-	call func(*Repository, context.Context, pagination.Params) ([]*contentdomain.ContentItem, error),
-) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*contentdomain.ContentItem, error) {
-	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*contentdomain.ContentItem, error) {
+	call func(*Repository, context.Context, pagination.Params) ([]*contentdomain.ContentItem, int, error),
+) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*contentdomain.ContentItem, int, error) {
+	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*contentdomain.ContentItem, int, error) {
 		repo := newTestRepo(runner)
-		return func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, error) {
+		return func(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error) {
 			return call(repo, ctx, params)
 		}
 	}
@@ -227,19 +227,19 @@ func fakeContentItemN(n int) *contentdomain.ContentItem {
 }
 
 func TestGetAllPublishedContentItems(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllPublishedContentItems", bindContentItemList((*Repository).GetAllPublishedContentItems), fakeContentItemN, fakeContentItemScan)
+	testutil.TestCountListMethod(t, "GetAllPublishedContentItems", bindContentItemList((*Repository).GetAllPublishedContentItems), fakeContentItemN, fakeContentItemScan)
 }
 
 func TestGetAllDraftContentItems(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllDraftContentItems", bindContentItemList((*Repository).GetAllDraftContentItems), fakeContentItemN, fakeContentItemScan)
+	testutil.TestCountListMethod(t, "GetAllDraftContentItems", bindContentItemList((*Repository).GetAllDraftContentItems), fakeContentItemN, fakeContentItemScan)
 }
 
 func TestGetAllArchivedContentItems(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllArchivedContentItems", bindContentItemList((*Repository).GetAllArchivedContentItems), fakeContentItemN, fakeContentItemScan)
+	testutil.TestCountListMethod(t, "GetAllArchivedContentItems", bindContentItemList((*Repository).GetAllArchivedContentItems), fakeContentItemN, fakeContentItemScan)
 }
 
 func TestGetAllContentItems(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllContentItems", bindContentItemList((*Repository).GetAllContentItems), fakeContentItemN, fakeContentItemScan)
+	testutil.TestCountListMethod(t, "GetAllContentItems", bindContentItemList((*Repository).GetAllContentItems), fakeContentItemN, fakeContentItemScan)
 }
 
 func TestCheckIfContentItemExistsByID(t *testing.T) {

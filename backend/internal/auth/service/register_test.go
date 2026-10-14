@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/crypto/bcrypt"
+
 	. "github.com/smartystreets/goconvey/convey"
 )
 
@@ -123,18 +125,15 @@ func TestRegisterExistingEmailNotifyGuard(t *testing.T) {
 
 // TestRegisterConstantTimeUserEnumeration covers the timing mitigation on Register: an already
 // registered email must still pay for a bcrypt comparison, so the 202 response time does not reveal
-// whether the email exists. It spies on the bcryptCompareHashAndPassword hook instead of timing.
+// whether the email exists. It spies on the service compareHash field instead of timing.
 func TestRegisterConstantTimeUserEnumeration(t *testing.T) {
 	Convey("Given an auth service", t, func() {
-		original := bcryptCompareHashAndPassword
-		Reset(func() { bcryptCompareHashAndPassword = original })
-
 		var calls int
 		var lastHash, lastPassword []byte
-		bcryptCompareHashAndPassword = func(hashedPassword, password []byte) error {
+		spy := func(hashedPassword, password []byte) error {
 			calls++
 			lastHash, lastPassword = hashedPassword, password
-			return original(hashedPassword, password)
+			return bcrypt.CompareHashAndPassword(hashedPassword, password)
 		}
 
 		Convey("When the email is already registered, the dummy bcrypt comparison still runs", func() {
@@ -147,6 +146,7 @@ func TestRegisterConstantTimeUserEnumeration(t *testing.T) {
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, testutil.NewNoopOutbox(), nil)
+			srv.compareHash = spy
 			req := fakeRegisterRequest()
 
 			_, err := srv.Register(context.Background(), req)
@@ -163,6 +163,7 @@ func TestRegisterConstantTimeUserEnumeration(t *testing.T) {
 				return "", testutil.ErrDBUnexpected
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
+			srv.compareHash = spy
 
 			_, err := srv.Register(context.Background(), fakeRegisterRequest())
 

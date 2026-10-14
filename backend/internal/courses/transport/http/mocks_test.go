@@ -45,7 +45,7 @@ type mockService struct {
 	getCourseBySlug func(ctx context.Context, slug string) (*coursedomain.Course, error)
 	publishCourse   func(ctx context.Context, courseID, userID string) error
 	updateCourse    func(ctx context.Context, req coursedomain.UpdateCourseRequest, userID string) error
-	getAllCourses   func(ctx context.Context, getType coursedomain.CourseStatus, params pagination.Params) (courseList []*coursedomain.Course, err error)
+	getAllCourses   func(ctx context.Context, getType coursedomain.CourseStatus, params pagination.Params) (courseList []*coursedomain.Course, total int, err error)
 }
 
 func (m *mockService) ArchiveCourse(ctx context.Context, courseID, userID string) error {
@@ -86,7 +86,7 @@ func (m *mockService) UpdateCourse(ctx context.Context, req coursedomain.UpdateC
 	}
 	return m.updateCourse(ctx, req, userID)
 }
-func (m *mockService) GetAllCourses(ctx context.Context, getType coursedomain.CourseStatus, params pagination.Params) (courseList []*coursedomain.Course, err error) {
+func (m *mockService) GetAllCourses(ctx context.Context, getType coursedomain.CourseStatus, params pagination.Params) (courseList []*coursedomain.Course, total int, err error) {
 	if m.getAllCourses == nil {
 		panic("mockService.getAllCourses not set")
 	}

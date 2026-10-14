@@ -287,20 +287,6 @@ func TestLogRespondErrorWithProps(t *testing.T) {
 	})
 }
 
-func TestNewEnvelope(t *testing.T) {
-	Convey("NewEnvelope", t, func() {
-		Convey("wraps the map as an Envelope with the same content", func() {
-			env := helpers.NewEnvelope(map[string]any{"status": "ok", "count": 2})
-
-			So(env, ShouldResemble, helpers.Envelope{"status": "ok", "count": 2})
-		})
-
-		Convey("keeps a nil map nil", func() {
-			So(helpers.NewEnvelope(nil), ShouldBeNil)
-		})
-	})
-}
-
 func TestRootError(t *testing.T) {
 	sentinel := errors.New("invalid title")
 

@@ -12,21 +12,21 @@ type mockReviewRepo struct {
 	createCourseReview                 func(ctx context.Context, courseReview *reviewdomain.CourseReview) (*reviewdomain.CourseReview, error)
 	updateCourseReview                 func(ctx context.Context, courseReview *reviewdomain.CourseReview) error
 	deleteCourseReview                 func(ctx context.Context, reviewID, userID string) error
-	getCourseReviewList                func(ctx context.Context, params pagination.Params, courseID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error)
+	getCourseReviewList                func(ctx context.Context, params pagination.Params, courseID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, int, error)
 	getCourseReviewByID                func(ctx context.Context, reviewID string) (*reviewdomain.CourseReview, error)
 	getCourseReviewByUserAndCourseID   func(ctx context.Context, userID, courseID string) (*reviewdomain.CourseReview, error)
 	getCourseReviewStats               func(ctx context.Context, courseID string) (rating float64, count int, err error)
 	createContentReview                func(ctx context.Context, contentReview *reviewdomain.ContentReview) (*reviewdomain.ContentReview, error)
 	updateContentReview                func(ctx context.Context, contentReview *reviewdomain.ContentReview) error
 	deleteContentReview                func(ctx context.Context, reviewID, userID string) error
-	getContentReviewList               func(ctx context.Context, params pagination.Params, contentID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error)
+	getContentReviewList               func(ctx context.Context, params pagination.Params, contentID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, int, error)
 	getContentReviewByID               func(ctx context.Context, reviewID string) (*reviewdomain.ContentReview, error)
 	getContentReviewByUserAndContentID func(ctx context.Context, userID, contentID string) (*reviewdomain.ContentReview, error)
 	getContentReviewStats              func(ctx context.Context, contentID string) (rating float64, count int, err error)
 	createArticleReview                func(ctx context.Context, articleReview *reviewdomain.ArticleReview) (*reviewdomain.ArticleReview, error)
 	updateArticleReview                func(ctx context.Context, articleReview *reviewdomain.ArticleReview) error
 	deleteArticleReview                func(ctx context.Context, reviewID, userID string) error
-	getArticleReviewList               func(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error)
+	getArticleReviewList               func(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, int, error)
 	getArticleReviewByID               func(ctx context.Context, reviewID string) (*reviewdomain.ArticleReview, error)
 	getArticleReviewByUserAndArticleID func(ctx context.Context, userID, articleID string) (*reviewdomain.ArticleReview, error)
 	getArticleReviewStats              func(ctx context.Context, articleID string) (rating float64, count int, err error)
@@ -58,7 +58,7 @@ func (m *mockReviewRepo) DeleteCourseReview(ctx context.Context, reviewID, userI
 
 	return m.deleteCourseReview(ctx, reviewID, userID)
 }
-func (m *mockReviewRepo) GetCourseReviewList(ctx context.Context, params pagination.Params, courseID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, error) {
+func (m *mockReviewRepo) GetCourseReviewList(ctx context.Context, params pagination.Params, courseID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, int, error) {
 	if m.getCourseReviewList == nil {
 		panic("mockReviewRepo.GetCourseReviewList not set")
 	}
@@ -108,7 +108,7 @@ func (m *mockReviewRepo) DeleteContentReview(ctx context.Context, reviewID, user
 
 	return m.deleteContentReview(ctx, reviewID, userID)
 }
-func (m *mockReviewRepo) GetContentReviewList(ctx context.Context, params pagination.Params, contentID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, error) {
+func (m *mockReviewRepo) GetContentReviewList(ctx context.Context, params pagination.Params, contentID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ContentReview, int, error) {
 	if m.getContentReviewList == nil {
 		panic("mockReviewRepo.GetContentReviewList not set")
 	}
@@ -158,7 +158,7 @@ func (m *mockReviewRepo) DeleteArticleReview(ctx context.Context, reviewID, user
 
 	return m.deleteArticleReview(ctx, reviewID, userID)
 }
-func (m *mockReviewRepo) GetArticleReviewList(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
+func (m *mockReviewRepo) GetArticleReviewList(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, int, error) {
 	if m.getArticleReviewList == nil {
 		panic("mockReviewRepo.GetArticleReviewList not set")
 	}

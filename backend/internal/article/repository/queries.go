@@ -58,11 +58,19 @@ const (
 		LIMIT $1 OFFSET $2
 	`
 
+	countPublishedArticlesSQL = `
+		SELECT COUNT(*) FROM articles WHERE status = 'published' AND deleted_at IS NULL
+	`
+
 	getAllDraftArticlesSQL = `
 		SELECT` + articleColumns + `
 		FROM articles WHERE status = 'draft' AND deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
+	`
+
+	countDraftArticlesSQL = `
+		SELECT COUNT(*) FROM articles WHERE status = 'draft' AND deleted_at IS NULL
 	`
 
 	getAllArchivedArticlesSQL = `
@@ -72,11 +80,19 @@ const (
 		LIMIT $1 OFFSET $2
 	`
 
+	countArchivedArticlesSQL = `
+		SELECT COUNT(*) FROM articles WHERE status = 'archived'
+	`
+
 	getAllArticlesSQL = `
 		SELECT` + articleColumns + `
 		FROM articles
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
+	`
+
+	countAllArticlesSQL = `
+		SELECT COUNT(*) FROM articles
 	`
 
 	getArticleByIDSQL = `

@@ -18,13 +18,13 @@ func (h *Handler) listAllCourses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	courseList, err := h.svc.GetAllCourses(ctx, status, pagination.ParsePaginationParams(r))
+	courseList, total, err := h.svc.GetAllCourses(ctx, status, pagination.ParsePaginationParams(r))
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
 	}
 
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"course_list": courseList}, nil)
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"courses": courseList, "total": total}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}

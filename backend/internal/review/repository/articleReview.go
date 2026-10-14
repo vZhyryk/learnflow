@@ -8,7 +8,6 @@ import (
 	reviewdomain "learnflow_backend/internal/review/domain"
 	"learnflow_backend/internal/shared/pagination"
 	"learnflow_backend/internal/shared/repository"
-	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -54,18 +53,11 @@ func (rep *Repository) DeleteArticleReview(ctx context.Context, reviewID, userID
 	return nil
 }
 
-// GetArticleReviewList returns a paginated list of non-deleted reviews for a Article.
-func (rep *Repository) GetArticleReviewList(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, error) {
-	args := make([]any, 1)
-	args[0] = articleID
-	query := getArticleReviewByArticleIDSQL
-	if idx := strings.Index(query, filterPlace); filter.IsUsed() && idx >= 0 {
-		query = query[:idx] + rep.GenerateFilterQuery(filter.Op)
-		args = append(args, filter.Rating)
-	} else {
-		query = strings.Replace(query, filterPlace, "", 1)
-	}
-	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, query, "GetArticleReviewList", &params, scanArticleReview, args)
+// GetArticleReviewList returns a paginated list of non-deleted reviews and the total matching count.
+func (rep *Repository) GetArticleReviewList(ctx context.Context, params pagination.Params, articleID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.ArticleReview, int, error) {
+	query, countQuery, args := rep.applyFilter(getArticleReviewByArticleIDSQL, countArticleReviewsByArticleIDSQL, articleID, filter)
+
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, query, countQuery, "GetArticleReviewList", params, scanArticleReview, args)
 }
 
 // GetArticleReviewByID retrieves a non-deleted Article review by ID.

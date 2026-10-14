@@ -30,25 +30,6 @@ func TestIsKnownEventType(t *testing.T) {
 	})
 }
 
-func TestIsKnownAggregationType(t *testing.T) {
-	Convey("IsKnownAggregationType", t, func() {
-		Convey("returns true for known event types", func() {
-			So(IsKnownAggregationType(AggregationTypeUser), ShouldBeTrue)
-			So(IsKnownAggregationType(AggregationTypeEmail), ShouldBeTrue)
-			So(IsKnownAggregationType(AggregationTypeAccount), ShouldBeTrue)
-			So(IsKnownAggregationType(AggregationTypePassword), ShouldBeTrue)
-			So(IsKnownAggregationType(AggregationTypeBrief), ShouldBeTrue)
-			So(IsKnownAggregationType(AggregationTypeBooking), ShouldBeTrue)
-			So(IsKnownAggregationType(AggregationTypePayment), ShouldBeTrue)
-			So(IsKnownAggregationType(AggregationTypeAnnouncement), ShouldBeTrue)
-		})
-
-		Convey("returns false for unknown event types", func() {
-			So(IsKnownAggregationType("unknown.event"), ShouldBeFalse)
-		})
-	})
-}
-
 // eventTypeValue returns the string value of a const spec declared with the EventType type.
 func eventTypeValue(spec ast.Spec) (EventType, bool) {
 	value, isValue := spec.(*ast.ValueSpec)

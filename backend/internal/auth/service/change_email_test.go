@@ -153,20 +153,6 @@ func TestInitiateEmailChangeAvailabilityCheck(t *testing.T) {
 			So(err.Error(), ShouldContainSubstring, "check new email exists")
 		})
 
-		Convey("When the new email is already taken by another user", func() {
-			uRepo := &mockUserRepo{
-				getUserByID: initiateEmailChangeGetUserByID,
-				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "someone-else"}, nil
-				},
-			}
-			srv := newTestService(uRepo, nil, nil, nil, nil)
-
-			err := srv.InitiateEmailChange(context.Background(), validRequestEmailChangeRequest())
-
-			So(err, ShouldBeNil)
-		})
-
 		Convey("When the new email is taken by another user, no token is created and nothing is emitted", func() {
 			var tokenCreated bool
 			var captured []any

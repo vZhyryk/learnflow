@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"fmt"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/logger"
@@ -12,29 +13,36 @@ import (
 // OutboxPoller for event_outbox.
 type DLQRetryWorker struct{}
 
-const (
-	selectFailedJobSQL = `
+// dlqMaxAttempts is the retry ceiling for a failed_jobs row: the select skips rows at the ceiling and
+// the mark-failed UPDATE resolves a row as max_retries_exceeded when it reaches it.
+const dlqMaxAttempts = 6
+
+var selectFailedJobSQL = fmt.Sprintf(`
 			SELECT id, event_type, queue_name, payload_json, attempt_count
 			FROM failed_jobs
-			WHERE resolved_at IS NULL AND attempt_count < 6
+			WHERE resolved_at IS NULL AND attempt_count < %d
 			ORDER BY failed_at ASC
 			LIMIT 50
 			FOR UPDATE SKIP LOCKED
-		`
+		`, dlqMaxAttempts)
+
+const (
 	markAsRetriedSuccessSQL = `
 	  		UPDATE failed_jobs
   				SET resolved_at = now(),
 				resolution_note = 'retried_successfully',
+				payload_json = payload_json - 'raw_token',
 				updated_at = now()
-			WHERE id = $1
+			WHERE id = ANY($1::uuid[])
 	`
 
 	markAsRetriedFailedSQL = `
   			UPDATE failed_jobs
 			SET attempt_count     = attempt_count + 1,
 				error_message     = $2,
-				resolution_note   = CASE WHEN attempt_count + 1 >= 6 THEN 'max_retries_exceeded' ELSE NULL END,
-				resolved_at       = CASE WHEN attempt_count + 1 >= 6 THEN now() ELSE NULL END,
+				resolution_note   = CASE WHEN attempt_count + 1 >= $3 THEN 'max_retries_exceeded' ELSE NULL END,
+				resolved_at       = CASE WHEN attempt_count + 1 >= $3 THEN now() ELSE NULL END,
+				payload_json      = CASE WHEN attempt_count + 1 >= $3 THEN payload_json - 'raw_token' ELSE payload_json END,
 				updated_at        = now()
 			WHERE id = $1
 	`
@@ -50,7 +58,7 @@ func scanFailedJob(row repository.RowScanner) (PollerEntry[DLQRetryWorker], erro
 
 // NewDLQRetryWorker returns a Poller that retries failed_jobs entries on a 5-minute ticker.
 func NewDLQRetryWorker(queryRunner db.QueryRunner, publisher events.Publisher, jsonLogger *logger.Logger, transactor Transactor) *Poller[DLQRetryWorker] {
-	return NewPoller[DLQRetryWorker](queryRunner, publisher, jsonLogger, transactor, "failedJobs", 5*time.Minute, SQLList[DLQRetryWorker]{
+	return NewPoller[DLQRetryWorker](queryRunner, publisher, jsonLogger, transactor, "failedJobs", 5*time.Minute, dlqMaxAttempts, SQLList[DLQRetryWorker]{
 		selectSQL:      selectFailedJobSQL,
 		markSuccessSQL: markAsRetriedSuccessSQL,
 		markFailedSQL:  markAsRetriedFailedSQL,

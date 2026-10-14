@@ -10,6 +10,7 @@ import (
 	"learnflow_backend/cmd/api/server"
 	"learnflow_backend/internal/infrastructure/bootstrap"
 	"learnflow_backend/internal/infrastructure/env"
+	"learnflow_backend/internal/infrastructure/metrics"
 	"net"
 	"net/url"
 	"strings"
@@ -27,6 +28,8 @@ func main() {
 
 	dbInstance, redisClient, cleanup := bootstrap.MustInitInfra(appConfig.Database, jsonLogger)
 	defer cleanup()
+
+	metrics.RegisterDBMetrics(dbInstance)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -88,7 +91,11 @@ func getAppConfig(environment string) (app.Config, error) {
 		return cfg, err
 	}
 
-	cfg.Cors.TrustedOrigins, err = getCorsTrustedOrigins()
+	if redisErr := bootstrap.ValidateRedisConfig(environment); redisErr != nil {
+		return cfg, redisErr
+	}
+
+	cfg.Cors.TrustedOrigins, err = getCorsTrustedOrigins(environment)
 	if err != nil {
 		return cfg, fmt.Errorf("CORS config: %w", err)
 	}
@@ -167,8 +174,14 @@ func parseTrustedProxies(raw string) ([]net.IPNet, error) {
 	return cidrs, nil
 }
 
-func getCorsTrustedOrigins() (map[string]struct{}, error) {
-	origins := env.GetStringEnv("CORS_TRUSTED_ORIGINS", "http://localhost:3000")
+// getCorsTrustedOrigins parses CORS_TRUSTED_ORIGINS. In production there is no localhost default and
+// every origin must be https, so a missing variable cannot silently trust a dev frontend with credentials.
+func getCorsTrustedOrigins(environment string) (map[string]struct{}, error) {
+	production := environment == "production"
+	origins := env.GetStringEnv("CORS_TRUSTED_ORIGINS", "")
+	if origins == "" && !production {
+		origins = "http://localhost:3000"
+	}
 	parts := strings.Split(origins, ",")
 	valid := make(map[string]struct{})
 	for _, p := range parts {
@@ -180,6 +193,10 @@ func getCorsTrustedOrigins() (map[string]struct{}, error) {
 		u, err := url.Parse(p)
 		if err != nil || u.Host == "" {
 			return nil, fmt.Errorf("invalid CORS origin: %q (expected https://host)", p)
+		}
+
+		if production && u.Scheme != "https" {
+			return nil, fmt.Errorf("invalid CORS origin: %q (production requires https)", p)
 		}
 
 		valid[p] = struct{}{}

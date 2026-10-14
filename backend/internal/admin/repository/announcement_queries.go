@@ -21,7 +21,7 @@ const (
 		updated_at = now(),
 		updated_by_user_id = $7,
 		expires_at = $8
-		WHERE id = $1
+		WHERE id = $1 AND approved_at IS NULL
 	`
 
 	setExpiredNowAnnouncementSQL = `
@@ -43,12 +43,23 @@ const (
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
 	`
+
+	countAnnouncementsSQL = `
+		SELECT COUNT(*)
+		FROM announcements
+	`
 	getUnApprovedAnnouncementsSQL = `
 		SELECT ` + announcementColumns + `
 		FROM announcements
 		WHERE approved_at IS NULL AND (expires_at IS NULL OR expires_at > now())
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
+	`
+
+	countUnApprovedAnnouncementsSQL = `
+		SELECT COUNT(*)
+		FROM announcements
+		WHERE approved_at IS NULL AND (expires_at IS NULL OR expires_at > now())
 	`
 	getApprovedAnnouncementsSQL = `
 		SELECT ` + announcementColumns + `
@@ -58,10 +69,28 @@ const (
 		LIMIT $1 OFFSET $2
 	`
 
+	countApprovedAnnouncementsSQL = `
+		SELECT COUNT(*)
+		FROM announcements
+		WHERE approved_at IS NOT NULL AND (expires_at IS NULL OR expires_at > now())
+	`
+
 	// Access predicates mirror access.HasAccessCourseQuery / HasAccessContentQuery.
 	getPublicAnnouncementsSQL = `
 		SELECT a.id, a.title, a.body, a.approved_at, a.expires_at, a.entity_id, a.entity_type
 		FROM announcements a
+		` + publicAnnouncementsWhereSQL + `
+		ORDER BY a.created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+
+	countPublicAnnouncementsSQL = `
+		SELECT COUNT(*)
+		FROM announcements a
+		` + publicAnnouncementsWhereSQL + `
+	`
+
+	publicAnnouncementsWhereSQL = `
 		WHERE a.approved_at IS NOT NULL AND (a.expires_at IS NULL OR a.expires_at > now()) AND 'banner' = ANY(a.channels)
 			AND (
 				a.entity_type IS NULL
@@ -85,8 +114,6 @@ const (
 					)
 				))
 			)
-		ORDER BY a.created_at DESC
-		LIMIT $2 OFFSET $3
 	`
 
 	getExpiredAnnouncementsSQL = `
@@ -95,6 +122,12 @@ const (
 		WHERE approved_at IS NOT NULL AND expires_at < now()
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
+	`
+
+	countExpiredAnnouncementsSQL = `
+		SELECT COUNT(*)
+		FROM announcements
+		WHERE approved_at IS NOT NULL AND expires_at < now()
 	`
 
 	getAnnouncementByIDSQL = `

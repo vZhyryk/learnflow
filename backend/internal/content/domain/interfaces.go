@@ -18,10 +18,10 @@ type ContentRepository interface {
 	ArchiveContentItem(ctx context.Context, contentItemID, userID string) error
 	DeleteContentItem(ctx context.Context, contentItemID, userID string) error
 	UpdateContentItem(ctx context.Context, contentItem *ContentItem, userID string) error
-	GetAllPublishedContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, error)
-	GetAllDraftContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, error)
-	GetAllArchivedContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, error)
-	GetAllContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, error)
+	GetAllPublishedContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, int, error)
+	GetAllDraftContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, int, error)
+	GetAllArchivedContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, int, error)
+	GetAllContentItems(ctx context.Context, params pagination.Params) ([]*ContentItem, int, error)
 	GetContentItemByID(ctx context.Context, contentItemID string) (*ContentItem, error)
 	GetContentItemBySlug(ctx context.Context, slug string) (*ContentItem, error)
 	CheckIfContentItemExistsByID(ctx context.Context, contentItemID string) (bool, error)
@@ -40,5 +40,5 @@ type Service interface {
 	GetContentItemBySlug(ctx context.Context, slug string) (*ContentItem, error)
 	PublishContentItem(ctx context.Context, contentItemID, userID string) error
 	UpdateContentItem(ctx context.Context, req UpdateContentItemRequest, userID string) error
-	GetAllContentItems(ctx context.Context, getType ContentItemStatus, params pagination.Params) (contentItemList []*ContentItem, err error)
+	GetAllContentItems(ctx context.Context, getType ContentItemStatus, params pagination.Params) (contentItemList []*ContentItem, total int, err error)
 }

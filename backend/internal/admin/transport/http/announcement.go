@@ -1,6 +1,7 @@
 package adminhttp
 
 import (
+	"context"
 	admindomain "learnflow_backend/internal/admin/domain"
 	"learnflow_backend/internal/infrastructure/helpers"
 	appcontext "learnflow_backend/internal/shared/context"
@@ -71,77 +72,6 @@ func (h *Handler) approveAnnouncement(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) getAnnouncements(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	announcementList, err := h.svc.GetAnnouncements(ctx, pagination.ParsePaginationParams(r))
-	if err != nil {
-		h.handleErrorResponse(w, r, err)
-		return
-	}
-
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"announcements": announcementList}, nil)
-	if err != nil {
-		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
-	}
-}
-
-func (h *Handler) getUnApprovedAnnouncements(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	announcementList, err := h.svc.GetUnApprovedAnnouncements(ctx, pagination.ParsePaginationParams(r))
-	if err != nil {
-		h.handleErrorResponse(w, r, err)
-		return
-	}
-
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"announcements": announcementList}, nil)
-	if err != nil {
-		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
-	}
-}
-
-func (h *Handler) getApprovedAnnouncements(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	announcementList, err := h.svc.GetApprovedAnnouncements(ctx, pagination.ParsePaginationParams(r))
-	if err != nil {
-		h.handleErrorResponse(w, r, err)
-		return
-	}
-
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"announcements": announcementList}, nil)
-	if err != nil {
-		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
-	}
-}
-
-func (h *Handler) getPublicAnnouncements(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	user := appcontext.MustUserFromContext(ctx)
-	announcementList, err := h.svc.GetPublicAnnouncements(ctx, pagination.ParsePaginationParams(r), user.ID)
-	if err != nil {
-		h.handleErrorResponse(w, r, err)
-		return
-	}
-
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"announcements": announcementList}, nil)
-	if err != nil {
-		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
-	}
-}
-
-func (h *Handler) getExpiredAnnouncements(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	announcementList, err := h.svc.GetExpiredAnnouncements(ctx, pagination.ParsePaginationParams(r))
-	if err != nil {
-		h.handleErrorResponse(w, r, err)
-		return
-	}
-
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"announcements": announcementList}, nil)
-	if err != nil {
-		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
-	}
-}
-
 func (h *Handler) setExpiredAnnouncements(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := appcontext.MustUserFromContext(ctx)
@@ -157,4 +87,51 @@ func (h *Handler) setExpiredAnnouncements(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}
+}
+
+type announcementLister func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error)
+
+func (h *Handler) getAnnouncementList(w http.ResponseWriter, r *http.Request, fetch announcementLister) {
+	ctx := r.Context()
+	announcementList, total, err := fetch(ctx, pagination.ParsePaginationParams(r))
+	if err != nil {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
+
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"announcements": announcementList, "total": total}, nil)
+	if err != nil {
+		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
+	}
+}
+
+func (h *Handler) getAnnouncements(w http.ResponseWriter, r *http.Request) {
+	h.getAnnouncementList(w, r, h.svc.GetAnnouncements)
+}
+
+func (h *Handler) getUnApprovedAnnouncements(w http.ResponseWriter, r *http.Request) {
+	h.getAnnouncementList(w, r, h.svc.GetUnApprovedAnnouncements)
+}
+
+func (h *Handler) getApprovedAnnouncements(w http.ResponseWriter, r *http.Request) {
+	h.getAnnouncementList(w, r, h.svc.GetApprovedAnnouncements)
+}
+
+func (h *Handler) getPublicAnnouncements(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	user := appcontext.MustUserFromContext(ctx)
+	announcementList, total, err := h.svc.GetPublicAnnouncements(ctx, pagination.ParsePaginationParams(r), user.ID)
+	if err != nil {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
+
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"announcements": announcementList, "total": total}, nil)
+	if err != nil {
+		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
+	}
+}
+
+func (h *Handler) getExpiredAnnouncements(w http.ResponseWriter, r *http.Request) {
+	h.getAnnouncementList(w, r, h.svc.GetExpiredAnnouncements)
 }

@@ -295,8 +295,10 @@ func (h *RouteHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetChain builds the standard middleware chain, inserting the limiters (in order) for rate limiting.
+// RecoverPanic sits right after the request-scoped setup so a recovered panic carries the request ID and IP,
+// and RequestLogger still logs the resulting 500.
 func (route *RouteHandler) SetChain(limiters ...alice.Constructor) alice.Chain {
-	return alice.New(route.RecoverPanic, route.SetIPAddress, route.SetRequestID, route.RequestLogger).
+	return alice.New(route.SetIPAddress, route.SetRequestID, route.RequestLogger, route.RecoverPanic).
 		Append(limiters...).
 		Append(route.EnableCORS, route.Timeout, route.SetSecurityHeaders)
 }

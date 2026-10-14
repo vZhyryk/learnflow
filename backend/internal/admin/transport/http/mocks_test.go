@@ -41,11 +41,11 @@ type mockService struct {
 	updateAnnouncement         func(ctx context.Context, req admindomain.UpdateAnnouncementRequest) error
 	approveAnnouncement        func(ctx context.Context, announcementID, userID string) error
 	setExpiredNowAnnouncement  func(ctx context.Context, announcementID, userID string) error
-	getAnnouncements           func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
-	getUnApprovedAnnouncements func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
-	getApprovedAnnouncements   func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
-	getPublicAnnouncements     func(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error)
-	getExpiredAnnouncements    func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error)
+	getAnnouncements           func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error)
+	getUnApprovedAnnouncements func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error)
+	getApprovedAnnouncements   func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error)
+	getPublicAnnouncements     func(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, int, error)
+	getExpiredAnnouncements    func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error)
 	getUsersData               func(ctx context.Context, params pagination.Params) ([]*admindomain.UserData, int, error)
 	getUserDataByID            func(ctx context.Context, userID string) (*admindomain.UserData, error)
 	changeUserField            func(ctx context.Context, userID, adminID string, operationName admindomain.UserAdminOperation) error
@@ -119,35 +119,35 @@ func (m *mockService) SetExpiredNowAnnouncement(ctx context.Context, announcemen
 	return m.setExpiredNowAnnouncement(ctx, announcementID, userID)
 }
 
-func (m *mockService) GetAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
+func (m *mockService) GetAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
 	if m.getAnnouncements == nil {
 		panic("mockService.getAnnouncements not set")
 	}
 	return m.getAnnouncements(ctx, params)
 }
 
-func (m *mockService) GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
+func (m *mockService) GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
 	if m.getUnApprovedAnnouncements == nil {
 		panic("mockService.getUnApprovedAnnouncements not set")
 	}
 	return m.getUnApprovedAnnouncements(ctx, params)
 }
 
-func (m *mockService) GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
+func (m *mockService) GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, int, error) {
 	if m.getPublicAnnouncements == nil {
 		panic("mockService.getPublicAnnouncements not set")
 	}
 	return m.getPublicAnnouncements(ctx, params, userID)
 }
 
-func (m *mockService) GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
+func (m *mockService) GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
 	if m.getApprovedAnnouncements == nil {
 		panic("mockService.getApprovedAnnouncements not set")
 	}
 	return m.getApprovedAnnouncements(ctx, params)
 }
 
-func (m *mockService) GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
+func (m *mockService) GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
 	if m.getExpiredAnnouncements == nil {
 		panic("mockService.getExpiredAnnouncements not set")
 	}

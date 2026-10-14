@@ -108,32 +108,6 @@ func assertRevokedSession(got *authdomain.UserSession, revokedByUserID string, r
 	So(got.LastSeenIP, ShouldBeNil)
 }
 
-// assertFailedLoginState checks the fields of a session after one or more
-// UpdateFailedLoginAttempts calls.
-func assertFailedLoginState(t *testing.T, got, seed *authdomain.UserSession, expectFailedCount int, expectLocked bool) {
-	t.Helper()
-	So(got.UserID, ShouldEqual, seed.UserID)
-	So(got.RefreshHash, ShouldEqual, seed.RefreshHash)
-	So(got.UserAgent, ShouldEqual, seed.UserAgent)
-	So(got.IPAddress, ShouldEqual, seed.IPAddress)
-	So(got.ExpiresAt, ShouldEqual, seed.ExpiresAt)
-	So(got.RevokedAt, ShouldBeNil)
-	So(got.RevokeReason, ShouldBeNil)
-	So(got.RevokedByUserID, ShouldBeNil)
-	So(got.CreatedAt.IsZero(), ShouldBeFalse)
-	So(got.FailedAttemptCount, ShouldEqual, expectFailedCount)
-	So(got.LastAttemptAt, ShouldNotBeNil)
-	if expectLocked {
-		So(got.LockedUntil, ShouldNotBeNil)
-	} else {
-		So(got.LockedUntil, ShouldBeNil)
-	}
-	So(got.TokenVersion, ShouldEqual, 1)
-	So(got.PreviousRefreshHash, ShouldBeNil)
-	So(got.LastSeenAt, ShouldBeNil)
-	So(got.LastSeenIP, ShouldBeNil)
-}
-
 // seedsByRefreshHash indexes seeds for matching returned rows in
 // multi-session list assertions, where result order is not guaranteed.
 func seedsByRefreshHash(seeds []*authdomain.UserSession) map[string]*authdomain.UserSession {
@@ -384,67 +358,6 @@ func TestRevokeAllUserSessions_Integration(t *testing.T) {
 				repo := &Repository{repository.BaseRepository{DB: tx}}
 				err := repo.RevokeAllUserSessions(ctx, nonExistentUUID, nil, authdomain.RevokeReason("bogus"))
 				So(err, ShouldNotBeNil)
-			})
-		})
-	})
-}
-
-func TestUpdateFailedLoginAttempts_Integration(t *testing.T) {
-	pool := testutil.NewTestPool(t)
-	Convey("UpdateFailedLoginAttempts", t, func() {
-		Convey("Successful test - not locked", func() {
-			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{repository.BaseRepository{DB: tx}}
-				_, seed, session := newSessionFixture(t, ctx, repo)
-
-				err := repo.UpdateFailedLoginAttempts(ctx, session.ID, "15 minutes", 3)
-				So(err, ShouldBeNil)
-
-				got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
-				So(err, ShouldBeNil)
-				So(got, ShouldNotBeNil)
-				assertFailedLoginState(t, got, seed, 1, false)
-			})
-		})
-
-		Convey("Successful test - locked", func() {
-			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{repository.BaseRepository{DB: tx}}
-				_, seed, session := newSessionFixture(t, ctx, repo)
-
-				err := repo.UpdateFailedLoginAttempts(ctx, session.ID, "15 minutes", 1)
-				So(err, ShouldBeNil)
-
-				got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
-				So(err, ShouldBeNil)
-				So(got, ShouldNotBeNil)
-				assertFailedLoginState(t, got, seed, 1, true)
-			})
-		})
-
-		Convey("Successful test - couple in row", func() {
-			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{repository.BaseRepository{DB: tx}}
-				_, seed, session := newSessionFixture(t, ctx, repo)
-
-				err := repo.UpdateFailedLoginAttempts(ctx, session.ID, "15 minutes", 5)
-				So(err, ShouldBeNil)
-
-				err = repo.UpdateFailedLoginAttempts(ctx, session.ID, "15 minutes", 5)
-				So(err, ShouldBeNil)
-
-				got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
-				So(err, ShouldBeNil)
-				So(got, ShouldNotBeNil)
-				assertFailedLoginState(t, got, seed, 2, false)
-			})
-		})
-
-		Convey("session does not exist", func() {
-			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{repository.BaseRepository{DB: tx}}
-				err := repo.UpdateFailedLoginAttempts(ctx, nonExistentUUID, "15 minutes", 3)
-				So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
 			})
 		})
 	})

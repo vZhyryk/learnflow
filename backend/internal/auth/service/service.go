@@ -31,10 +31,12 @@ type Service struct {
 	transactor        authdomain.Transactor
 	outbox            *events.OutboxWriter
 	dummyPasswordHash []byte
-	cost              int
-	token             *tokens.Tokens
-	blocklist         authdomain.TokenBlocklist
-	audit             authdomain.Audit
+	// compareHash is bcrypt.CompareHashAndPassword; a field so tests can spy on it without touching package state.
+	compareHash func(hashedPassword, password []byte) error
+	cost        int
+	token       *tokens.Tokens
+	blocklist   authdomain.TokenBlocklist
+	audit       authdomain.Audit
 }
 
 // Repos groups the repository dependencies required by the auth Service.
@@ -80,6 +82,7 @@ func New(
 		blocklist:         utils.Blocklist,
 		cost:              cost,
 		dummyPasswordHash: dummyPasswordHash,
+		compareHash:       bcrypt.CompareHashAndPassword,
 		audit:             utils.Audit,
 	}
 

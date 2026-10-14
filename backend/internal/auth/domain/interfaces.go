@@ -44,9 +44,7 @@ type SessionRepository interface {
 	GetUserSessionByRefreshToken(ctx context.Context, refreshTokenHash string) (*UserSession, error)
 	RevokeUserSession(ctx context.Context, sessionID, revokedByUserID string, revokeReason RevokeReason) error
 	RevokeAllUserSessions(ctx context.Context, userID string, revokedByUserID *string, revokeReason RevokeReason) error
-	GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*UserSession, error)
 	UpdateSessionToken(ctx context.Context, sessionID, tokenHash, userAgent, ipAddress string) error
-	UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error
 	GetSessionByPrevHash(ctx context.Context, prevRefreshTokenHash string) (*UserSession, error)
 }
 

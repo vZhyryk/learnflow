@@ -513,9 +513,10 @@ func TestGetCourseReviewList_Integration(t *testing.T) {
 			So(repo.DeleteCourseReview(ctx, deleted.ID, testutil.InsertRandomTestUser(t, tx)), ShouldBeNil)
 
 			Convey("Listing returns only active reviews for that course", func() {
-				got, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), courseID, reviewdomain.ReviewFilter{})
+				got, total, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), courseID, reviewdomain.ReviewFilter{})
 
 				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 2)
 				ids := courseReviewIDs(got)
 				So(ids, ShouldContain, active1.ID)
 				So(ids, ShouldContain, active2.ID)
@@ -523,25 +524,28 @@ func TestGetCourseReviewList_Integration(t *testing.T) {
 			})
 
 			Convey("Pagination limits the returned page size", func() {
-				got, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 1), courseID, reviewdomain.ReviewFilter{})
+				got, total, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 1), courseID, reviewdomain.ReviewFilter{})
 
 				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 2)
 				So(len(got), ShouldEqual, 1)
 			})
 
 			Convey("A different course has no reviews", func() {
 				otherCourseID := testutil.InsertTestCourse(t, tx)
 
-				got, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), otherCourseID, reviewdomain.ReviewFilter{})
+				got, total, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), otherCourseID, reviewdomain.ReviewFilter{})
 
 				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 0)
 				So(got, ShouldBeEmpty)
 			})
 
 			Convey("rating filter (gte) returns only reviews matching the comparison", func() {
-				got, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), courseID, reviewdomain.ReviewFilter{Op: "gte", Rating: 4})
+				got, total, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), courseID, reviewdomain.ReviewFilter{Op: "gte", Rating: 4})
 
 				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 1)
 				ids := courseReviewIDs(got)
 				So(ids, ShouldContain, active1.ID)    // rating 5
 				So(ids, ShouldNotContain, active2.ID) // rating 3
@@ -549,9 +553,10 @@ func TestGetCourseReviewList_Integration(t *testing.T) {
 			})
 
 			Convey("rating filter (eq) matches exactly", func() {
-				got, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), courseID, reviewdomain.ReviewFilter{Op: "eq", Rating: 3})
+				got, total, err := repo.GetCourseReviewList(ctx, pagination.NewParams(1, 100), courseID, reviewdomain.ReviewFilter{Op: "eq", Rating: 3})
 
 				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 1)
 				ids := courseReviewIDs(got)
 				So(ids, ShouldContain, active2.ID)
 				So(ids, ShouldNotContain, active1.ID)
@@ -575,18 +580,20 @@ func TestGetContentReviewList_Integration(t *testing.T) {
 			So(repo.DeleteContentReview(ctx, deleted.ID, testutil.InsertRandomTestUser(t, tx)), ShouldBeNil)
 
 			Convey("Listing returns only active reviews for that content item", func() {
-				got, err := repo.GetContentReviewList(ctx, pagination.NewParams(1, 100), contentID, reviewdomain.ReviewFilter{})
+				got, total, err := repo.GetContentReviewList(ctx, pagination.NewParams(1, 100), contentID, reviewdomain.ReviewFilter{})
 
 				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 1)
 				ids := contentReviewIDs(got)
 				So(ids, ShouldContain, active.ID)
 				So(ids, ShouldNotContain, deleted.ID)
 			})
 
 			Convey("rating filter (lte) returns only reviews matching the comparison", func() {
-				got, err := repo.GetContentReviewList(ctx, pagination.NewParams(1, 100), contentID, reviewdomain.ReviewFilter{Op: "lte", Rating: 3})
+				got, total, err := repo.GetContentReviewList(ctx, pagination.NewParams(1, 100), contentID, reviewdomain.ReviewFilter{Op: "lte", Rating: 3})
 
 				So(err, ShouldBeNil)
+				So(total, ShouldEqual, 0)
 				ids := contentReviewIDs(got)
 				So(ids, ShouldNotContain, active.ID) // rating 5
 				So(ids, ShouldNotContain, deleted.ID)

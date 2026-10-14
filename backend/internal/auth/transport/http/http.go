@@ -73,3 +73,16 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, chains AuthRouteChains) {
 
 	mux.Handle("PUT /api/v1/auth/account/recover", chains.PassReset.ThenFunc(h.recoverAccount))
 }
+
+// maxUserAgentRunes matches the user_sessions.user_agent column (varchar(255)); longer values would make the
+// session INSERT/UPDATE fail with a 500.
+const maxUserAgentRunes = 255
+
+func clientUserAgent(r *http.Request) string {
+	ua := []rune(r.UserAgent())
+	if len(ua) > maxUserAgentRunes {
+		ua = ua[:maxUserAgentRunes]
+	}
+
+	return string(ua)
+}

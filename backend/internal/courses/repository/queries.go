@@ -64,11 +64,19 @@ const (
 		LIMIT $1 OFFSET $2
 	`
 
+	countPublishedCoursesSQL = `
+		SELECT COUNT(*) FROM courses WHERE status = 'published' AND deleted_at IS NULL
+	`
+
 	getAllDraftCoursesSQL = `
 		SELECT` + courseColumns + `
 		FROM courses WHERE status = 'draft' AND deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
+	`
+
+	countDraftCoursesSQL = `
+		SELECT COUNT(*) FROM courses WHERE status = 'draft' AND deleted_at IS NULL
 	`
 
 	getAllArchivedCoursesSQL = `
@@ -78,11 +86,19 @@ const (
 		LIMIT $1 OFFSET $2
 	`
 
+	countArchivedCoursesSQL = `
+		SELECT COUNT(*) FROM courses WHERE status = 'archived'
+	`
+
 	getAllCoursesSQL = `
 		SELECT` + courseColumns + `
 		FROM courses
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
+	`
+
+	countAllCoursesSQL = `
+		SELECT COUNT(*) FROM courses
 	`
 
 	getCourseByIDSQL = `

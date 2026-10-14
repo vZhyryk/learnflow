@@ -44,13 +44,7 @@ func (s *Service) InitiatePasswordReset(ctx context.Context, req authdomain.Requ
 					return nil, fmt.Errorf("init_password_reset: create token: %w", err)
 				}
 
-				return events.TokenPayload{
-					UserID:    user.ID,
-					Email:     user.Email,
-					ExpiresAt: expiresAt,
-					RawToken:  rawToken,
-					UserName:  userProfile.GetFirstName(),
-				}, nil
+				return newTokenPayload(user.ID, user.Email, rawToken, expiresAt, userProfile), nil
 			},
 		)
 	})

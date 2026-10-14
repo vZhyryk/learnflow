@@ -56,7 +56,7 @@ func TestMarkAsRetriedFailedSQL_MaxRetriesBoundary_Integration(t *testing.T) {
 				w := NewDLQRetryWorker(tx, nil, testutil.NewTestLogger(), nil)
 				id := insertFailedJob(t, ctx, tx, 4)
 
-				w.markEntryFailed(ctx, errors.New("boom"), id)
+				w.markEntryFailed(ctx, errors.New("boom"), id, w.maxAttemptsCount)
 
 				attemptCount, resolutionNote, resolved := getFailedJobState(t, ctx, tx, id)
 				So(attemptCount, ShouldEqual, 5)
@@ -70,13 +70,74 @@ func TestMarkAsRetriedFailedSQL_MaxRetriesBoundary_Integration(t *testing.T) {
 				w := NewDLQRetryWorker(tx, nil, testutil.NewTestLogger(), nil)
 				id := insertFailedJob(t, ctx, tx, 5)
 
-				w.markEntryFailed(ctx, errors.New("boom"), id)
+				w.markEntryFailed(ctx, errors.New("boom"), id, w.maxAttemptsCount)
 
 				attemptCount, resolutionNote, resolved := getFailedJobState(t, ctx, tx, id)
 				So(attemptCount, ShouldEqual, 6)
 				So(resolutionNote, ShouldNotBeNil)
 				So(*resolutionNote, ShouldEqual, "max_retries_exceeded")
 				So(resolved, ShouldBeTrue)
+			})
+		})
+	})
+}
+
+func hasRawToken(t *testing.T, ctx context.Context, tx pgx.Tx, id string) bool {
+	t.Helper()
+
+	var present bool
+	err := tx.QueryRow(ctx, `SELECT payload_json ? 'raw_token' FROM failed_jobs WHERE id = $1`, id).Scan(&present)
+	if err != nil {
+		t.Fatalf("hasRawToken: %v", err)
+	}
+
+	return present
+}
+
+func TestFailedJobRawTokenScrubbed_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+
+	Convey("Given a failed_jobs row carrying a one-time token", t, func() {
+		insertWithToken := func(ctx context.Context, tx pgx.Tx, attempts int) string {
+			var id string
+			err := tx.QueryRow(ctx,
+				`INSERT INTO failed_jobs (event_type, queue_name, payload_json, attempt_count, failed_at)
+				 VALUES ('user.registered', 'email', '{"user_id":"u-1","raw_token":"secret"}', $1, now())
+				 RETURNING id`, attempts).Scan(&id)
+			So(err, ShouldBeNil)
+			return id
+		}
+
+		Convey("When a retry fails below the ceiling, the token is kept for the next retry", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				w := NewDLQRetryWorker(tx, nil, testutil.NewTestLogger(), nil)
+				id := insertWithToken(ctx, tx, 0)
+
+				w.markEntryFailed(ctx, errors.New("boom"), id, w.maxAttemptsCount)
+
+				So(hasRawToken(t, ctx, tx, id), ShouldBeTrue)
+			})
+		})
+
+		Convey("When the ceiling is reached, the token is removed", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				w := NewDLQRetryWorker(tx, nil, testutil.NewTestLogger(), nil)
+				id := insertWithToken(ctx, tx, w.maxAttemptsCount-1)
+
+				w.markEntryFailed(ctx, errors.New("boom"), id, w.maxAttemptsCount)
+
+				So(hasRawToken(t, ctx, tx, id), ShouldBeFalse)
+			})
+		})
+
+		Convey("When the retry succeeds, the token is removed", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				w := NewDLQRetryWorker(tx, nil, testutil.NewTestLogger(), nil)
+				id := insertWithToken(ctx, tx, 0)
+
+				w.markPublished(ctx, []string{id})
+
+				So(hasRawToken(t, ctx, tx, id), ShouldBeFalse)
 			})
 		})
 	})

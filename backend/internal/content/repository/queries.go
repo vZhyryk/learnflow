@@ -65,11 +65,19 @@ const (
 		LIMIT $1 OFFSET $2
 	`
 
+	countPublishedContentItemsSQL = `
+		SELECT COUNT(*) FROM content_items WHERE status = 'published' AND deleted_at IS NULL
+	`
+
 	getAllDraftContentItemsSQL = `
 		SELECT` + contentColumns + `
 		FROM content_items WHERE status = 'draft' AND deleted_at IS NULL
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
+	`
+
+	countDraftContentItemsSQL = `
+		SELECT COUNT(*) FROM content_items WHERE status = 'draft' AND deleted_at IS NULL
 	`
 
 	getAllArchivedContentItemsSQL = `
@@ -79,11 +87,19 @@ const (
 		LIMIT $1 OFFSET $2
 	`
 
+	countArchivedContentItemsSQL = `
+		SELECT COUNT(*) FROM content_items WHERE status = 'archived'
+	`
+
 	getAllContentItemsSQL = `
 		SELECT` + contentColumns + `
 		FROM content_items
 		ORDER BY created_at DESC
 		LIMIT $1 OFFSET $2
+	`
+
+	countAllContentItemsSQL = `
+		SELECT COUNT(*) FROM content_items
 	`
 
 	getContentItemByIDSQL = `

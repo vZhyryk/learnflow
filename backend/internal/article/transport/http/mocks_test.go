@@ -45,7 +45,7 @@ type mockService struct {
 	getArticleBySlug func(ctx context.Context, slug string) (*articledomain.Article, error)
 	publishArticle   func(ctx context.Context, articleID, userID string) error
 	updateArticle    func(ctx context.Context, req articledomain.UpdateArticleRequest, userID string) error
-	getAllArticles   func(ctx context.Context, getType articledomain.ArticleStatus, params pagination.Params) (articleList []*articledomain.Article, err error)
+	getAllArticles   func(ctx context.Context, getType articledomain.ArticleStatus, params pagination.Params) (articleList []*articledomain.Article, total int, err error)
 }
 
 func (m *mockService) ArchiveArticle(ctx context.Context, articleID, userID string) error {
@@ -86,7 +86,7 @@ func (m *mockService) UpdateArticle(ctx context.Context, req articledomain.Updat
 	}
 	return m.updateArticle(ctx, req, userID)
 }
-func (m *mockService) GetAllArticles(ctx context.Context, getType articledomain.ArticleStatus, params pagination.Params) (articleList []*articledomain.Article, err error) {
+func (m *mockService) GetAllArticles(ctx context.Context, getType articledomain.ArticleStatus, params pagination.Params) (articleList []*articledomain.Article, total int, err error) {
 	if m.getAllArticles == nil {
 		panic("mockService.getAllArticles not set")
 	}

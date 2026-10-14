@@ -469,3 +469,17 @@ func TestIsValidContentBody(t *testing.T) {
 		})
 	})
 }
+
+func TestIsValidCity(t *testing.T) {
+	Convey("IsValidCity", t, func() {
+		Convey("empty is valid", func() {
+			So(validator.IsValidCity(""), ShouldBeTrue)
+		})
+		Convey("100 runes is valid (boundary)", func() {
+			So(validator.IsValidCity(strings.Repeat("ł", 100)), ShouldBeTrue)
+		})
+		Convey("101 runes is invalid (boundary)", func() {
+			So(validator.IsValidCity(strings.Repeat("ł", 101)), ShouldBeFalse)
+		})
+	})
+}

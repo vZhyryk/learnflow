@@ -15,10 +15,10 @@ type mockCourseRepoRepo struct {
 	archiveCourse           func(ctx context.Context, courseID, userID string) error
 	deleteCourse            func(ctx context.Context, courseID, userID string) error
 	updateCourse            func(ctx context.Context, course *coursedomain.Course, userID string) error
-	getAllPublishedCourses  func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
-	getAllDraftCourses      func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
-	getAllArchivedCourses   func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
-	getAllCourses           func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error)
+	getAllPublishedCourses  func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error)
+	getAllDraftCourses      func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error)
+	getAllArchivedCourses   func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error)
+	getAllCourses           func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error)
 	getCourseByID           func(ctx context.Context, courseID string) (*coursedomain.Course, error)
 	getCourseBySlug         func(ctx context.Context, slug string) (*coursedomain.Course, error)
 	checkIfCourseExistsByID func(ctx context.Context, courseID string) (bool, error)
@@ -59,28 +59,28 @@ func (m *mockCourseRepoRepo) UpdateCourse(ctx context.Context, course *coursedom
 
 	return m.updateCourse(ctx, course, userID)
 }
-func (m *mockCourseRepoRepo) GetAllPublishedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
+func (m *mockCourseRepoRepo) GetAllPublishedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
 	if m.getAllPublishedCourses == nil {
 		panic("mockCourseRepo.getAllPublishedCourses not set")
 	}
 
 	return m.getAllPublishedCourses(ctx, params)
 }
-func (m *mockCourseRepoRepo) GetAllDraftCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
+func (m *mockCourseRepoRepo) GetAllDraftCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
 	if m.getAllDraftCourses == nil {
 		panic("mockCourseRepo.getAllDraftCourses not set")
 	}
 
 	return m.getAllDraftCourses(ctx, params)
 }
-func (m *mockCourseRepoRepo) GetAllArchivedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
+func (m *mockCourseRepoRepo) GetAllArchivedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
 	if m.getAllArchivedCourses == nil {
 		panic("mockCourseRepo.getAllArchivedCourses not set")
 	}
 
 	return m.getAllArchivedCourses(ctx, params)
 }
-func (m *mockCourseRepoRepo) GetAllCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
+func (m *mockCourseRepoRepo) GetAllCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
 	if m.getAllCourses == nil {
 		panic("mockCourseRepo.getAllCourses not set")
 	}

@@ -13,6 +13,7 @@ import (
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/logger"
 	"learnflow_backend/internal/infrastructure/retry"
+	"learnflow_backend/internal/shared/repository"
 	"slices"
 	"strings"
 	"time"
@@ -25,7 +26,7 @@ const (
 	// builds on — only the entity-access JOIN and the WHERE clause differ between them.
 	recipientBaseSelectSQL = `
 		SELECT u.id FROM users u
-		LEFT JOIN notification_preferences np ON np.user_id = u.id
+		JOIN notification_preferences np ON np.user_id = u.id
 	`
 
 	getAnnouncementUserListSQL = recipientBaseSelectSQL + `
@@ -33,21 +34,21 @@ const (
 	`
 
 	getContentAnnouncementUserListSQL = recipientBaseSelectSQL + `
-		LEFT JOIN user_content_access uca ON uca.user_id = u.id
+		JOIN user_content_access uca ON uca.user_id = u.id
 		WHERE np.email_on_announcement = true AND uca.content_item_id = $1 AND uca.status = 'active'
 		AND (uca.expires_at IS NULL OR uca.expires_at > now()) AND u.deleted_at IS NULL AND u.status = 'active'
 
 		UNION
 
 	` + recipientBaseSelectSQL + `
-		LEFT JOIN user_course_access uca ON uca.user_id = u.id
+		JOIN user_course_access uca ON uca.user_id = u.id
 		JOIN course_content_items cci ON cci.course_id = uca.course_id
 		WHERE np.email_on_announcement = true AND cci.content_item_id = $1 AND uca.status = 'active'
 		AND (uca.expires_at IS NULL OR uca.expires_at > now()) AND u.deleted_at IS NULL AND u.status = 'active'
 	`
 
 	getCourseAnnouncementUserListSQL = recipientBaseSelectSQL + `
-		LEFT JOIN user_course_access uca ON uca.user_id = u.id
+		JOIN user_course_access uca ON uca.user_id = u.id
 		WHERE np.email_on_announcement = true AND uca.course_id = $1 AND uca.status = 'active'
 		AND (uca.expires_at IS NULL OR uca.expires_at > now()) AND u.deleted_at IS NULL AND u.status = 'active'
 	`
@@ -173,7 +174,7 @@ func (w *AnnouncementFanOutWorker) parseMessage(ctx context.Context, message str
 	}
 
 	key := w.generateIdempotencyKey(payload)
-	ok, err := w.redisClient.SetNX(ctx, key, 1, 24*time.Hour).Result()
+	ok, err := w.redisClient.SetNX(ctx, key, "processing", fanOutLeaseTTL).Result()
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("%s: idempotency check: %w", w.eventType, err)
 	}
@@ -204,7 +205,7 @@ func (w *AnnouncementFanOutWorker) validatePayload(ctx context.Context, p events
 func (w *AnnouncementFanOutWorker) fetchAnnouncement(ctx context.Context, id string) (*admindomain.Announcement, error) {
 	announcement, err := w.announcementRep.GetAnnouncementByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("announcement: worker.fetchAnnouncement: %w", err)
+		return nil, fmt.Errorf("worker.fetchAnnouncement: %w", err)
 	}
 
 	if announcement == nil {
@@ -239,15 +240,31 @@ func (w *AnnouncementFanOutWorker) checkEntityExists(ctx context.Context, announ
 	return nil
 }
 
+// fanOutLeaseTTL is how long a crashed fan-out blocks a replay of the same announcement; a completed
+// fan-out extends the key to fanOutDoneTTL.
+const (
+	fanOutLeaseTTL = 10 * time.Minute
+	fanOutDoneTTL  = 24 * time.Hour
+)
+
+// processAndHandleFailure fans the announcement out. The idempotency key and the DLQ write use a context
+// that survives shutdown, otherwise a SIGTERM mid-fan-out would lose both the event and the key cleanup.
 func (w *AnnouncementFanOutWorker) processAndHandleFailure(ctx context.Context, payload *events.AnnouncementPayload, announcement *admindomain.Announcement, key string) {
+	settleCtx := context.WithoutCancel(ctx)
+
 	if err := retry.Do(ctx, attemptsCount, func() error {
 		return w.fanOut(ctx, announcement)
 	}); err != nil {
 		w.logger.Error(err, nil)
-		w.dlq.Write(ctx, w.eventType, w.aggregationType, payload, err, attemptsCount)
-		if delErr := w.redisClient.Del(ctx, key).Err(); delErr != nil {
+		w.dlq.Write(settleCtx, w.eventType, w.aggregationType, payload, err, attemptsCount)
+		if delErr := w.redisClient.Del(settleCtx, key).Err(); delErr != nil {
 			w.logger.Error(fmt.Errorf("%s: idempotency key cleanup: %w", w.eventType, delErr), nil)
 		}
+		return
+	}
+
+	if setErr := w.redisClient.Set(settleCtx, key, "done", fanOutDoneTTL).Err(); setErr != nil {
+		w.logger.Error(fmt.Errorf("%s: idempotency key finalize: %w", w.eventType, setErr), nil)
 	}
 }
 
@@ -258,18 +275,18 @@ func (w *AnnouncementFanOutWorker) generateIdempotencyKey(p events.AnnouncementP
 func (w *AnnouncementFanOutWorker) fanOut(ctx context.Context, p *admindomain.Announcement) error {
 	query, args, err := w.buildRecipientQuery(p)
 	if err != nil {
-		return fmt.Errorf("AnnouncementFanOutWorker.fanOut: %w", err)
+		return fmt.Errorf("worker.fanOut: %w", err)
 	}
 
 	recipients, err := w.queryRecipients(ctx, query, args)
 	if err != nil {
-		return fmt.Errorf("AnnouncementFanOutWorker.fanOut: %w", err)
+		return fmt.Errorf("worker.fanOut: %w", err)
 	}
 
 	for batch := range slices.Chunk(recipients, 500) {
 		query, args := w.buildInsertBatch(batch, p)
 		if err := w.insertBatch(ctx, query, args); err != nil {
-			return fmt.Errorf("AnnouncementFanOutWorker.fanOut: %w", err)
+			return fmt.Errorf("worker.fanOut: %w", err)
 		}
 	}
 
@@ -306,7 +323,7 @@ func (w *AnnouncementFanOutWorker) buildInsertBatch(recipients []string, p *admi
 // not an error condition, so it isn't checked here.
 func (w *AnnouncementFanOutWorker) insertBatch(ctx context.Context, query string, args []any) error {
 	if _, err := w.queryRunner(ctx).Exec(ctx, query, args...); err != nil {
-		return fmt.Errorf("AnnouncementFanOutWorker.insertBatch: %w", err)
+		return fmt.Errorf("worker.insertBatch: %w", err)
 	}
 
 	return nil
@@ -332,25 +349,23 @@ func (w *AnnouncementFanOutWorker) buildRecipientQuery(p *admindomain.Announceme
 	return cfg.recipientSQL, nil, nil
 }
 
+func scanRecipientID(row repository.RowScanner) (string, error) {
+	var id string
+	err := row.Scan(&id)
+	return id, err
+}
+
 func (w *AnnouncementFanOutWorker) queryRecipients(ctx context.Context, query string, args []any) ([]string, error) {
 	rows, err := w.queryRunner(ctx).Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("AnnouncementFanOutWorker.queryRecipients: %w", err)
+		return nil, fmt.Errorf("worker.queryRecipients: %w", err)
 	}
 
 	defer rows.Close()
 
-	var recipients []string
-	for rows.Next() {
-		var val string
-		if scanErr := rows.Scan(&val); scanErr != nil {
-			return nil, fmt.Errorf("AnnouncementFanOutWorker.queryRecipients: scan: %w", scanErr)
-		}
-		recipients = append(recipients, val)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("AnnouncementFanOutWorker.queryRecipients: %w", err)
+	recipients, err := repository.CollectRows(rows, "worker.queryRecipients", scanRecipientID)
+	if err != nil {
+		return nil, err
 	}
 
 	return recipients, nil

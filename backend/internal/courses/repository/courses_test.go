@@ -209,11 +209,11 @@ func TestUpdateCourse(t *testing.T) {
 // bindCourseList adapts a repository list method into the shape testutil.TestListMethod
 // expects: build a repo around the given runner, return the bound method.
 func bindCourseList(
-	call func(*Repository, context.Context, pagination.Params) ([]*coursedomain.Course, error),
-) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*coursedomain.Course, error) {
-	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*coursedomain.Course, error) {
+	call func(*Repository, context.Context, pagination.Params) ([]*coursedomain.Course, int, error),
+) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*coursedomain.Course, int, error) {
+	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*coursedomain.Course, int, error) {
 		repo := newTestRepo(runner)
-		return func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, error) {
+		return func(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
 			return call(repo, ctx, params)
 		}
 	}
@@ -227,22 +227,22 @@ func fakeCourseN(n int) *coursedomain.Course {
 }
 
 func TestGetAllPublishedCourses(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllPublishedCourses",
+	testutil.TestCountListMethod(t, "GetAllPublishedCourses",
 		bindCourseList((*Repository).GetAllPublishedCourses), fakeCourseN, fakeCourseScan)
 }
 
 func TestGetAllDraftCourses(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllDraftCourses",
+	testutil.TestCountListMethod(t, "GetAllDraftCourses",
 		bindCourseList((*Repository).GetAllDraftCourses), fakeCourseN, fakeCourseScan)
 }
 
 func TestGetAllArchivedCourses(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllArchivedCourses",
+	testutil.TestCountListMethod(t, "GetAllArchivedCourses",
 		bindCourseList((*Repository).GetAllArchivedCourses), fakeCourseN, fakeCourseScan)
 }
 
 func TestGetAllCourses(t *testing.T) {
-	testutil.TestListMethod(t, "GetAllCourses",
+	testutil.TestCountListMethod(t, "GetAllCourses",
 		bindCourseList((*Repository).GetAllCourses), fakeCourseN, fakeCourseScan)
 }
 

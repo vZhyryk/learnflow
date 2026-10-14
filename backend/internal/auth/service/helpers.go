@@ -45,6 +45,17 @@ func (s *Service) revokeAllUserTokens(ctx context.Context, caller, userID string
 	return nil
 }
 
+// newTokenPayload builds the payload of a one-time-token link email; profile may be nil (greeting falls back).
+func newTokenPayload(userID, email, rawToken string, expiresAt time.Time, profile *authdomain.UserProfile) events.TokenPayload {
+	return events.TokenPayload{
+		UserID:    userID,
+		Email:     email,
+		ExpiresAt: expiresAt,
+		RawToken:  rawToken,
+		UserName:  profile.GetFirstName(),
+	}
+}
+
 func (s *Service) emitTokenEvent(
 	ctx context.Context,
 	userID string,

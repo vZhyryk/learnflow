@@ -16,7 +16,7 @@ var (
 	// ErrAccountDeleted is returned when the account has been soft-deleted.
 	ErrAccountDeleted = errors.New("account is deleted")
 
-	// ErrAccountLocked is returned when the account has exceeded login attempt limits.
+	// ErrAccountLocked is returned by change-password and change-email while the login lockout is active (login itself answers ErrInvalidCredentials).
 	ErrAccountLocked = errors.New("account is temporarily locked")
 	// ErrInvalidCredentials is returned on wrong email or password.
 	ErrInvalidCredentials = errors.New("invalid email or password")
@@ -62,6 +62,20 @@ var (
 	ErrInvalidDateOfBirth = errors.New("invalid date of birth")
 	// ErrInvalidUILanguage is returned when UI language is not a supported language code.
 	ErrInvalidUILanguage = errors.New("invalid UI language")
+	// ErrInvalidFirstName is returned when first name exceeds 100 characters.
+	ErrInvalidFirstName = errors.New("invalid first name")
+	// ErrInvalidLastName is returned when last name exceeds 100 characters.
+	ErrInvalidLastName = errors.New("invalid last name")
+	// ErrInvalidPhoneNumber is returned when phone number exceeds 20 characters.
+	ErrInvalidPhoneNumber = errors.New("invalid phone number")
+	// ErrInvalidCity is returned when city exceeds 100 characters.
+	ErrInvalidCity = errors.New("invalid city")
+	// ErrInvalidAvatarURL is returned when avatar URL is not a valid HTTPS URL.
+	ErrInvalidAvatarURL = errors.New("invalid avatar URL")
+	// ErrInvalidTimezone is returned when timezone is not a valid IANA name.
+	ErrInvalidTimezone = errors.New("invalid timezone")
+	// ErrInvalidBio is returned when bio exceeds 500 characters.
+	ErrInvalidBio = errors.New("invalid bio")
 	// ErrBlocklistUnavailable is returned when the Redis blocklist cannot be updated; the DB change is rolled back.
 	ErrBlocklistUnavailable = errors.New("blocklist unavailable")
 	// ErrRequestInProgress is returned when a row-level lock (FOR UPDATE NOWAIT) is held by a concurrent request.

@@ -293,7 +293,7 @@ func TestSetExpiredNowAnnouncement_Integration(t *testing.T) {
 				created, err := repo.CreateAnnouncement(ctx, draftAnnouncement(t, tx))
 				So(err, ShouldBeNil)
 				So(repo.ApproveAnnouncement(ctx, created.ID, testutil.InsertRandomTestUser(t, tx)), ShouldBeNil)
-				live, err := repo.GetApprovedAnnouncements(ctx, pagination.NewParams(1, 100))
+				live, _, err := repo.GetApprovedAnnouncements(ctx, pagination.NewParams(1, 100))
 				So(err, ShouldBeNil)
 				So(announcementIDs(live), ShouldContain, created.ID)
 
@@ -304,7 +304,7 @@ func TestSetExpiredNowAnnouncement_Integration(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(got.ExpiresAt.After(time.Now()), ShouldBeFalse)
 				So(got.ApprovedAt, ShouldNotBeNil)
-				stillLive, err := repo.GetApprovedAnnouncements(ctx, pagination.NewParams(1, 100))
+				stillLive, _, err := repo.GetApprovedAnnouncements(ctx, pagination.NewParams(1, 100))
 				So(err, ShouldBeNil)
 				So(announcementIDs(stillLive), ShouldNotContain, created.ID)
 			})
@@ -367,8 +367,9 @@ func TestGetAnnouncementsByStatus_Integration(t *testing.T) {
 			params := pagination.NewParams(1, 100)
 
 			Convey("GetUnApprovedAnnouncements returns only the unapproved, non-expired one", func() {
-				got, err := repo.GetUnApprovedAnnouncements(ctx, params)
+				got, total, err := repo.GetUnApprovedAnnouncements(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := announcementIDs(got)
 				So(ids, ShouldContain, unapproved.ID)
 				So(ids, ShouldNotContain, approved.ID)
@@ -376,8 +377,9 @@ func TestGetAnnouncementsByStatus_Integration(t *testing.T) {
 			})
 
 			Convey("GetApprovedAnnouncements returns only the approved, non-expired one", func() {
-				got, err := repo.GetApprovedAnnouncements(ctx, params)
+				got, total, err := repo.GetApprovedAnnouncements(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := announcementIDs(got)
 				So(ids, ShouldContain, approved.ID)
 				So(ids, ShouldNotContain, unapproved.ID)
@@ -385,8 +387,9 @@ func TestGetAnnouncementsByStatus_Integration(t *testing.T) {
 			})
 
 			Convey("GetExpiredAnnouncements returns only the approved-but-expired one", func() {
-				got, err := repo.GetExpiredAnnouncements(ctx, params)
+				got, total, err := repo.GetExpiredAnnouncements(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := announcementIDs(got)
 				So(ids, ShouldContain, expired.ID)
 				So(ids, ShouldNotContain, unapproved.ID)
@@ -394,8 +397,9 @@ func TestGetAnnouncementsByStatus_Integration(t *testing.T) {
 			})
 
 			Convey("GetAnnouncements returns all three regardless of status", func() {
-				got, err := repo.GetAnnouncements(ctx, params)
+				got, total, err := repo.GetAnnouncements(ctx, params)
 				So(err, ShouldBeNil)
+				So(total, ShouldBeGreaterThanOrEqualTo, len(got))
 				ids := announcementIDs(got)
 				So(ids, ShouldContain, unapproved.ID)
 				So(ids, ShouldContain, approved.ID)

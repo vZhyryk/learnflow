@@ -17,12 +17,12 @@ type AnnouncementRepository interface {
 	CreateAnnouncement(ctx context.Context, announcement *Announcement) (*Announcement, error)
 	UpdateAnnouncement(ctx context.Context, announcement *Announcement) error
 	ApproveAnnouncement(ctx context.Context, announcementID, userID string) error
-	GetAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
-	GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
-	GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
-	GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
+	GetAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, int, error)
+	GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, int, error)
+	GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, int, error)
+	GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, int, error)
 	GetAnnouncementByID(ctx context.Context, id string) (*Announcement, error)
-	GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*AnnouncementPublic, error)
+	GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*AnnouncementPublic, int, error)
 	SetExpiredNowAnnouncement(ctx context.Context, announcementID string) error
 }
 
@@ -76,11 +76,11 @@ type Service interface {
 	CreateAnnouncement(ctx context.Context, req CreateAnnouncementRequest) (string, error)
 	UpdateAnnouncement(ctx context.Context, req UpdateAnnouncementRequest) error
 	ApproveAnnouncement(ctx context.Context, announcementID, userID string) error
-	GetAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
-	GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
-	GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
-	GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, error)
-	GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*AnnouncementPublic, error)
+	GetAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, int, error)
+	GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, int, error)
+	GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, int, error)
+	GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*Announcement, int, error)
+	GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*AnnouncementPublic, int, error)
 	GetUsersData(ctx context.Context, params pagination.Params) ([]*UserData, int, error)
 	GetUserDataByID(ctx context.Context, userID string) (*UserData, error)
 	ChangeUserField(ctx context.Context, userID, adminID string, operationName UserAdminOperation) error

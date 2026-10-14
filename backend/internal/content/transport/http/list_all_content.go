@@ -18,13 +18,13 @@ func (h *Handler) listAllContentItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contentList, err := h.svc.GetAllContentItems(ctx, status, pagination.ParsePaginationParams(r))
+	contentList, total, err := h.svc.GetAllContentItems(ctx, status, pagination.ParsePaginationParams(r))
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
 	}
 
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"content_item_list": contentList}, nil)
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"content_items": contentList, "total": total}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"user_id": user.ID, "path": r.URL.Path})
 	}

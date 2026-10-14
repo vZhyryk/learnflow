@@ -96,6 +96,24 @@ func startRun(w *EmailWorker[testPayload]) (cancel context.CancelFunc, done <-ch
 	return cancelFn, doneCh
 }
 
+// waitForListDrained polls until eventType's Redis list is empty, failing the test after 10s.
+func waitForListDrained(t *testing.T, w *EmailWorker[testPayload], eventType string) {
+	t.Helper()
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		n, err := w.redisClient.LLen(context.Background(), eventType).Result()
+		if err != nil {
+			t.Fatalf("waitForListDrained: llen: %v", err)
+		}
+		if n == 0 {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("waitForListDrained: list %q was not drained within 10s", eventType)
+}
+
 // stopRunAndWait cancels Run's context and fails the test if Run doesn't
 // return afterward. The production Redis client (see redis.InitRedis) never
 // sets ContextTimeoutEnabled, so an in-flight BLPop does not abort the moment
@@ -189,9 +207,9 @@ func TestRun_SkipsAlreadyProcessedMessage_Integration(t *testing.T) {
 			pushMessage(t, w, eventType, payload)
 			cancel, done := startRun(w)
 
-			// Run's BLPop timeout is 5s; sleeping past a full cycle proves the
-			// message was drained from the list without Process ever firing.
-			time.Sleep(6 * time.Second)
+			// The message is popped and skipped by the idempotency check; once the
+			// list is empty Process had its chance to fire and did not.
+			waitForListDrained(t, w, eventType)
 			So(callCount.Load(), ShouldEqual, int32(0))
 
 			stopRunAndWait(t, cancel, done)

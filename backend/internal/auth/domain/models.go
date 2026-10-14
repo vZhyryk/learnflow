@@ -161,9 +161,9 @@ type UserProfile struct {
 	UpdatedAt   time.Time
 }
 
-// GetFirstName returns the first name, or "User" when it is not set, so emails always have a greeting.
+// GetFirstName returns the first name, or "User" when the profile or name is not set, so emails always have a greeting.
 func (u *UserProfile) GetFirstName() string {
-	if u.FirstName != nil && *u.FirstName != "" {
+	if u != nil && u.FirstName != nil && *u.FirstName != "" {
 		return *u.FirstName
 	}
 
@@ -192,10 +192,16 @@ type RegisterRequest struct {
 func (r *RegisterRequest) Validate() error {
 	checks := []func() error{
 		r.validateCredentials,
+		r.validateNames,
+		r.validatePhoneNumber,
 		r.validateCountry,
+		r.validateCity,
 		r.validateGender,
 		r.validateDateOfBirth,
 		r.validateUILanguage,
+		r.validateAvatarURL,
+		r.validateTimezone,
+		r.validateBio,
 	}
 	for _, check := range checks {
 		if err := check(); err != nil {
@@ -212,6 +218,51 @@ func (r *RegisterRequest) validateCredentials() error {
 	r.Password = validator.NormalizePassword(r.Password)
 	if len(r.Password) < 8 || len(r.Password) > 72 {
 		return ErrInvalidCredentialFormat
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateNames() error {
+	if r.FirstName != "" && !validator.IsValidFirstName(r.FirstName) {
+		return ErrInvalidFirstName
+	}
+	if !validator.IsValidLastName(r.LastName) {
+		return ErrInvalidLastName
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validatePhoneNumber() error {
+	if !validator.IsValidPhoneNumber(r.PhoneNumber) {
+		return ErrInvalidPhoneNumber
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateCity() error {
+	if !validator.IsValidCity(r.City) {
+		return ErrInvalidCity
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateAvatarURL() error {
+	if r.AvatarURL != "" && !validator.IsValidAvatarURL(r.AvatarURL) {
+		return ErrInvalidAvatarURL
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateTimezone() error {
+	if r.Timezone != "" && !validator.IsValidTimezone(r.Timezone) {
+		return ErrInvalidTimezone
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateBio() error {
+	if !validator.IsValidBio(r.Bio) {
+		return ErrInvalidBio
 	}
 	return nil
 }
@@ -345,7 +396,7 @@ func (r *ResetPasswordRequest) Validate() error {
 
 // ChangePasswordRequest carries the user ID, current password, and desired new password.
 type ChangePasswordRequest struct {
-	UserID      string `json:"user_id"`
+	UserID      string `json:"-"`
 	OldPassword string `json:"old_password"`
 	NewPassword string `json:"new_password"`
 }

@@ -144,3 +144,20 @@ func TestLoggerTraceLevel(t *testing.T) {
 		})
 	})
 }
+
+// --- Write failure does not panic ---
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("sink closed") }
+
+func TestLoggerWriteFailureDoesNotPanic(t *testing.T) {
+	Convey("A failing sink", t, func() {
+		l := logger.New(failingWriter{}, nil, logger.LevelFatal)
+
+		Convey("Info and Error fall back to stderr instead of panicking", func() {
+			So(func() { l.Info("hello", nil) }, ShouldNotPanic)
+			So(func() { l.Error(errors.New("boom"), nil) }, ShouldNotPanic)
+		})
+	})
+}

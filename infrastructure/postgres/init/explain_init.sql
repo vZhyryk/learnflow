@@ -842,6 +842,11 @@ CREATE TABLE user_content_access (
 CREATE UNIQUE INDEX idx_user_content_access_user_id_content_item_id_active_unique
     ON user_content_access(user_id, content_item_id) WHERE status = 'active';
 
+-- [Partial WHERE status='active']: added in migration 000004 — admin query "who has access to this item?"
+-- The unique index above leads with user_id, so it cannot serve lookups by content_item_id alone.
+CREATE INDEX idx_user_content_access_content_item_id_active
+    ON user_content_access(content_item_id) WHERE status = 'active';
+
 -- ---------------------------------------------------------------------------
 -- 12. USER NOTES
 -- ---------------------------------------------------------------------------
@@ -1369,7 +1374,10 @@ CREATE TABLE announcement_email_deliveries (
     status          text        NOT NULL DEFAULT 'pending' CONSTRAINT announcement_email_deliveries_status_check CHECK (status IN ('pending', 'sent', 'failed')),
     last_error      text,
     created_at      timestamptz NOT NULL DEFAULT now(),
-    updated_at      timestamptz NOT NULL DEFAULT now()
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    -- [attempt_count]: added in migration 000017 — failed publishes retry (status stays 'pending') until
+    -- the poller's max attempts, then status becomes 'failed'; no available_at, retry is on the next tick.
+    attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT announcement_email_deliveries_attempt_count_check CHECK (attempt_count >= 0)
 );
 
 -- [Partial index WHERE status='pending']: the delivery poller only ever queries pending

@@ -304,7 +304,7 @@ make run_full                 # dev + observability
 
 # Database backup
 make backup                   # create timestamped backup
-make restore FILE=backup.sql  # restore from file
+make restore FILE=learnflow_YYYYMMDD_HHMMSS.sql.gz  # drop public schema + restore from MinIO backup
 ```
 
 **Single package test:**

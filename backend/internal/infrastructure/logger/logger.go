@@ -61,18 +61,16 @@ func New(out io.Writer, sanit *sanitizer.Sanitizer, traceLevel Level) *Logger {
 
 // Info logs an informational message with optional key-value properties.
 func (l *Logger) Info(message string, properties map[string]any) {
-	err := l.log(LevelInfo, message, properties)
-	if err != nil {
-		panic(fmt.Errorf("logger.Info: %w", err))
+	if err := l.log(LevelInfo, message, properties); err != nil {
+		reportWriteFailure("logger.Info", err, message)
 	}
 }
 
 // Error logs an error. No-op if err is nil.
 func (l *Logger) Error(err error, properties map[string]any) {
 	if err != nil {
-		logErr := l.log(LevelError, err.Error(), properties)
-		if logErr != nil {
-			panic(fmt.Errorf("logger.Error: %w", logErr))
+		if logErr := l.log(LevelError, err.Error(), properties); logErr != nil {
+			reportWriteFailure("logger.Error", logErr, err.Error())
 		}
 	}
 }
@@ -83,11 +81,17 @@ func (l *Logger) Fatal(err error, properties map[string]any) {
 	if err == nil {
 		panic("logger.Fatal called with nil error")
 	}
-	err = l.log(LevelFatal, err.Error(), properties)
-	if err != nil {
-		panic(fmt.Errorf("logger.Fatal: %w", err))
+	message := err.Error()
+	if logErr := l.log(LevelFatal, message, properties); logErr != nil {
+		reportWriteFailure("logger.Fatal", logErr, message)
 	}
 	os.Exit(1)
+}
+
+// reportWriteFailure is the last resort when the log sink fails: a logging failure must not take down a
+// request or a worker, so the entry goes to stderr instead of panicking.
+func reportWriteFailure(caller string, err error, message string) {
+	fmt.Fprintf(os.Stderr, "%s: %v: dropped log entry: %s\n", caller, err, message) //nolint:errcheck // stderr is the last resort, nothing left to report to
 }
 
 func (l *Logger) log(level Level, message string, properties map[string]any) error {
@@ -99,7 +103,7 @@ func (l *Logger) log(level Level, message string, properties map[string]any) err
 		Trace      string         `json:"trace,omitempty"`
 	}{
 		Level: level.String(),
-		Time:  time.Now().UTC().Format(time.RFC3339),
+		Time:  time.Now().UTC().Format(time.RFC3339Nano),
 	}
 
 	aux.Message = l.sanitizer.SanitizeString(message)

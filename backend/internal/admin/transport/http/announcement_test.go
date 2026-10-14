@@ -206,8 +206,8 @@ func TestGetAnnouncements(t *testing.T) {
 	Convey("GET /api/v1/admin/announcements/all", t, func() {
 		var svcErr error
 		svc := &mockService{
-			getAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return []*admindomain.Announcement{}, svcErr
+			getAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return []*admindomain.Announcement{}, 3, svcErr
 			},
 		}
 
@@ -244,8 +244,8 @@ func TestGetUnApprovedAnnouncements(t *testing.T) {
 	Convey("GET /api/v1/admin/announcements/unapproved", t, func() {
 		var svcErr error
 		svc := &mockService{
-			getUnApprovedAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return []*admindomain.Announcement{}, svcErr
+			getUnApprovedAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return []*admindomain.Announcement{}, 3, svcErr
 			},
 		}
 
@@ -277,8 +277,8 @@ func TestGetApprovedAnnouncements(t *testing.T) {
 	Convey("GET /api/v1/admin/announcements/approved", t, func() {
 		var svcErr error
 		svc := &mockService{
-			getApprovedAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return []*admindomain.Announcement{}, svcErr
+			getApprovedAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return []*admindomain.Announcement{}, 3, svcErr
 			},
 		}
 
@@ -311,9 +311,9 @@ func TestGetPublicAnnouncements(t *testing.T) {
 		var svcErr error
 		var gotUserID string
 		svc := &mockService{
-			getPublicAnnouncements: func(_ context.Context, _ pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, error) {
+			getPublicAnnouncements: func(_ context.Context, _ pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, int, error) {
 				gotUserID = userID
-				return []*admindomain.AnnouncementPublic{{ID: "announcement-1"}}, svcErr
+				return []*admindomain.AnnouncementPublic{{ID: "announcement-1"}}, 3, svcErr
 			},
 		}
 
@@ -352,8 +352,8 @@ func TestGetExpiredAnnouncements(t *testing.T) {
 	Convey("GET /api/v1/admin/announcements/expired", t, func() {
 		var svcErr error
 		svc := &mockService{
-			getExpiredAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, error) {
-				return []*admindomain.Announcement{}, svcErr
+			getExpiredAnnouncements: func(_ context.Context, _ pagination.Params) ([]*admindomain.Announcement, int, error) {
+				return []*admindomain.Announcement{}, 3, svcErr
 			},
 		}
 

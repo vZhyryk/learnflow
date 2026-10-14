@@ -1,7 +1,12 @@
--include .env
-export
-
 SHELL := /bin/bash
+
+# .env is not included as make syntax (it would expand `$` and keep quotes) and nothing is
+# exported globally; only recipes that run the Go binaries load it, via with_env.
+SONAR_TOKEN ?= $(shell sed -n 's/^SONAR_TOKEN=//p' .env 2>/dev/null)
+
+define with_env
+set -a; while IFS='=' read -r k v; do case "$$k" in ''|\#*) ;; *) export "$$k=$$v";; esac; done < .env; set +a;
+endef
 
 BACKEND_DIR := backend
 BUILD_DIR := builds
@@ -74,40 +79,40 @@ cleanup:
 	go clean -testcache
 
 run:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' up
 
 run_rebuild:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up --build
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' up --build
 
 run_obs:
 	$(DOCKER_COMPOSE) -f '$(OBS_COMPOSE_FILE)' up --build
 
 run_full:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' -f '$(OBS_COMPOSE_FILE)' up --build
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' -f '$(OBS_COMPOSE_FILE)' up --build
 
 stop:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' down
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' down
 	$(DOCKER_COMPOSE) -f '$(OBS_COMPOSE_FILE)' down
 	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' down
 
 logs:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' logs -f
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' logs -f
 
 migrate:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up --build 'migrate'
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' up --build 'migrate'
 
 migrate_up:
-	cd $(BACKEND_DIR) && go run ./cmd/migrate -steps=1 -direction=up
+	@$(with_env) cd $(BACKEND_DIR) && go run ./cmd/migrate -steps=1 -direction=up
 
 migrate_down:
-	cd $(BACKEND_DIR) && go run ./cmd/migrate -steps=0 -direction=down
+	@$(with_env) cd $(BACKEND_DIR) && go run ./cmd/migrate -steps=0 -direction=down
 
 migrate_docker:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up 'migrate'
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' up 'migrate'
 
 run_no_docker:
-	$(DOCKER_COMPOSE) -f '$(NO_DOCKER_COMPOSE_FILE)' up --build -d
-	cd $(BACKEND_DIR) && go run ./cmd/api
+	$(DOCKER_COMPOSE) --env-file .env -f '$(NO_DOCKER_COMPOSE_FILE)' up --build -d
+	@$(with_env) cd $(BACKEND_DIR) && go run ./cmd/api
 
 
 run_graph_build:
@@ -277,11 +282,11 @@ backup:
 	docker exec learnflow_backup backup.sh
 
 backup_list:
-	docker exec learnflow_backup mc ls local/${BACKUP_BUCKET:-learnflow-backups}
+	docker exec learnflow_backup sh -c 'mc ls local/$${BACKUP_BUCKET:-learnflow-backups}'
 
 restore:
 	@test -n "$$FILE" || (echo "No FILE. Use: make restore FILE=learnflow_20240101_120000.sql.gz"; exit 1)
-	@echo "$$FILE" | grep -qE '^learnflow_[0-9]{8}_[0-9]{6}\.sql\.gz$$' || (echo "Invalid FILE: expected format learnflow_YYYYMMDD_HHMMSS.sql.gz, got: $$FILE"; exit 1)
+	@echo "$$FILE" | grep -qE '^[A-Za-z0-9_-]+\.sql\.gz$$' || (echo "Invalid FILE: expected <POSTGRES_DB>_YYYYMMDD_HHMMSS.sql.gz, got: $$FILE"; exit 1)
 	docker exec learnflow_backup restore.sh "$$FILE"
 
 

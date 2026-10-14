@@ -87,11 +87,18 @@ func TestGetMailerConfig(t *testing.T) {
 	})
 }
 
+func setValidRedisEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("REDIS_PASSWORD", "redis-secret")
+	t.Setenv("REDIS_TLS", "false")
+}
+
 func TestGetAppConfig(t *testing.T) {
 	Convey("getAppConfig", t, func() {
 		Convey("When DB and SMTP env vars are all valid, it succeeds", func() {
 			testutil.SetRequiredDBEnv(t)
 			setValidSMTPEnv(t)
+			setValidRedisEnv(t)
 
 			cfg, err := getAppConfig("production")
 
@@ -114,12 +121,25 @@ func TestGetAppConfig(t *testing.T) {
 
 		Convey("When DB config is valid but SMTP is invalid, it errors", func() {
 			testutil.SetRequiredDBEnv(t)
+			setValidRedisEnv(t)
 			t.Setenv("SMTP_HOST", "")
 
 			_, err := getAppConfig("production")
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "SMTP_")
+		})
+
+		Convey("When Redis has no password in production, it errors", func() {
+			testutil.SetRequiredDBEnv(t)
+			setValidSMTPEnv(t)
+			t.Setenv("REDIS_PASSWORD", "")
+			t.Setenv("REDIS_TLS", "false")
+
+			_, err := getAppConfig("production")
+
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "REDIS_PASSWORD")
 		})
 	})
 }

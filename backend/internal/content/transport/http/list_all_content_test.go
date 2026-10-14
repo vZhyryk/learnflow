@@ -16,8 +16,8 @@ func TestListAllContent(t *testing.T) {
 		var svcErr error
 
 		svc := &mockService{
-			getAllContentItems: func(_ context.Context, _ contentdomain.ContentItemStatus, _ pagination.Params) ([]*contentdomain.ContentItem, error) {
-				return []*contentdomain.ContentItem{}, svcErr
+			getAllContentItems: func(_ context.Context, _ contentdomain.ContentItemStatus, _ pagination.Params) ([]*contentdomain.ContentItem, int, error) {
+				return []*contentdomain.ContentItem{}, 3, svcErr
 			},
 		}
 
@@ -48,7 +48,8 @@ func TestListAllContent(t *testing.T) {
 			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
-			So(body["content_item_list"], ShouldNotBeNil)
+			So(body["content_items"], ShouldNotBeNil)
+			So(body["total"], ShouldEqual, 3)
 		})
 
 		Convey("Valid request → 200 with message - valid status", func() {
@@ -58,7 +59,8 @@ func TestListAllContent(t *testing.T) {
 			w := testutil.ServeHTTP(mux, withUser(newReq("", urlParam)))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
-			So(body["content_item_list"], ShouldNotBeNil)
+			So(body["content_items"], ShouldNotBeNil)
+			So(body["total"], ShouldEqual, 3)
 		})
 
 		Convey("Valid request and the success response write fails → does not panic", func() {

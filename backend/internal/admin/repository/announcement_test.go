@@ -213,11 +213,11 @@ func TestGetAnnouncementByID(t *testing.T) {
 // testutil.TestListMethod expects: build a repo around the given runner, return the
 // bound method.
 func bindAnnouncementList(
-	call func(*Repository, context.Context, pagination.Params) ([]*admindomain.Announcement, error),
-) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*admindomain.Announcement, error) {
-	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*admindomain.Announcement, error) {
+	call func(*Repository, context.Context, pagination.Params) ([]*admindomain.Announcement, int, error),
+) func(*testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*admindomain.Announcement, int, error) {
+	return func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params) ([]*admindomain.Announcement, int, error) {
 		repo := newTestRepo(runner)
-		return func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, error) {
+		return func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
 			return call(repo, ctx, params)
 		}
 	}
@@ -231,24 +231,24 @@ func fakeAnnouncementN(n int) *admindomain.Announcement {
 }
 
 func TestGetAnnouncements(t *testing.T) {
-	testutil.TestListMethod(t, "GetAnnouncements", bindAnnouncementList((*Repository).GetAnnouncements), fakeAnnouncementN, fakeAnnouncementScan)
+	testutil.TestCountListMethod(t, "GetAnnouncements", bindAnnouncementList((*Repository).GetAnnouncements), fakeAnnouncementN, fakeAnnouncementScan)
 }
 
 func TestGetUnApprovedAnnouncements(t *testing.T) {
-	testutil.TestListMethod(t, "GetUnApprovedAnnouncements", bindAnnouncementList((*Repository).GetUnApprovedAnnouncements), fakeAnnouncementN, fakeAnnouncementScan)
+	testutil.TestCountListMethod(t, "GetUnApprovedAnnouncements", bindAnnouncementList((*Repository).GetUnApprovedAnnouncements), fakeAnnouncementN, fakeAnnouncementScan)
 }
 
 func TestGetApprovedAnnouncements(t *testing.T) {
-	testutil.TestListMethod(t, "GetApprovedAnnouncements", bindAnnouncementList((*Repository).GetApprovedAnnouncements), fakeAnnouncementN, fakeAnnouncementScan)
+	testutil.TestCountListMethod(t, "GetApprovedAnnouncements", bindAnnouncementList((*Repository).GetApprovedAnnouncements), fakeAnnouncementN, fakeAnnouncementScan)
 }
 
 func TestGetExpiredAnnouncements(t *testing.T) {
-	testutil.TestListMethod(t, "GetExpiredAnnouncements", bindAnnouncementList((*Repository).GetExpiredAnnouncements), fakeAnnouncementN, fakeAnnouncementScan)
+	testutil.TestCountListMethod(t, "GetExpiredAnnouncements", bindAnnouncementList((*Repository).GetExpiredAnnouncements), fakeAnnouncementN, fakeAnnouncementScan)
 }
 
 func TestGetPublicAnnouncements(t *testing.T) {
-	testutil.TestListMethodWithStringArg(t, "GetPublicAnnouncements",
-		func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*admindomain.AnnouncementPublic, error) {
+	testutil.TestCountListMethodWithStringArg(t, "GetPublicAnnouncements",
+		func(runner *testutil.MockQueryRunner) func(context.Context, pagination.Params, string) ([]*admindomain.AnnouncementPublic, int, error) {
 			return newTestRepo(runner).GetPublicAnnouncements
 		},
 		fakeAnnouncementPublic, fakeAnnouncementPublicScan)
@@ -258,7 +258,16 @@ func TestGetPublicAnnouncementsArgs(t *testing.T) {
 	Convey("Given an admin repository", t, func() {
 		var gotQuery string
 		var gotArgs []any
+		var gotCountQuery string
+		var gotCountArgs []any
 		repo := newTestRepo(&testutil.MockQueryRunner{
+			QueryRowFn: func(_ context.Context, sql string, args ...any) pgx.Row {
+				gotCountQuery, gotCountArgs = sql, args
+				return &testutil.MockRow{ScanFn: func(dest ...any) error {
+					*testutil.CastInt(dest[0], 0) = 5
+					return nil
+				}}
+			},
 			QueryFn: func(_ context.Context, sql string, args ...any) (pgx.Rows, error) {
 				gotQuery, gotArgs = sql, args
 				return &testutil.MockRows{}, nil
@@ -267,9 +276,13 @@ func TestGetPublicAnnouncementsArgs(t *testing.T) {
 
 		Convey("When listing public announcements for a user", func() {
 			params := pagination.NewParams(2, 10)
-			_, err := repo.GetPublicAnnouncements(context.Background(), params, "user-1")
+			_, total, err := repo.GetPublicAnnouncements(context.Background(), params, "user-1")
 
 			So(err, ShouldBeNil)
+			So(total, ShouldEqual, 5)
+			So(gotCountQuery, ShouldContainSubstring, "COUNT(*)")
+			So(gotCountQuery, ShouldContainSubstring, "'banner' = ANY(a.channels)")
+			So(gotCountArgs, ShouldResemble, []any{"user-1"})
 			So(gotQuery, ShouldContainSubstring, "'banner' = ANY(a.channels)")
 			So(gotArgs, ShouldResemble, []any{"user-1", params.Limit(), params.Offset()})
 		})

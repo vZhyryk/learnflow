@@ -2,6 +2,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -71,6 +72,24 @@ func GetRedis() (*redis.Instance, error) {
 		TLS:             env.GetBoolEnv("REDIS_TLS", false),
 	}
 	return redis.InitRedis(env.GetStringEnv("REDIS_ADDR", "redis:6379"), env.GetStringEnv("REDIS_PASSWORD", ""), pool)
+}
+
+// ValidateRedisConfig fails startup in production when Redis would run without a password or without
+// an explicit REDIS_TLS decision; other environments accept the defaults.
+func ValidateRedisConfig(environment string) error {
+	if environment != "production" {
+		return nil
+	}
+
+	if env.GetStringEnv("REDIS_PASSWORD", "") == "" {
+		return errors.New("REDIS_PASSWORD is required in production")
+	}
+
+	if _, set := os.LookupEnv("REDIS_TLS"); !set {
+		return errors.New("REDIS_TLS must be set explicitly (true or false) in production")
+	}
+
+	return nil
 }
 
 // MustInitInfra inits the DB pool and Redis client (jsonLogger.Fatal on failure) and

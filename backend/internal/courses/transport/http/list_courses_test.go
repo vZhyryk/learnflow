@@ -16,8 +16,8 @@ func TestListCourses(t *testing.T) {
 		var svcErr error
 
 		svc := &mockService{
-			getAllCourses: func(_ context.Context, _ coursedomain.CourseStatus, _ pagination.Params) ([]*coursedomain.Course, error) {
-				return []*coursedomain.Course{}, svcErr
+			getAllCourses: func(_ context.Context, _ coursedomain.CourseStatus, _ pagination.Params) ([]*coursedomain.Course, int, error) {
+				return []*coursedomain.Course{}, 3, svcErr
 			},
 		}
 
@@ -39,7 +39,8 @@ func TestListCourses(t *testing.T) {
 			w := testutil.ServeHTTP(mux, withUser(newReq("", nil)))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
-			So(body["course_list"], ShouldNotBeNil)
+			So(body["courses"], ShouldNotBeNil)
+			So(body["total"], ShouldEqual, 3)
 		})
 
 		Convey("Valid request and the success response write fails → does not panic", func() {

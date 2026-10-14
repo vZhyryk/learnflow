@@ -9,13 +9,13 @@ import (
 
 func (h *Handler) listArticles(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	articleList, err := h.svc.GetAllArticles(ctx, articledomain.PublishedStatus, pagination.ParsePaginationParams(r))
+	articleList, total, err := h.svc.GetAllArticles(ctx, articledomain.PublishedStatus, pagination.ParsePaginationParams(r))
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
 		return
 	}
 
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"article_list": articleList}, nil)
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"articles": articleList, "total": total}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"path": r.URL.Path})
 	}

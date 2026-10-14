@@ -62,20 +62,3 @@ const (
 	AggregationTypePayment      AggregationType = "payment"
 	AggregationTypeAnnouncement AggregationType = "announcement"
 )
-
-// IsKnownAggregationType reports whether t is a registered aggregate type.
-func IsKnownAggregationType(t AggregationType) bool {
-	switch t {
-	case
-		AggregationTypeUser,
-		AggregationTypeEmail,
-		AggregationTypeAccount,
-		AggregationTypePassword,
-		AggregationTypeBrief,
-		AggregationTypeBooking,
-		AggregationTypePayment,
-		AggregationTypeAnnouncement:
-		return true
-	}
-	return false
-}

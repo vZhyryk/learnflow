@@ -186,14 +186,14 @@ func TestHandleFailedJobEntrySuccess(t *testing.T) {
 			w := newTestDLQRetryWorker(runner, publisher)
 
 			payload := `{"a":"b"}`
-			w.handleEntry(context.Background(), PollerEntry[DLQRetryWorker]{
+			w.handleEntries(context.Background(), []PollerEntry[DLQRetryWorker]{{
 				ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: payload,
-			})
+			}})
 
 			So(publishedType, ShouldEqual, events.EventUserRegistered)
 			So(publishedPayload, ShouldResemble, json.RawMessage(`{"a":"b"}`))
 			So(gotQuery, ShouldEqual, markAsRetriedSuccessSQL)
-			So(gotArgs[0], ShouldEqual, "job-1")
+			So(gotArgs[0], ShouldResemble, []string{"job-1"})
 		})
 	})
 }
@@ -213,7 +213,7 @@ func TestHandleFailedJobEntrySuccessNoRowsAffected(t *testing.T) {
 
 			// Nothing to assert beyond "this does not panic" — a zero-rows update is only logged.
 			payload := `{"a":"b"}`
-			w.handleEntry(context.Background(), PollerEntry[DLQRetryWorker]{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: payload})
+			w.handleEntries(context.Background(), []PollerEntry[DLQRetryWorker]{{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: payload}})
 		})
 	})
 }
@@ -237,9 +237,8 @@ func TestHandleFailedJobEntrySuccessButMarkRetriedExecFails(t *testing.T) {
 
 			payload := `{"a":"b"}`
 			// Nothing to assert beyond "this does not panic" — the Exec error is only logged, and the
-			// transaction still commits at the poll() level despite this failure (see handleEntry's
-			// void signature).
-			w.handleEntry(context.Background(), PollerEntry[DLQRetryWorker]{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: payload})
+			// transaction still commits at the poll() level despite this failure.
+			w.handleEntries(context.Background(), []PollerEntry[DLQRetryWorker]{{ID: "job-1", EventType: events.EventUserRegistered, PayloadJSON: payload}})
 
 			So(publishedType, ShouldEqual, events.EventUserRegistered)
 			So(publishedPayload, ShouldResemble, json.RawMessage(`{"a":"b"}`))

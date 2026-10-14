@@ -108,7 +108,7 @@ func TestGetCorsTrustedOrigins(t *testing.T) {
 		Convey("When the env var is empty, it defaults to the local frontend", func() {
 			t.Setenv("CORS_TRUSTED_ORIGINS", "")
 
-			got, err := getCorsTrustedOrigins()
+			got, err := getCorsTrustedOrigins("dev")
 
 			So(err, ShouldBeNil)
 			So(got, ShouldHaveLength, 1)
@@ -118,7 +118,7 @@ func TestGetCorsTrustedOrigins(t *testing.T) {
 		Convey("When several origins are given, it trims and keeps each", func() {
 			t.Setenv("CORS_TRUSTED_ORIGINS", " https://app.example.com , http://localhost:3000 ,")
 
-			got, err := getCorsTrustedOrigins()
+			got, err := getCorsTrustedOrigins("dev")
 
 			So(err, ShouldBeNil)
 			So(got, ShouldHaveLength, 2)
@@ -130,7 +130,7 @@ func TestGetCorsTrustedOrigins(t *testing.T) {
 			Convey("When an origin is invalid ("+bad+"), it fails startup", func() {
 				t.Setenv("CORS_TRUSTED_ORIGINS", bad)
 
-				got, err := getCorsTrustedOrigins()
+				got, err := getCorsTrustedOrigins("dev")
 
 				So(got, ShouldBeNil)
 				So(err, ShouldNotBeNil)
@@ -138,10 +138,38 @@ func TestGetCorsTrustedOrigins(t *testing.T) {
 			})
 		}
 
+		Convey("In production, a missing variable fails instead of defaulting to localhost", func() {
+			t.Setenv("CORS_TRUSTED_ORIGINS", "")
+
+			got, err := getCorsTrustedOrigins("production")
+
+			So(got, ShouldBeNil)
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "at least one origin")
+		})
+
+		Convey("In production, an http origin is rejected", func() {
+			t.Setenv("CORS_TRUSTED_ORIGINS", "https://app.example.com,http://app.example.com")
+
+			_, err := getCorsTrustedOrigins("production")
+
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "requires https")
+		})
+
+		Convey("In production, https origins are accepted", func() {
+			t.Setenv("CORS_TRUSTED_ORIGINS", "https://app.example.com")
+
+			got, err := getCorsTrustedOrigins("production")
+
+			So(err, ShouldBeNil)
+			So(got, ShouldContainKey, "https://app.example.com")
+		})
+
 		Convey("When only separators are given, it requires at least one origin", func() {
 			t.Setenv("CORS_TRUSTED_ORIGINS", " , ,")
 
-			_, err := getCorsTrustedOrigins()
+			_, err := getCorsTrustedOrigins("dev")
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "at least one origin")

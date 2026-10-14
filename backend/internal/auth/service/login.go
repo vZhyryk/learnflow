@@ -7,8 +7,6 @@ import (
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/shared/tokens"
 	"time"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -16,10 +14,6 @@ const (
 	// loginFailLimit: consecutive failed attempts before a temporary lock (see sarch-14).
 	loginFailLimit = 5
 )
-
-// bcryptCompareHashAndPassword indirects bcrypt.CompareHashAndPassword so tests can spy on
-// the dummy-hash comparison in loginGetUser instead of asserting on wall-clock timing.
-var bcryptCompareHashAndPassword = bcrypt.CompareHashAndPassword
 
 // Login authenticates a user and returns access/refresh tokens. Check order (lock →
 // bcrypt → status) is timing-attack-sensitive — do not reorder, see TestLoginConstantTimeUserEnumeration.
@@ -32,11 +26,11 @@ func (s *Service) Login(ctx context.Context, req authdomain.LoginRequest) (*auth
 	}
 
 	if user.LoginLockedUntil != nil && user.LoginLockedUntil.After(time.Now().UTC()) {
-		bcryptCompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck,gosec // discarded intentionally, only used to consume constant time
+		s.compareHash(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck,gosec // discarded intentionally, only used to consume constant time
 		return nil, authdomain.ErrInvalidCredentials
 	}
 
-	err = bcryptCompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
+	err = s.compareHash([]byte(user.PasswordHash), []byte(req.Password))
 	if err != nil {
 		incErr := s.userRepo.IncrementFailedLogin(ctx, user.ID, loginLockInterval, loginFailLimit)
 		if incErr != nil && !errors.Is(incErr, authdomain.ErrUserNotFound) {
@@ -70,7 +64,7 @@ func (s *Service) loginGetUser(ctx context.Context, req authdomain.LoginRequest)
 	}
 
 	// Dummy bcrypt against a precomputed hash — keeps timing constant; never generate per-request.
-	bcryptCompareHashAndPassword(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck,gosec // discarded intentionally, only used to consume constant time
+	s.compareHash(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck,gosec // discarded intentionally, only used to consume constant time
 	return nil, authdomain.ErrInvalidCredentials
 }
 

@@ -49,7 +49,7 @@ func seedPublicAnnouncement(t *testing.T, ctx context.Context, tx pgx.Tx, repo *
 func visiblePublicIDs(t *testing.T, ctx context.Context, repo *Repository, userID string) []string {
 	t.Helper()
 
-	list, err := repo.GetPublicAnnouncements(ctx, pagination.NewParams(1, 50), userID)
+	list, _, err := repo.GetPublicAnnouncements(ctx, pagination.NewParams(1, 50), userID)
 	if err != nil {
 		t.Fatalf("visiblePublicIDs: %v", err)
 	}
