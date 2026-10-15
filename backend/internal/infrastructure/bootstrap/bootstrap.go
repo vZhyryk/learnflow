@@ -2,6 +2,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -10,10 +11,10 @@ import (
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/env"
 	"learnflow_backend/internal/infrastructure/logger"
-	lredis "learnflow_backend/internal/infrastructure/redis"
+	"learnflow_backend/internal/infrastructure/redis"
+	"learnflow_backend/internal/infrastructure/sanitizer"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 )
 
 // NewLogger builds the process logger for a cmd/ entrypoint, defaulting to error-level
@@ -23,7 +24,7 @@ func NewLogger(environment string) *logger.Logger {
 	if environment == "dev" {
 		traceLevel = logger.LevelError
 	}
-	return logger.New(os.Stdout, nil, traceLevel)
+	return logger.New(os.Stdout, sanitizer.NewSanitizer("", 0, nil), traceLevel)
 }
 
 // DatabaseConfig holds PostgreSQL connection settings, shared by every entrypoint's Config.
@@ -62,24 +63,41 @@ func LoadDatabaseConfig() (DatabaseConfig, error) {
 }
 
 // GetRedis builds a Redis client from environment-configured pool settings and pings it.
-func GetRedis() (*redis.Client, error) {
-	pool := lredis.PoolConfig{
+func GetRedis() (*redis.Instance, error) {
+	pool := redis.PoolConfig{
 		PoolSize:        env.GetIntEnv("REDIS_POOL_SIZE", 10),
 		MinIdleConns:    env.GetIntEnv("REDIS_MIN_IDLE_CONNS", 2),
 		MaxRetries:      env.GetIntEnv("REDIS_MAX_RETRIES", 3),
 		ConnMaxLifetime: env.GetDurationEnv("REDIS_CONN_MAX_LIFETIME", 5*time.Minute),
+		TLS:             env.GetBoolEnv("REDIS_TLS", false),
 	}
-	return lredis.InitRedis(env.GetStringEnv("REDIS_ADDR", "redis:6379"), env.GetStringEnv("REDIS_PASSWORD", ""), pool)
+	return redis.InitRedis(env.GetStringEnv("REDIS_ADDR", "redis:6379"), env.GetStringEnv("REDIS_PASSWORD", ""), pool)
 }
 
-// MustInitInfra initializes the database pool and Redis client, exiting the process via
-// jsonLogger.Fatal (which never returns) if either fails. It returns a single cleanup
-// func that closes both connections in the reverse order of acquisition; callers should
-// `defer cleanup()` immediately.
-func MustInitInfra(dbCfg DatabaseConfig, jsonLogger *logger.Logger) (*pgxpool.Pool, *redis.Client, func()) {
+// ValidateRedisConfig fails startup in production when Redis would run without a password or without
+// an explicit REDIS_TLS decision; other environments accept the defaults.
+func ValidateRedisConfig(environment string) error {
+	if environment != "production" {
+		return nil
+	}
+
+	if env.GetStringEnv("REDIS_PASSWORD", "") == "" {
+		return errors.New("REDIS_PASSWORD is required in production")
+	}
+
+	if _, set := os.LookupEnv("REDIS_TLS"); !set {
+		return errors.New("REDIS_TLS must be set explicitly (true or false) in production")
+	}
+
+	return nil
+}
+
+// MustInitInfra inits the DB pool and Redis client (jsonLogger.Fatal on failure) and
+// returns a cleanup func closing both in reverse order — `defer cleanup()` immediately.
+func MustInitInfra(dbCfg DatabaseConfig, jsonLogger *logger.Logger) (*pgxpool.Pool, *redis.Instance, func()) {
 	dbInstance, err := db.InitDatabase(dbCfg.DSN, dbCfg.MaxIdleTime, dbCfg.MaxLifetime, int32(dbCfg.MaxOpenConns), int32(dbCfg.MinOpenConns)) //nolint:gosec // bounded by runtime config, cannot overflow int32
 	if err != nil {
-		jsonLogger.Fatal(err, nil)
+		jsonLogger.Fatal(fmt.Errorf("bootstrap: db init failed (dsn=%s): %w", db.MaskDSN(dbCfg.DSN), err), nil)
 	}
 
 	redisClient, err := GetRedis()
@@ -88,8 +106,8 @@ func MustInitInfra(dbCfg DatabaseConfig, jsonLogger *logger.Logger) (*pgxpool.Po
 	}
 
 	cleanup := func() {
-		if closeErr := redisClient.Close(); closeErr != nil {
-			jsonLogger.Fatal(closeErr, nil)
+		if closeErr := redisClient.Raw().Close(); closeErr != nil {
+			jsonLogger.Error(closeErr, nil)
 		}
 		dbInstance.Close()
 	}

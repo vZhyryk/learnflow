@@ -12,7 +12,7 @@ import (
 )
 
 func TestInitiateEmailChange(t *testing.T) {
-	Convey("POST /api/v1/users/auth/email/change", t, func() {
+	Convey("POST /api/v1/auth/email/change", t, func() {
 		var svcErr error
 
 		svc := &mockService{
@@ -20,7 +20,7 @@ func TestInitiateEmailChange(t *testing.T) {
 				return svcErr
 			},
 		}
-		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/users/auth/email/change")
+		f := newHTTPFixture(svc, http.MethodPost, "/api/v1/auth/email/change")
 		mux, newReq := f.mux, f.newReq
 
 		Convey("Empty body → 400", func() {
@@ -28,30 +28,42 @@ func TestInitiateEmailChange(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
-		Convey("Invalid NewEmail format → 400", func() {
-			w := testutil.ServeHTTP(mux, newReq(`{"NewEmail":"notanemail"}`))
+		Convey("Missing password → 400", func() {
+			w := testutil.ServeHTTP(mux, newReq(`{"new_email":"new@example.com"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
-		Convey("No user in context → 401", func() {
-			w := testutil.ServeHTTP(mux, newReq(`{"NewEmail":"new@example.com"}`))
-			So(w.Code, ShouldEqual, http.StatusUnauthorized)
+		Convey("Invalid NewEmail format → 400", func() {
+			w := testutil.ServeHTTP(mux, newReq(`{"new_email":"notanemail"}`))
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		})
+
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(mux, newReq(`{"new_email":"new@example.com","password":"password123"}`))
+			}, ShouldPanic)
 		})
 
 		Convey("Service ErrEmailAlreadyInUse → 401", func() {
 			svcErr = authdomain.ErrEmailAlreadyInUse
-			w := testutil.ServeHTTP(mux, withUser(newReq(`{"NewEmail":"new@example.com"}`)))
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com","password":"password123"}`)))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
+		})
+
+		Convey("Service ErrWrongPassword → 422", func() {
+			svcErr = authdomain.ErrWrongPassword
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com","password":"password123"}`)))
+			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
 		})
 
 		Convey("Unexpected service error → 500", func() {
 			svcErr = testutil.ErrDBUnexpected
-			w := testutil.ServeHTTP(mux, withUser(newReq(`{"NewEmail":"new@example.com"}`)))
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com","password":"password123"}`)))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid request → 200 with message", func() {
-			w := testutil.ServeHTTP(mux, withUser(newReq(`{"NewEmail":"new@example.com"}`)))
+			w := testutil.ServeHTTP(mux, withUser(newReq(`{"new_email":"new@example.com","password":"password123"}`)))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["message"], ShouldNotBeNil)
@@ -59,7 +71,7 @@ func TestInitiateEmailChange(t *testing.T) {
 
 		Convey("Valid request and the success response write fails → does not panic", func() {
 			So(func() {
-				mux.ServeHTTP(&errWriter{}, withUser(newReq(`{"NewEmail":"new@example.com"}`)))
+				mux.ServeHTTP(&errWriter{}, withUser(newReq(`{"new_email":"new@example.com","password":"password123"}`)))
 			}, ShouldNotPanic)
 		})
 	})
@@ -77,12 +89,12 @@ func newChangeEmailFixture() *changeEmailFixture {
 			return f.svcErr
 		},
 	}
-	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/users/auth/email/change")
+	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/auth/email/change")
 	return f
 }
 
 func TestChangeEmailRequestValidation(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/email/change — request validation", t, func() {
+	Convey("PUT /api/v1/auth/email/change — request validation", t, func() {
 		f := newChangeEmailFixture()
 
 		Convey("Empty body → 400", func() {
@@ -91,54 +103,55 @@ func TestChangeEmailRequestValidation(t *testing.T) {
 		})
 
 		Convey("Empty Token → 400", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":""}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"token":""}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
-		Convey("No user in context → 401", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"Token":"tok"}`))
-			So(w.Code, ShouldEqual, http.StatusUnauthorized)
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(f.mux, f.newReq(`{"token":"tok"}`))
+			}, ShouldPanic)
 		})
 	})
 }
 
 func TestChangeEmailServiceOutcomes(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/email/change — service outcomes", t, func() {
+	Convey("PUT /api/v1/auth/email/change — service outcomes", t, func() {
 		f := newChangeEmailFixture()
 
 		Convey("Service ErrTokenExpired → 400", func() {
 			f.svcErr = authdomain.ErrTokenExpired
-			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(`{"Token":"tok"}`)))
+			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(`{"token":"tok"}`)))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("Service ErrTokenUsed → 401", func() {
 			f.svcErr = authdomain.ErrTokenUsed
-			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(`{"Token":"tok"}`)))
+			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(`{"token":"tok"}`)))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Service ErrInvalidToken → 401", func() {
 			f.svcErr = authdomain.ErrInvalidToken
-			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(`{"Token":"tok"}`)))
+			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(`{"token":"tok"}`)))
 			So(w.Code, ShouldEqual, http.StatusUnauthorized)
 		})
 
 		Convey("Unexpected service error → 500", func() {
 			f.svcErr = testutil.ErrDBUnexpected
-			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(`{"Token":"tok"}`)))
+			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(`{"token":"tok"}`)))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
 		Convey("Valid request → 200 with message", func() {
-			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(`{"Token":"tok"}`)))
+			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(`{"token":"tok"}`)))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
 			So(body["message"], ShouldNotBeNil)
 		})
 
 		Convey("Valid request and the success response write fails → does not panic", func() {
-			So(func() { f.mux.ServeHTTP(&errWriter{}, withUser(f.newReq(`{"Token":"tok"}`))) }, ShouldNotPanic)
+			So(func() { f.mux.ServeHTTP(&errWriter{}, withUser(f.newReq(`{"token":"tok"}`))) }, ShouldNotPanic)
 		})
 	})
 }

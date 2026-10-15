@@ -12,12 +12,12 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func newTestEmailWorker() *EmailWorker[map[string]string] {
-	return &EmailWorker[map[string]string]{
+func newTestEmailWorker() *EmailWorker[testPayload] {
+	return &EmailWorker[testPayload]{
 		logger: testutil.NewTestLogger(),
-		cfg: Config[map[string]string]{
+		cfg: Config[testPayload]{
 			EventType: "test.event",
-			Validate:  func(_ map[string]string) error { return nil },
+			Name:      "test_event",
 		},
 	}
 }
@@ -27,7 +27,7 @@ func TestHandleRunBLPopErrorsRedisNil(t *testing.T) {
 		Convey("When BLPop returns redis.Nil (no message available)", func() {
 			w := newTestEmailWorker()
 
-			shouldContinue, shouldReturn := w.handleRunBLPopErrors(redis.Nil)
+			shouldContinue, shouldReturn := handleRunBLPopErrors(redis.Nil, w.cfg.EventType, w.logger)
 
 			So(shouldContinue, ShouldBeTrue)
 			So(shouldReturn, ShouldBeFalse)
@@ -40,7 +40,7 @@ func TestHandleRunBLPopErrorsContextCanceled(t *testing.T) {
 		Convey("When BLPop fails because the context was canceled", func() {
 			w := newTestEmailWorker()
 
-			shouldContinue, shouldReturn := w.handleRunBLPopErrors(context.Canceled)
+			shouldContinue, shouldReturn := handleRunBLPopErrors(context.Canceled, w.cfg.EventType, w.logger)
 
 			So(shouldContinue, ShouldBeFalse)
 			So(shouldReturn, ShouldBeTrue)
@@ -49,7 +49,7 @@ func TestHandleRunBLPopErrorsContextCanceled(t *testing.T) {
 		Convey("When BLPop fails because the context deadline was exceeded", func() {
 			w := newTestEmailWorker()
 
-			shouldContinue, shouldReturn := w.handleRunBLPopErrors(context.DeadlineExceeded)
+			shouldContinue, shouldReturn := handleRunBLPopErrors(context.DeadlineExceeded, w.cfg.EventType, w.logger)
 
 			So(shouldContinue, ShouldBeFalse)
 			So(shouldReturn, ShouldBeTrue)
@@ -58,7 +58,7 @@ func TestHandleRunBLPopErrorsContextCanceled(t *testing.T) {
 		Convey("When BLPop fails with a context error wrapped by another error", func() {
 			w := newTestEmailWorker()
 
-			shouldContinue, shouldReturn := w.handleRunBLPopErrors(fmt.Errorf("blpop: %w", context.Canceled))
+			shouldContinue, shouldReturn := handleRunBLPopErrors(fmt.Errorf("blpop: %w", context.Canceled), w.cfg.EventType, w.logger)
 
 			So(shouldContinue, ShouldBeFalse)
 			So(shouldReturn, ShouldBeTrue)
@@ -71,7 +71,7 @@ func TestHandleRunBLPopErrorsUnexpectedError(t *testing.T) {
 		Convey("When BLPop fails with an unexpected, non-context error", func() {
 			w := newTestEmailWorker()
 
-			shouldContinue, shouldReturn := w.handleRunBLPopErrors(testutil.ErrRedisUnavailable)
+			shouldContinue, shouldReturn := handleRunBLPopErrors(testutil.ErrRedisUnavailable, w.cfg.EventType, w.logger)
 
 			So(shouldContinue, ShouldBeTrue)
 			So(shouldReturn, ShouldBeFalse)
@@ -84,7 +84,7 @@ func TestHandleRunBLPopErrorsNoError(t *testing.T) {
 		Convey("When BLPop succeeds", func() {
 			w := newTestEmailWorker()
 
-			shouldContinue, shouldReturn := w.handleRunBLPopErrors(nil)
+			shouldContinue, shouldReturn := handleRunBLPopErrors(nil, w.cfg.EventType, w.logger)
 
 			So(shouldContinue, ShouldBeFalse)
 			So(shouldReturn, ShouldBeFalse)
@@ -106,13 +106,11 @@ func TestHandleMessage(t *testing.T) {
 
 		Convey("Break validate", func() {
 			w := newTestEmailWorker()
-			w.cfg.Validate = func(_ map[string]string) error {
-				return fmt.Errorf("some error")
-			}
 
-			result, idempotencyKey, err := w.handleMessage(context.Background(), `{"value": "value"}`)
+			result, idempotencyKey, err := w.handleMessage(context.Background(), `{"value": ""}`)
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "some error")
+			So(err.Error(), ShouldStartWith, "test_event: invalid payload")
+			So(err.Error(), ShouldContainSubstring, "Value")
 			So(result, ShouldBeNil)
 			So(idempotencyKey, ShouldBeEmpty)
 		})
@@ -122,7 +120,7 @@ func TestHandleMessage(t *testing.T) {
 				logger: testutil.NewTestLogger(),
 				cfg: Config[events.RegistrationAttemptPayload]{
 					EventType: "registration_attempt",
-					Validate:  ValidateRegistrationAttemptsPayload,
+					Name:      "registration_attempt",
 				},
 			}
 
@@ -136,13 +134,6 @@ func TestHandleMessage(t *testing.T) {
 
 		Convey("No redis (broken SetNX)", func() {
 			w := newTestEmailWorker()
-			w.cfg.Validate = func(_ map[string]string) error {
-				return nil
-			}
-
-			w.cfg.IdempotencyKey = func(_ map[string]string) string {
-				return "test_key:test_key"
-			}
 
 			So(func() {
 				_, _, _ = w.handleMessage(context.Background(), `{"value": "value"}`) //nolint:errcheck // panics before returning; asserted via ShouldPanic

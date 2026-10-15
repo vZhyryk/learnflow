@@ -20,7 +20,7 @@ func TestNewApp(t *testing.T) {
 			},
 		}
 		log := testutil.NewTestLogger()
-		redisClient := testutil.UnreachableRedis()
+		redisClient := testutil.UnreachableRedisInstance()
 		defer redisClient.Close() //nolint:errcheck // best-effort cleanup
 
 		app := NewApp(cfg, log, nil, redisClient)
@@ -28,7 +28,6 @@ func TestNewApp(t *testing.T) {
 		Convey("It wires all dependencies into the App container", func() {
 			So(app.Config, ShouldResemble, cfg)
 			So(app.Logger, ShouldEqual, log)
-			So(app.RedisClient, ShouldEqual, redisClient)
 			So(app.Outbox, ShouldNotBeNil)
 			So(app.Publisher, ShouldNotBeNil)
 			So(app.Mailer, ShouldNotBeNil)

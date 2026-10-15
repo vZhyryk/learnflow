@@ -13,13 +13,18 @@ type Publisher interface {
 	Publish(ctx context.Context, eventType EventType, payload any) error
 }
 
-// RedisPublisher publishes events to Redis lists via LPUSH.
-type RedisPublisher struct {
-	client *redis.Client
+// Pusher is the only Redis command the publisher needs; *redis.Client satisfies it.
+type Pusher interface {
+	LPush(ctx context.Context, key string, values ...any) *redis.IntCmd
 }
 
-// NewRedisPublisher returns a new RedisPublisher backed by the given Redis client.
-func NewRedisPublisher(client *redis.Client) *RedisPublisher {
+// RedisPublisher publishes events to Redis lists via LPUSH.
+type RedisPublisher struct {
+	client Pusher
+}
+
+// NewRedisPublisher returns a new RedisPublisher backed by the given Pusher.
+func NewRedisPublisher(client Pusher) *RedisPublisher {
 	return &RedisPublisher{client: client}
 }
 
@@ -27,7 +32,7 @@ func NewRedisPublisher(client *redis.Client) *RedisPublisher {
 func (p *RedisPublisher) Publish(ctx context.Context, eventType EventType, payload any) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("publisher.Publish marshal: %w", err)
+		return fmt.Errorf("publisher.Publish: marshal: %w", err)
 	}
 	if err := p.client.LPush(ctx, string(eventType), data).Err(); err != nil {
 		return fmt.Errorf("publisher.Publish: %w", err)

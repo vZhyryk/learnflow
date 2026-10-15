@@ -9,7 +9,7 @@ import (
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	var req authdomain.LogoutRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 	ctx := r.Context()
@@ -23,7 +23,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"ok": true}, nil)
+	err = helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "you have been logged out"}, nil)
 	if err != nil {
 		h.jsonLogger.Error(err, map[string]any{"event": logoutEvent, "user_id": userID, "path": r.URL.Path})
 	}

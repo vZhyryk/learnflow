@@ -41,7 +41,7 @@ func main() {
 	}
 	m, err := migrate.NewWithSourceInstance("iofs", d, dsn)
 	if err != nil {
-		jsonLogger.Fatal(fmt.Errorf("migrate init failed: %w", err), nil)
+		jsonLogger.Fatal(fmt.Errorf("migrate init failed (dsn=%s): %w", db.MaskDSN(dsn), err), nil)
 	}
 
 	defer handleDefer(m, jsonLogger)

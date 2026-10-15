@@ -4,30 +4,29 @@ import (
 	"context"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 // mockUserRepo implements authdomain.UserRepository via function fields.
 // Only set the fields needed for each test case — unset fields panic with a clear message.
 type mockUserRepo struct {
-	getUserByEmail         func(ctx context.Context, email string) (*authdomain.User, error)
-	createUser             func(ctx context.Context, user *authdomain.User) (string, error)
-	createUserProfile      func(ctx context.Context, profile *authdomain.UserProfile) error
-	getUserByID            func(ctx context.Context, userID string) (*authdomain.User, error)
-	updateStatus           func(ctx context.Context, userID string, status authdomain.UserStatus) error
-	updatePasswordHash     func(ctx context.Context, userID, hash string) error
-	updateEmail            func(ctx context.Context, userID, email string) error
-	updateEmailVerifiedAt  func(ctx context.Context, userID string) error
-	incrementFailedLogin   func(ctx context.Context, userID, lockInterval string, limit int) error
-	resetFailedLogin       func(ctx context.Context, userID string) error
-	updateLastLoginAt      func(ctx context.Context, userID string) error
-	getUserProfileByUserID func(ctx context.Context, userID string) (*authdomain.UserProfile, error)
-	getDeletedUserByEmail  func(ctx context.Context, email string) (*authdomain.User, error)
-	getDeletedUserByID     func(ctx context.Context, userID string) (*authdomain.User, error)
-	restoreUser            func(ctx context.Context, userID string) error
-	deleteUser             func(ctx context.Context, userID string) error
-	updateRole             func(ctx context.Context, userID string, role authdomain.UserRole) error
+	getUserByEmail                func(ctx context.Context, email string) (*authdomain.User, error)
+	createUser                    func(ctx context.Context, user *authdomain.User) (string, error)
+	createUserProfile             func(ctx context.Context, profile *authdomain.UserProfile) error
+	createNotificationPreferences func(ctx context.Context, userID string) error
+	getUserByID                   func(ctx context.Context, userID string) (*authdomain.User, error)
+	updateStatus                  func(ctx context.Context, userID string, status authdomain.UserStatus) error
+	updatePasswordHash            func(ctx context.Context, userID, hash string) error
+	updateEmail                   func(ctx context.Context, userID, email string) error
+	updateEmailVerifiedAt         func(ctx context.Context, userID string) error
+	incrementFailedLogin          func(ctx context.Context, userID, lockInterval string, limit int) error
+	resetFailedLogin              func(ctx context.Context, userID string) error
+	updateLastLoginAt             func(ctx context.Context, userID string) error
+	getUserProfileByUserID        func(ctx context.Context, userID string) (*authdomain.UserProfile, error)
+	getDeletedUserByEmail         func(ctx context.Context, email string) (*authdomain.User, error)
+	getDeletedUserByID            func(ctx context.Context, userID string) (*authdomain.User, error)
+	restoreUser                   func(ctx context.Context, userID string) error
+	deleteUser                    func(ctx context.Context, userID string) error
+	updateRole                    func(ctx context.Context, userID string, role authdomain.UserRole) error
 }
 
 func (m *mockUserRepo) CreateUser(ctx context.Context, user *authdomain.User) (string, error) {
@@ -42,6 +41,13 @@ func (m *mockUserRepo) CreateUserProfile(ctx context.Context, profile *authdomai
 		panic("mockUserRepo.createUserProfile not set")
 	}
 	return m.createUserProfile(ctx, profile)
+}
+
+func (m *mockUserRepo) CreateNotificationPreferences(ctx context.Context, userID string) error {
+	if m.createNotificationPreferences == nil {
+		panic("mockUserRepo.createNotificationPreferences not set")
+	}
+	return m.createNotificationPreferences(ctx, userID)
 }
 
 func (m *mockUserRepo) GetUserByID(ctx context.Context, userID string) (*authdomain.User, error) {
@@ -156,10 +162,8 @@ type mockSessionRepo struct {
 	getUserSessionByRefreshToken func(ctx context.Context, refreshTokenHash string) (*authdomain.UserSession, error)
 	revokeUserSession            func(ctx context.Context, sessionID, revokedBy string, reason authdomain.RevokeReason) error
 	revokeAllUserSessions        func(ctx context.Context, userID string, revokedBy *string, reason authdomain.RevokeReason) error
-	getActiveSessionsByUserID    func(ctx context.Context, userID string) ([]*authdomain.UserSession, error)
 	getSessionByPrevHash         func(ctx context.Context, prevRefreshTokenHash string) (*authdomain.UserSession, error)
 	updateSessionToken           func(ctx context.Context, sessionID, hash, ua, ip string) error
-	updateFailedLoginAttempts    func(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error
 }
 
 func (m *mockSessionRepo) CreateUserSession(ctx context.Context, s *authdomain.UserSession) (*authdomain.UserSession, error) {
@@ -190,25 +194,11 @@ func (m *mockSessionRepo) RevokeAllUserSessions(ctx context.Context, userID stri
 	return m.revokeAllUserSessions(ctx, userID, revokedByUserID, revokeReason)
 }
 
-func (m *mockSessionRepo) GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
-	if m.getActiveSessionsByUserID == nil {
-		panic("mockSessionRepo.getActiveSessionsByUserID not set")
-	}
-	return m.getActiveSessionsByUserID(ctx, userID)
-}
-
 func (m *mockSessionRepo) UpdateSessionToken(ctx context.Context, sessionID, tokenHash, userAgent, ipAddress string) error {
 	if m.updateSessionToken == nil {
 		panic("mockSessionRepo.updateSessionToken not set")
 	}
 	return m.updateSessionToken(ctx, sessionID, tokenHash, userAgent, ipAddress)
-}
-
-func (m *mockSessionRepo) UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error {
-	if m.updateFailedLoginAttempts == nil {
-		panic("mockSessionRepo.updateFailedLoginAttempts not set")
-	}
-	return m.updateFailedLoginAttempts(ctx, sessionID, lockInterval, loginCountLimit)
 }
 
 func (m *mockSessionRepo) GetSessionByPrevHash(ctx context.Context, prevRefreshTokenHash string) (*authdomain.UserSession, error) {
@@ -327,23 +317,66 @@ func (m *mockTokenRepo) MarkAccountRecoveryTokenUsed(ctx context.Context, tokenH
 	return m.markAccountRecoveryTokenUsed(ctx, tokenHash)
 }
 
-// mockRedis implements NXSetter for JTI blocklist tests.
-type mockRedis struct {
-	setNX func(ctx context.Context, key string, value any, exp time.Duration) *redis.BoolCmd
+// mockAudit implements authdomain.Audit via a function field.
+type mockAudit struct {
+	wasDeletedByAdmin func(ctx context.Context, targetID string) (bool, error)
 }
 
-func (m *mockRedis) SetNX(ctx context.Context, key string, value any, expiration time.Duration) *redis.BoolCmd {
-	if m.setNX == nil {
-		panic("mockRedis.setNX not set")
+func (m *mockAudit) WasDeletedByAdmin(ctx context.Context, targetID string) (bool, error) {
+	if m.wasDeletedByAdmin == nil {
+		panic("mockAudit.wasDeletedByAdmin not set")
 	}
-	return m.setNX(ctx, key, value, expiration)
+	return m.wasDeletedByAdmin(ctx, targetID)
 }
 
-// mockRedisSetNXError returns a mockRedis whose SetNX always fails with err.
-func mockRedisSetNXError(err error) *mockRedis {
-	return &mockRedis{
-		setNX: func(_ context.Context, _ string, _ any, _ time.Duration) *redis.BoolCmd {
-			return redis.NewBoolResult(false, err)
+// mockAuditDeletedByAdmin returns a mockAudit whose WasDeletedByAdmin always answers (deleted, err).
+func mockAuditDeletedByAdmin(deleted bool, err error) *mockAudit {
+	return &mockAudit{wasDeletedByAdmin: func(_ context.Context, _ string) (bool, error) { return deleted, err }}
+}
+
+// mockBlocklist implements authdomain.TokenBlocklist via function fields.
+type mockBlocklist struct {
+	blockToken       func(ctx context.Context, jti string, ttl time.Duration) error
+	revokeUserTokens func(ctx context.Context, userID string, ttl time.Duration) error
+	unBlockUser      func(ctx context.Context, userID string) error
+}
+
+func (m *mockBlocklist) RevokeUserTokens(ctx context.Context, userID string, ttl time.Duration) error {
+	if m.revokeUserTokens == nil {
+		panic("mockBlocklist.revokeUserTokens not set")
+	}
+	return m.revokeUserTokens(ctx, userID, ttl)
+}
+
+func (m *mockBlocklist) BlockToken(ctx context.Context, jti string, ttl time.Duration) error {
+	if m.blockToken == nil {
+		panic("mockBlocklist.blockToken not set")
+	}
+	return m.blockToken(ctx, jti, ttl)
+}
+
+func (m *mockBlocklist) UnBlockUser(ctx context.Context, userID string) error {
+	if m.unBlockUser == nil {
+		panic("mockBlocklist.unBlockUser not set")
+	}
+	return m.unBlockUser(ctx, userID)
+}
+
+// mockBlocklistBlockTokenError returns a mockBlocklist whose BlockToken always fails with err.
+func mockBlocklistBlockTokenError(err error) *mockBlocklist {
+	return &mockBlocklist{
+		blockToken: func(_ context.Context, _ string, _ time.Duration) error { return err },
+	}
+}
+
+// mockBlocklistUnBlockUser returns a mockBlocklist whose UnBlockUser records the user IDs in unblocked and fails with err.
+func mockBlocklistUnBlockUser(unblocked *[]string, err error) *mockBlocklist {
+	return &mockBlocklist{
+		unBlockUser: func(_ context.Context, userID string) error {
+			if unblocked != nil {
+				*unblocked = append(*unblocked, userID)
+			}
+			return err
 		},
 	}
 }

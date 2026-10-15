@@ -43,7 +43,7 @@ func TestInitRecoverAccountUserLookup(t *testing.T) {
 		Convey("When the account is not actually deleted", func() {
 			uRepo := &mockUserRepo{
 				getDeletedUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Status: authdomain.StatusActive}, nil
+					return &authdomain.User{ID: TestUserID, Status: authdomain.StatusActive}, nil
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
@@ -55,12 +55,73 @@ func TestInitRecoverAccountUserLookup(t *testing.T) {
 	})
 }
 
-func recoverAccountDeletedUser() *authdomain.User {
-	return &authdomain.User{ID: "user-123", Email: "user@example.com", Status: authdomain.StatusDeleted}
+func fakeRecoverAccountDeletedUser() *authdomain.User {
+	return &authdomain.User{ID: TestUserID, Email: "user@example.com", Status: authdomain.StatusDeleted}
+}
+
+func TestInitRecoverAccountDeletedByAdmin(t *testing.T) {
+	deletedUser := fakeRecoverAccountDeletedUser()
+
+	Convey("Given a soft-deleted user", t, func() {
+		// getUserProfileByUserID is left unset: reaching it would panic, proving the check short-circuits.
+		uRepo := &mockUserRepo{
+			getDeletedUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
+				return deletedUser, nil
+			},
+		}
+		req := authdomain.RequestRecoverAccountRequest{Email: "user@example.com"}
+
+		Convey("When an admin deleted the account, recovery is refused before any token is issued", func() {
+			srv := newTestService(uRepo, nil, nil, nil, nil)
+			srv.audit = mockAuditDeletedByAdmin(true, nil)
+
+			err := srv.InitRecoverAccount(context.Background(), req)
+
+			So(errors.Is(err, authdomain.ErrDeletedByAdmin), ShouldBeTrue)
+		})
+
+		Convey("When the audit lookup fails, the error is wrapped", func() {
+			srv := newTestService(uRepo, nil, nil, nil, nil)
+			srv.audit = mockAuditDeletedByAdmin(false, testutil.ErrDBUnexpected)
+
+			err := srv.InitRecoverAccount(context.Background(), req)
+
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "check deleted by admin")
+		})
+	})
+}
+
+func TestRecoverAccountDeletedByAdmin(t *testing.T) {
+	Convey("Given a valid token for a soft-deleted user", t, func() {
+		tRepo := &mockTokenRepo{getAccountRecoveryToken: validRecoverAccountToken}
+		// restoreUser is left unset: reaching it would panic, proving the account is not restored.
+		uRepo := &mockUserRepo{getDeletedUserByID: recoverAccountGetDeletedUserByID}
+		req := authdomain.RecoverAccountRequest{Token: "tok"}
+
+		Convey("When an admin deleted the account, it is not restored", func() {
+			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+			srv.audit = mockAuditDeletedByAdmin(true, nil)
+
+			err := srv.RecoverAccount(context.Background(), req)
+
+			So(errors.Is(err, authdomain.ErrDeletedByAdmin), ShouldBeTrue)
+		})
+
+		Convey("When the audit lookup fails, the error is wrapped", func() {
+			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+			srv.audit = mockAuditDeletedByAdmin(false, testutil.ErrDBUnexpected)
+
+			err := srv.RecoverAccount(context.Background(), req)
+
+			So(errors.Is(err, testutil.ErrDBUnexpected), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "check deleted by admin")
+		})
+	})
 }
 
 func TestInitRecoverAccountProfileLookup(t *testing.T) {
-	deletedUser := recoverAccountDeletedUser()
+	deletedUser := fakeRecoverAccountDeletedUser()
 
 	Convey("Given an auth service", t, func() {
 		Convey("When fetching the user profile fails", func() {
@@ -86,7 +147,7 @@ func TestInitRecoverAccountProfileLookup(t *testing.T) {
 					return deletedUser, nil
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123"}, nil
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -94,7 +155,7 @@ func TestInitRecoverAccountProfileLookup(t *testing.T) {
 					return nil, testutil.ErrDBUnexpected
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newNoopOutbox(), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewNoopOutbox(), nil)
 
 			err := srv.InitRecoverAccount(context.Background(), authdomain.RequestRecoverAccountRequest{Email: "user@example.com"})
 
@@ -105,7 +166,7 @@ func TestInitRecoverAccountProfileLookup(t *testing.T) {
 }
 
 func TestInitRecoverAccountTokenIssued(t *testing.T) {
-	deletedUser := recoverAccountDeletedUser()
+	deletedUser := fakeRecoverAccountDeletedUser()
 
 	Convey("Given an auth service", t, func() {
 		Convey("When the token is issued successfully", func() {
@@ -116,7 +177,7 @@ func TestInitRecoverAccountTokenIssued(t *testing.T) {
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
 					aliceName := "Alice"
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
+					return &authdomain.UserProfile{UserID: TestUserID, FirstName: &aliceName}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -124,14 +185,14 @@ func TestInitRecoverAccountTokenIssued(t *testing.T) {
 					return t, nil
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newCapturingOutbox(&captured), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewCapturingOutbox(&captured), nil)
 
 			err := srv.InitRecoverAccount(context.Background(), authdomain.RequestRecoverAccountRequest{Email: "user@example.com"})
 
 			So(err, ShouldBeNil)
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "account")
-			So(captured[1], ShouldEqual, "user-123")
+			So(captured[1], ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -155,7 +216,7 @@ func TestRecoverAccountTokenLookup(t *testing.T) {
 			tRepo := &mockTokenRepo{
 				getAccountRecoveryToken: func(_ context.Context, _ string) (*authdomain.AccountRecoveryToken, error) {
 					return &authdomain.AccountRecoveryToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(-time.Hour)},
+						TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(-time.Hour)},
 					}, nil
 				},
 			}
@@ -170,12 +231,12 @@ func TestRecoverAccountTokenLookup(t *testing.T) {
 
 func validRecoverAccountToken(_ context.Context, _ string) (*authdomain.AccountRecoveryToken, error) {
 	return &authdomain.AccountRecoveryToken{
-		TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
+		TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(time.Hour)},
 	}, nil
 }
 
 func recoverAccountGetDeletedUserByID(_ context.Context, _ string) (*authdomain.User, error) {
-	return &authdomain.User{ID: "user-123", Status: authdomain.StatusDeleted}, nil
+	return &authdomain.User{ID: TestUserID, Status: authdomain.StatusDeleted}, nil
 }
 
 func TestRecoverAccountUserLookup(t *testing.T) {
@@ -199,7 +260,7 @@ func TestRecoverAccountUserLookup(t *testing.T) {
 			tRepo := &mockTokenRepo{getAccountRecoveryToken: validRecoverAccountToken}
 			uRepo := &mockUserRepo{
 				getDeletedUserByID: func(_ context.Context, _ string) (*authdomain.User, error) {
-					return &authdomain.User{ID: "user-123", Status: authdomain.StatusActive}, nil
+					return &authdomain.User{ID: TestUserID, Status: authdomain.StatusActive}, nil
 				},
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
@@ -217,9 +278,7 @@ func TestRecoverAccountRestoreFailures(t *testing.T) {
 			tRepo := &mockTokenRepo{getAccountRecoveryToken: validRecoverAccountToken}
 			uRepo := &mockUserRepo{
 				getDeletedUserByID: recoverAccountGetDeletedUserByID,
-				restoreUser: func(_ context.Context, _ string) error {
-					return testutil.ErrDBUnexpected
-				},
+				restoreUser:        testutil.AlwaysFailsDB,
 			}
 			srv := newTestService(uRepo, nil, tRepo, nil, nil)
 
@@ -231,21 +290,39 @@ func TestRecoverAccountRestoreFailures(t *testing.T) {
 
 		Convey("When marking the token as used fails", func() {
 			tRepo := &mockTokenRepo{
-				getAccountRecoveryToken: validRecoverAccountToken,
-				markAccountRecoveryTokenUsed: func(_ context.Context, _ string) error {
-					return testutil.ErrDBUnexpected
-				},
+				getAccountRecoveryToken:      validRecoverAccountToken,
+				markAccountRecoveryTokenUsed: testutil.AlwaysFailsDB,
 			}
 			uRepo := &mockUserRepo{
 				getDeletedUserByID: recoverAccountGetDeletedUserByID,
 				restoreUser:        testutil.AlwaysNil,
 			}
-			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+			var unblocked []string
+			srv := newTestService(uRepo, nil, tRepo, nil, mockBlocklistUnBlockUser(&unblocked, nil))
 
 			err := srv.RecoverAccount(context.Background(), authdomain.RecoverAccountRequest{Token: "tok"})
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "mark token used")
+			So(unblocked, ShouldBeEmpty)
+		})
+
+		Convey("When clearing the Redis block mark fails", func() {
+			tRepo := &mockTokenRepo{
+				getAccountRecoveryToken:      validRecoverAccountToken,
+				markAccountRecoveryTokenUsed: testutil.AlwaysNil,
+			}
+			uRepo := &mockUserRepo{
+				getDeletedUserByID: recoverAccountGetDeletedUserByID,
+				restoreUser:        testutil.AlwaysNil,
+			}
+			srv := newTestService(uRepo, nil, tRepo, nil, mockBlocklistUnBlockUser(nil, testutil.ErrRedisUnavailable))
+
+			err := srv.RecoverAccount(context.Background(), authdomain.RecoverAccountRequest{Token: "tok"})
+
+			So(errors.Is(err, testutil.ErrRedisUnavailable), ShouldBeTrue)
+			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
+			So(err.Error(), ShouldContainSubstring, "clear user_blocked")
 		})
 	})
 }
@@ -265,12 +342,14 @@ func TestRecoverAccountSuccess(t *testing.T) {
 					return nil
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, nil, nil)
+			var unblocked []string
+			srv := newTestService(uRepo, nil, tRepo, nil, mockBlocklistUnBlockUser(&unblocked, nil))
 
 			err := srv.RecoverAccount(context.Background(), authdomain.RecoverAccountRequest{Token: "tok"})
 
 			So(err, ShouldBeNil)
-			So(gotRestoredUserID, ShouldEqual, "user-123")
+			So(gotRestoredUserID, ShouldEqual, TestUserID)
+			So(unblocked, ShouldResemble, []string{TestUserID})
 		})
 	})
 }

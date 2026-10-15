@@ -8,11 +8,12 @@ import (
 
 func (h *Handler) initiatePasswordReset(w http.ResponseWriter, r *http.Request) {
 	var req authdomain.RequestPasswordResetRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 
 	ctx := r.Context()
+
 	err := h.svc.InitiatePasswordReset(ctx, req)
 	if err != nil {
 		h.handleErrorResponse(w, r, err)
@@ -28,7 +29,7 @@ func (h *Handler) initiatePasswordReset(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) resetPassword(w http.ResponseWriter, r *http.Request) {
 	var req authdomain.ResetPasswordRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 

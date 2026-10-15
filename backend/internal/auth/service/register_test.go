@@ -8,15 +8,21 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/crypto/bcrypt"
+
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func registerExistingUser() *authdomain.User {
-	return &authdomain.User{ID: "user-123", Email: "user@example.com"}
+	return &authdomain.User{ID: TestUserID, Email: "user@example.com"}
 }
 
-func validRegisterRequest() authdomain.RegisterRequest {
+func fakeRegisterRequest() authdomain.RegisterRequest {
 	return authdomain.RegisterRequest{Email: "user@example.com", Password: "password123"}
+}
+
+func createEmailVerificationToken(_ context.Context, t *authdomain.EmailVerificationToken) (*authdomain.EmailVerificationToken, error) {
+	return t, nil
 }
 
 func TestRegisterExistingEmailLookupFailures(t *testing.T) {
@@ -29,7 +35,7 @@ func TestRegisterExistingEmailLookupFailures(t *testing.T) {
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			_, err := srv.Register(context.Background(), validRegisterRequest())
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "get user by email")
@@ -46,7 +52,7 @@ func TestRegisterExistingEmailLookupFailures(t *testing.T) {
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			_, err := srv.Register(context.Background(), validRegisterRequest())
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "get user profile")
@@ -62,12 +68,12 @@ func TestRegisterExistingEmailNotifyGuard(t *testing.T) {
 					return registerExistingUser(), nil
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123"}, nil
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
 				},
 			}
-			srv := newTestService(uRepo, nil, nil, newFailingOutbox(testutil.ErrDBUnexpected), nil)
+			srv := newTestService(uRepo, nil, nil, testutil.NewFailingOutbox(testutil.ErrDBUnexpected), nil)
 
-			_, err := srv.Register(context.Background(), validRegisterRequest())
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "inform user")
@@ -81,18 +87,88 @@ func TestRegisterExistingEmailNotifyGuard(t *testing.T) {
 				},
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
 					aliceName := "Alice"
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
+					return &authdomain.UserProfile{UserID: TestUserID, FirstName: &aliceName}, nil
 				},
 			}
-			srv := newTestService(uRepo, nil, nil, newCapturingOutbox(&captured), nil)
+			srv := newTestService(uRepo, nil, nil, testutil.NewCapturingOutbox(&captured), nil)
 
-			id, err := srv.Register(context.Background(), validRegisterRequest())
+			id, err := srv.Register(context.Background(), fakeRegisterRequest())
 
 			So(errors.Is(err, authdomain.ErrUserAlreadyExists), ShouldBeTrue)
 			So(id, ShouldBeEmpty)
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "user")
-			So(captured[1], ShouldEqual, "user-123")
+			So(captured[1], ShouldEqual, TestUserID)
+			So(captured[3], ShouldContainSubstring, `"user_name":"Alice"`)
+		})
+
+		Convey("When the email is already registered and the profile has no first name, the warning still names the user", func() {
+			var captured []any
+			uRepo := &mockUserRepo{
+				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
+					return registerExistingUser(), nil
+				},
+				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
+				},
+			}
+			srv := newTestService(uRepo, nil, nil, testutil.NewCapturingOutbox(&captured), nil)
+
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
+
+			So(errors.Is(err, authdomain.ErrUserAlreadyExists), ShouldBeTrue)
+			So(captured, ShouldHaveLength, 4)
+			So(captured[3], ShouldContainSubstring, `"user_name":"User"`)
+		})
+	})
+}
+
+// TestRegisterConstantTimeUserEnumeration covers the timing mitigation on Register: an already
+// registered email must still pay for a bcrypt comparison, so the 202 response time does not reveal
+// whether the email exists. It spies on the service compareHash field instead of timing.
+func TestRegisterConstantTimeUserEnumeration(t *testing.T) {
+	Convey("Given an auth service", t, func() {
+		var calls int
+		var lastHash, lastPassword []byte
+		spy := func(hashedPassword, password []byte) error {
+			calls++
+			lastHash, lastPassword = hashedPassword, password
+			return bcrypt.CompareHashAndPassword(hashedPassword, password)
+		}
+
+		Convey("When the email is already registered, the dummy bcrypt comparison still runs", func() {
+			uRepo := &mockUserRepo{
+				getUserByEmail: func(_ context.Context, _ string) (*authdomain.User, error) {
+					return registerExistingUser(), nil
+				},
+				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
+				},
+			}
+			srv := newTestService(uRepo, nil, nil, testutil.NewNoopOutbox(), nil)
+			srv.compareHash = spy
+			req := fakeRegisterRequest()
+
+			_, err := srv.Register(context.Background(), req)
+
+			So(errors.Is(err, authdomain.ErrUserAlreadyExists), ShouldBeTrue)
+			So(calls, ShouldEqual, 1)
+			So(lastHash, ShouldResemble, srv.dummyPasswordHash)
+			So(string(lastPassword), ShouldEqual, req.Password)
+		})
+
+		Convey("When the email is new, the dummy comparison is not used (the real hashing pays the cost)", func() {
+			uRepo := newRegisterNewUserRepo()
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) {
+				return "", testutil.ErrDBUnexpected
+			}
+			srv := newTestService(uRepo, nil, nil, nil, nil)
+			srv.compareHash = spy
+
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
+
+			So(err, ShouldNotBeNil)
+			So(calls, ShouldEqual, 0)
 		})
 	})
 }
@@ -114,7 +190,7 @@ func TestRegisterCreateUserFailures(t *testing.T) {
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			_, err := srv.Register(context.Background(), validRegisterRequest())
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "create user")
@@ -122,16 +198,36 @@ func TestRegisterCreateUserFailures(t *testing.T) {
 
 		Convey("When creating the user profile fails", func() {
 			uRepo := newRegisterNewUserRepo()
-			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return TestUserID, nil }
 			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error {
+				return testutil.ErrDBUnexpected
+			}
+			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error { return nil }
+			srv := newTestService(uRepo, nil, nil, nil, nil)
+
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
+
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "create user profile")
+		})
+	})
+}
+
+func TestRegisterCreateNotificationPreferencesFails(t *testing.T) {
+	Convey("Given an auth service", t, func() {
+		Convey("When creating notification preferences fails", func() {
+			uRepo := newRegisterNewUserRepo()
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return TestUserID, nil }
+			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error { return nil }
+			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error {
 				return testutil.ErrDBUnexpected
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
 
-			_, err := srv.Register(context.Background(), validRegisterRequest())
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "create user profile")
+			So(err.Error(), ShouldContainSubstring, "create notification preferences")
 		})
 	})
 }
@@ -140,16 +236,17 @@ func TestRegisterCreateVerificationTokenFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When creating the verification token fails", func() {
 			uRepo := newRegisterNewUserRepo()
-			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return TestUserID, nil }
 			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error { return nil }
+			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error { return nil }
 			tRepo := &mockTokenRepo{
 				createEmailVerificationToken: func(_ context.Context, _ *authdomain.EmailVerificationToken) (*authdomain.EmailVerificationToken, error) {
 					return nil, testutil.ErrDBUnexpected
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newNoopOutbox(), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewNoopOutbox(), nil)
 
-			_, err := srv.Register(context.Background(), validRegisterRequest())
+			_, err := srv.Register(context.Background(), fakeRegisterRequest())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "create verification token")
@@ -163,29 +260,28 @@ func TestRegisterSuccess(t *testing.T) {
 			var capturedProfile *authdomain.UserProfile
 			var captured []any
 			uRepo := newRegisterNewUserRepo()
-			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return TestUserID, nil }
 			uRepo.createUserProfile = func(_ context.Context, p *authdomain.UserProfile) error {
 				capturedProfile = p
 				return nil
 			}
+			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error { return nil }
 			tRepo := &mockTokenRepo{
-				createEmailVerificationToken: func(_ context.Context, t *authdomain.EmailVerificationToken) (*authdomain.EmailVerificationToken, error) {
-					return t, nil
-				},
+				createEmailVerificationToken: createEmailVerificationToken,
 			}
-			srv := newTestService(uRepo, nil, tRepo, newCapturingOutbox(&captured), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewCapturingOutbox(&captured), nil)
 
 			id, err := srv.Register(context.Background(), authdomain.RegisterRequest{
 				Email: "user@example.com", Password: "password123", FirstName: "Alice",
 			})
 
 			So(err, ShouldBeNil)
-			So(id, ShouldEqual, "user-123")
-			So(capturedProfile.UserID, ShouldEqual, "user-123")
+			So(id, ShouldEqual, TestUserID)
+			So(capturedProfile.UserID, ShouldEqual, TestUserID)
 			So(*capturedProfile.FirstName, ShouldEqual, "Alice")
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "user")
-			So(captured[1], ShouldEqual, "user-123")
+			So(captured[1], ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -194,14 +290,13 @@ func TestRegisterMaxLengthPasswordHashing(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When the password is exactly 72 bytes of multi-byte runes (Validate's own limit)", func() {
 			uRepo := newRegisterNewUserRepo()
-			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return "user-123", nil }
+			uRepo.createUser = func(_ context.Context, _ *authdomain.User) (string, error) { return TestUserID, nil }
 			uRepo.createUserProfile = func(_ context.Context, _ *authdomain.UserProfile) error { return nil }
+			uRepo.createNotificationPreferences = func(_ context.Context, _ string) error { return nil }
 			tRepo := &mockTokenRepo{
-				createEmailVerificationToken: func(_ context.Context, t *authdomain.EmailVerificationToken) (*authdomain.EmailVerificationToken, error) {
-					return t, nil
-				},
+				createEmailVerificationToken: createEmailVerificationToken,
 			}
-			srv := newTestService(uRepo, nil, tRepo, newNoopOutbox(), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewNoopOutbox(), nil)
 
 			// 36 Cyrillic runes * 2 bytes = 72 bytes, at bcrypt's own byte limit,
 			// so GenerateFromPassword must not return bcrypt.ErrPasswordTooLong.
@@ -211,7 +306,7 @@ func TestRegisterMaxLengthPasswordHashing(t *testing.T) {
 			})
 
 			So(err, ShouldBeNil)
-			So(id, ShouldEqual, "user-123")
+			So(id, ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -221,9 +316,9 @@ func TestNewUserProfileFromRegisterRequest(t *testing.T) {
 		Convey("When optional fields are empty", func() {
 			req := authdomain.RegisterRequest{Email: "user@example.com", Password: "password123"}
 
-			p := newUserProfileFromRegisterRequest("user-123", req)
+			p := newUserProfileFromRegisterRequest(TestUserID, req)
 
-			So(p.UserID, ShouldEqual, "user-123")
+			So(p.UserID, ShouldEqual, TestUserID)
 			So(p.FirstName, ShouldBeNil)
 			So(p.LastName, ShouldBeNil)
 			So(p.PhoneNumber, ShouldBeNil)

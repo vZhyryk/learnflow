@@ -24,9 +24,15 @@ type mockService struct {
 }
 
 func (m *mockService) GetUserProfile(ctx context.Context, userID string) (*usersdomain.UserProfile, error) {
+	if m.getUserProfile == nil {
+		panic("mockService.getUserProfile not set")
+	}
 	return m.getUserProfile(ctx, userID)
 }
 
 func (m *mockService) ChangeUserProfile(ctx context.Context, req usersdomain.ChangeUserProfileRequest) error {
+	if m.changeUserProfile == nil {
+		panic("mockService.changeUserProfile not set")
+	}
 	return m.changeUserProfile(ctx, req)
 }

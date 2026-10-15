@@ -29,7 +29,7 @@ func TestRenderEmail(t *testing.T) {
 			_, _, _, err := renderEmail("does_not_exist.html", nil)
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "renderEmail parse template")
+			So(err.Error(), ShouldContainSubstring, "renderEmail: parse template")
 		})
 
 		Convey("data incompatible with template fields returns an execute error", func() {
@@ -70,7 +70,45 @@ func TestMailerSendDialFailure(t *testing.T) {
 			err := m.Send("does_not_exist.html", nil, CCUser{Mail: "user@example.com", Username: "Alice"}, nil)
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "renderEmail parse template")
+			So(err.Error(), ShouldContainSubstring, "renderEmail: parse template")
 		})
+	})
+}
+
+func TestRenderEmailUserStatusTemplates(t *testing.T) {
+	Convey("user status email templates", t, func() {
+		cases := map[string]string{
+			"email_user_block.html":   "blocked",
+			"email_user_unblock.html": "unblocked",
+			"email_user_delete.html":  "deleted",
+			"email_user_restore.html": "restored",
+		}
+		for tmpl, word := range cases {
+			Convey(tmpl+" renders subject, plain and html bodies", func() {
+				subject, plainBody, htmlBody, err := renderEmail(tmpl, map[string]string{"name": "Alice"})
+
+				So(err, ShouldBeNil)
+				So(subject, ShouldContainSubstring, word)
+				So(plainBody, ShouldContainSubstring, "Alice")
+				So(htmlBody, ShouldContainSubstring, "Alice")
+			})
+		}
+	})
+}
+
+func TestRenderEmailGrantAccessTemplate(t *testing.T) {
+	Convey("email_grant_access.html", t, func() {
+		subject, plainBody, htmlBody, err := renderEmail("email_grant_access.html", map[string]string{
+			"name":      "Alice",
+			"item_name": "Go Basics",
+			"item_type": "course",
+		})
+
+		So(err, ShouldBeNil)
+		So(subject, ShouldContainSubstring, "access")
+		So(plainBody, ShouldContainSubstring, "Alice")
+		So(plainBody, ShouldContainSubstring, "Go Basics")
+		So(htmlBody, ShouldContainSubstring, "course")
+		So(htmlBody, ShouldContainSubstring, "Go Basics")
 	})
 }

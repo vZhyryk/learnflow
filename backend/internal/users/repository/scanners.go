@@ -2,20 +2,17 @@ package usersrepository
 
 import (
 	"learnflow_backend/internal/infrastructure/convert"
+	"learnflow_backend/internal/shared/repository"
 	usersdomain "learnflow_backend/internal/users/domain"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type rowScanner interface {
-	Scan(dest ...any) error
-}
-
 // dobLayout matches usersdomain's DateOfBirth string format and the
 // validator.IsValidDateOfBirth parse layout.
 const dobLayout = "2006-01-02"
 
-func scanUserProfile(row rowScanner) (*usersdomain.UserProfile, error) {
+func scanUserProfile(row repository.RowScanner) (*usersdomain.UserProfile, error) {
 	user := &usersdomain.UserProfile{}
 	var dob pgtype.Date
 	err := row.Scan(

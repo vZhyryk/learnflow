@@ -1,0 +1,84 @@
+package courseservice
+
+import (
+	"context"
+	"errors"
+	coursedomain "learnflow_backend/internal/courses/domain"
+	"learnflow_backend/internal/shared/testutil"
+	"testing"
+
+	. "github.com/smartystreets/goconvey/convey"
+)
+
+func validGetCourseByID(_ context.Context, _ string) (*coursedomain.Course, error) {
+	des := "description"
+	ThumbnailURL := "ThumbnailURL"
+	PreviewVideoURL := "PreviewVideoURL"
+	SeoTitle := "SeoTitle"
+	SeoDescription := "SeoDescription"
+	return &coursedomain.Course{Status: coursedomain.DraftStatus, Title: "title", Description: &des, ThumbnailURL: &ThumbnailURL, PreviewVideoURL: &PreviewVideoURL, SeoTitle: &SeoTitle, SeoDescription: &SeoDescription}, nil
+}
+
+func TestPublishCourse(t *testing.T) {
+	Convey("PublishCourse Course", t, func() {
+		Convey("PublishCourse - GetCourseByID error", func() {
+			cRepo := &mockCourseRepoRepo{
+				getCourseByID: alwaysError,
+			}
+
+			srv := newTestService(cRepo)
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "db connection lost")
+		})
+
+		Convey("PublishCourse - wrong status", func() {
+			cRepo := &mockCourseRepoRepo{
+				getCourseByID: func(_ context.Context, _ string) (*coursedomain.Course, error) {
+					return &coursedomain.Course{Status: coursedomain.ArchivedStatus}, nil
+				},
+			}
+
+			srv := newTestService(cRepo)
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
+			So(err, ShouldNotBeNil)
+			So(errors.Is(err, coursedomain.ErrInvalidCourseStatus), ShouldBeTrue)
+		})
+
+		Convey("PublishCourse - not ready to publish", func() {
+			cRepo := &mockCourseRepoRepo{
+				getCourseByID: func(_ context.Context, _ string) (*coursedomain.Course, error) {
+					return &coursedomain.Course{Status: coursedomain.DraftStatus}, nil
+				},
+			}
+
+			srv := newTestService(cRepo)
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "service.ReadyToPublish")
+		})
+
+		Convey("PublishCourse - publish error", func() {
+			cRepo := &mockCourseRepoRepo{
+				getCourseByID: validGetCourseByID,
+				publishCourse: testutil.AlwaysFailsDB2,
+			}
+
+			srv := newTestService(cRepo)
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "service.PublishCourse")
+		})
+
+		Convey("Successful", func() {
+			cRepo := &mockCourseRepoRepo{
+				getCourseByID: validGetCourseByID,
+				publishCourse: testutil.AlwaysNil2,
+			}
+
+			srv := newTestService(cRepo)
+			err := srv.PublishCourse(context.Background(), "course_ID", "user-1")
+			So(err, ShouldBeNil)
+		})
+	})
+}

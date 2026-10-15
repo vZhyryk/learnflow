@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/repository"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
 	"time"
@@ -51,7 +52,7 @@ func newSessionFixture(t *testing.T, ctx context.Context, repo *Repository) (use
 	So(err, ShouldBeNil)
 
 	t.Cleanup(func() {
-		repo.queryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
+		repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
 	})
 
 	return userId, seed, session
@@ -107,32 +108,6 @@ func assertRevokedSession(got *authdomain.UserSession, revokedByUserID string, r
 	So(got.LastSeenIP, ShouldBeNil)
 }
 
-// assertFailedLoginState checks the fields of a session after one or more
-// UpdateFailedLoginAttempts calls.
-func assertFailedLoginState(t *testing.T, got, seed *authdomain.UserSession, expectFailedCount int, expectLocked bool) {
-	t.Helper()
-	So(got.UserID, ShouldEqual, seed.UserID)
-	So(got.RefreshHash, ShouldEqual, seed.RefreshHash)
-	So(got.UserAgent, ShouldEqual, seed.UserAgent)
-	So(got.IPAddress, ShouldEqual, seed.IPAddress)
-	So(got.ExpiresAt, ShouldEqual, seed.ExpiresAt)
-	So(got.RevokedAt, ShouldBeNil)
-	So(got.RevokeReason, ShouldBeNil)
-	So(got.RevokedByUserID, ShouldBeNil)
-	So(got.CreatedAt.IsZero(), ShouldBeFalse)
-	So(got.FailedAttemptCount, ShouldEqual, expectFailedCount)
-	So(got.LastAttemptAt, ShouldNotBeNil)
-	if expectLocked {
-		So(got.LockedUntil, ShouldNotBeNil)
-	} else {
-		So(got.LockedUntil, ShouldBeNil)
-	}
-	So(got.TokenVersion, ShouldEqual, 1)
-	So(got.PreviousRefreshHash, ShouldBeNil)
-	So(got.LastSeenAt, ShouldBeNil)
-	So(got.LastSeenIP, ShouldBeNil)
-}
-
 // seedsByRefreshHash indexes seeds for matching returned rows in
 // multi-session list assertions, where result order is not guaranteed.
 func seedsByRefreshHash(seeds []*authdomain.UserSession) map[string]*authdomain.UserSession {
@@ -148,7 +123,7 @@ func TestGetUserSessionByRefreshToken_Integration(t *testing.T) {
 	Convey("GetUserSessionByRefreshToken", t, func() {
 		Convey("Successful test", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				_, seed, _ := newSessionFixture(t, ctx, repo)
 
 				got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
@@ -160,11 +135,11 @@ func TestGetUserSessionByRefreshToken_Integration(t *testing.T) {
 
 		Convey("Successful test - multiple sessions", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				seeds := createSessions(t, ctx, repo, userId, 3)
 				t.Cleanup(func() {
-					repo.queryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
+					repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
 				})
 
 				for _, seed := range seeds {
@@ -178,7 +153,7 @@ func TestGetUserSessionByRefreshToken_Integration(t *testing.T) {
 
 		Convey("user does not have a session", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				got, err := repo.GetUserSessionByRefreshToken(ctx, "non-existent-refresh-token")
 				So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
 				So(got, ShouldBeNil)
@@ -226,7 +201,7 @@ func TestGetSessionByPrevHash_Integration(t *testing.T) {
 	Convey("GetSessionByPrevHash", t, func() {
 		Convey("Successful test", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				_, seed, session := newSessionFixture(t, ctx, repo)
 
 				assertTokenRotation(t, ctx, repo, seed, session, nil, func(got *authdomain.UserSession) {
@@ -238,7 +213,7 @@ func TestGetSessionByPrevHash_Integration(t *testing.T) {
 
 		Convey("Successful test - multiple sessions", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				createSessions(t, ctx, repo, userId, 2) // noise sessions for the same user
 
@@ -246,7 +221,7 @@ func TestGetSessionByPrevHash_Integration(t *testing.T) {
 				session, err := repo.CreateUserSession(ctx, seed)
 				So(err, ShouldBeNil)
 				t.Cleanup(func() {
-					repo.queryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
+					repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
 				})
 
 				assertTokenRotation(t, ctx, repo, seed, session, nil, func(got *authdomain.UserSession) {
@@ -258,7 +233,7 @@ func TestGetSessionByPrevHash_Integration(t *testing.T) {
 
 		Convey("user does not have a session", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				got, err := repo.GetSessionByPrevHash(ctx, "non-existent-prev-refresh-token")
 				So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
 				So(got, ShouldBeNil)
@@ -272,7 +247,7 @@ func TestRevokeUserSession_Integration(t *testing.T) {
 	Convey("RevokeUserSession", t, func() {
 		Convey("Successful test", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId, seed, session := newSessionFixture(t, ctx, repo)
 
 				res := authdomain.RevokeReasonLogout
@@ -295,9 +270,54 @@ func TestRevokeUserSession_Integration(t *testing.T) {
 
 		Convey("session does not exist", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				err := repo.RevokeUserSession(ctx, nonExistentUUID, nonExistentUUID, authdomain.RevokeReasonLogout)
 				So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
+			})
+		})
+	})
+}
+
+func TestRevokeAllUserSessionsAdmin_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+	Convey("RevokeAllUserSessionsAdmin", t, func() {
+		Convey("revokes every session of the target user as 'admin' and leaves other users untouched", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				targetID := newTestUser(t, ctx, repo)
+				otherID := newTestUser(t, ctx, repo)
+				adminID := newTestUser(t, ctx, repo)
+				createSessions(t, ctx, repo, targetID, 2)
+				createSessions(t, ctx, repo, otherID, 1)
+
+				err := repo.RevokeAllUserSessionsAdmin(ctx, targetID, adminID)
+				So(err, ShouldBeNil)
+
+				target, err := repo.GetAllSessionsByUserID(ctx, targetID)
+				So(err, ShouldBeNil)
+				So(target, ShouldHaveLength, 2)
+				for _, session := range target {
+					So(session.RevokedAt, ShouldNotBeNil)
+					So(*session.RevokeReason, ShouldEqual, authdomain.RevokeReasonAdmin)
+					So(*session.RevokedByUserID, ShouldEqual, adminID)
+				}
+
+				active, err := repo.GetActiveSessionsByUserID(ctx, targetID)
+				So(err, ShouldBeNil)
+				So(active, ShouldBeEmpty)
+
+				otherActive, err := repo.GetActiveSessionsByUserID(ctx, otherID)
+				So(err, ShouldBeNil)
+				So(otherActive, ShouldHaveLength, 1)
+			})
+		})
+
+		Convey("a user without sessions is not an error", func() {
+			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
+				repo := &Repository{repository.BaseRepository{DB: tx}}
+				adminID := newTestUser(t, ctx, repo)
+
+				So(repo.RevokeAllUserSessionsAdmin(ctx, nonExistentUUID, adminID), ShouldBeNil)
 			})
 		})
 	})
@@ -308,7 +328,7 @@ func TestRevokeAllUserSessions_Integration(t *testing.T) {
 	Convey("RevokeAllUserSessions", t, func() {
 		Convey("Successful test", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId, _, _ := newSessionFixture(t, ctx, repo)
 
 				res := authdomain.RevokeReasonLogout
@@ -327,7 +347,7 @@ func TestRevokeAllUserSessions_Integration(t *testing.T) {
 
 		Convey("user has no sessions to revoke", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				err := repo.RevokeAllUserSessions(ctx, nonExistentUUID, nil, authdomain.RevokeReasonLogout)
 				So(err, ShouldBeNil)
 			})
@@ -335,70 +355,9 @@ func TestRevokeAllUserSessions_Integration(t *testing.T) {
 
 		Convey("invalid revoke reason", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				err := repo.RevokeAllUserSessions(ctx, nonExistentUUID, nil, authdomain.RevokeReason("bogus"))
 				So(err, ShouldNotBeNil)
-			})
-		})
-	})
-}
-
-func TestUpdateFailedLoginAttempts_Integration(t *testing.T) {
-	pool := testutil.NewTestPool(t)
-	Convey("UpdateFailedLoginAttempts", t, func() {
-		Convey("Successful test - not locked", func() {
-			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
-				_, seed, session := newSessionFixture(t, ctx, repo)
-
-				err := repo.UpdateFailedLoginAttempts(ctx, session.ID, "15 minutes", 3)
-				So(err, ShouldBeNil)
-
-				got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
-				So(err, ShouldBeNil)
-				So(got, ShouldNotBeNil)
-				assertFailedLoginState(t, got, seed, 1, false)
-			})
-		})
-
-		Convey("Successful test - locked", func() {
-			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
-				_, seed, session := newSessionFixture(t, ctx, repo)
-
-				err := repo.UpdateFailedLoginAttempts(ctx, session.ID, "15 minutes", 1)
-				So(err, ShouldBeNil)
-
-				got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
-				So(err, ShouldBeNil)
-				So(got, ShouldNotBeNil)
-				assertFailedLoginState(t, got, seed, 1, true)
-			})
-		})
-
-		Convey("Successful test - couple in row", func() {
-			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
-				_, seed, session := newSessionFixture(t, ctx, repo)
-
-				err := repo.UpdateFailedLoginAttempts(ctx, session.ID, "15 minutes", 5)
-				So(err, ShouldBeNil)
-
-				err = repo.UpdateFailedLoginAttempts(ctx, session.ID, "15 minutes", 5)
-				So(err, ShouldBeNil)
-
-				got, err := repo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
-				So(err, ShouldBeNil)
-				So(got, ShouldNotBeNil)
-				assertFailedLoginState(t, got, seed, 2, false)
-			})
-		})
-
-		Convey("session does not exist", func() {
-			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
-				err := repo.UpdateFailedLoginAttempts(ctx, nonExistentUUID, "15 minutes", 3)
-				So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
 			})
 		})
 	})
@@ -409,7 +368,7 @@ func TestGetActiveSessionsByUserID_Integration(t *testing.T) {
 	Convey("GetActiveSessionsByUserID", t, func() {
 		Convey("Successful test", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId, seed, _ := newSessionFixture(t, ctx, repo)
 
 				sessionList, err := repo.GetActiveSessionsByUserID(ctx, userId)
@@ -425,11 +384,11 @@ func TestGetActiveSessionsByUserID_Integration(t *testing.T) {
 
 		Convey("Successful test - multiple sessions", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				seeds := createSessions(t, ctx, repo, userId, 3)
 				t.Cleanup(func() {
-					repo.queryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
+					repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
 				})
 
 				sessionList, err := repo.GetActiveSessionsByUserID(ctx, userId)
@@ -448,10 +407,10 @@ func TestGetActiveSessionsByUserID_Integration(t *testing.T) {
 
 		Convey("user does not have a session", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				sessionList, err := repo.GetActiveSessionsByUserID(ctx, nonExistentUUID)
 				So(err, ShouldBeNil)
-				So(sessionList, ShouldBeNil)
+				So(sessionList, ShouldBeEmpty)
 				So(len(sessionList), ShouldEqual, 0)
 			})
 		})
@@ -463,7 +422,7 @@ func TestGetAllSessionsByUserID_Integration(t *testing.T) {
 	Convey("GetAllSessionsByUserID", t, func() {
 		Convey("Successful test", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId, seed, session := newSessionFixture(t, ctx, repo)
 
 				res := authdomain.RevokeReasonLogout
@@ -485,11 +444,11 @@ func TestGetAllSessionsByUserID_Integration(t *testing.T) {
 
 		Convey("Successful test - multiple sessions", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 				seeds := createSessions(t, ctx, repo, userId, 3)
 				t.Cleanup(func() {
-					repo.queryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
+					repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
 				})
 
 				res := authdomain.RevokeReasonLogout
@@ -512,10 +471,10 @@ func TestGetAllSessionsByUserID_Integration(t *testing.T) {
 
 		Convey("user does not have a session", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				sessionList, err := repo.GetAllSessionsByUserID(ctx, nonExistentUUID)
 				So(err, ShouldBeNil)
-				So(sessionList, ShouldBeNil)
+				So(sessionList, ShouldBeEmpty)
 				So(len(sessionList), ShouldEqual, 0)
 			})
 		})
@@ -527,11 +486,11 @@ func TestUpdateSessionToken_Integration(t *testing.T) {
 	Convey("UpdateSessionToken", t, func() {
 		Convey("Successful test - multiple sessions", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				userId := newTestUser(t, ctx, repo)
 
 				t.Cleanup(func() {
-					repo.queryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
+					repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id = $1", userId)
 				})
 
 				seed := fullTestSession(userId)
@@ -557,7 +516,7 @@ func TestUpdateSessionToken_Integration(t *testing.T) {
 
 		Convey("session does not exist", func() {
 			testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-				repo := &Repository{db: tx}
+				repo := &Repository{repository.BaseRepository{DB: tx}}
 				err := repo.UpdateSessionToken(ctx, nonExistentUUID, "new-hash", "new-ua", "new-ip")
 				So(errors.Is(err, authdomain.ErrSessionNotFound), ShouldBeTrue)
 			})
@@ -569,7 +528,7 @@ func TestSessionIsolationBetweenUsers_Integration(t *testing.T) {
 	pool := testutil.NewTestPool(t)
 	Convey("Session queries do not leak across users", t, func() {
 		testutil.WithTestTx(t, pool, func(ctx context.Context, tx pgx.Tx) {
-			repo := &Repository{db: tx}
+			repo := &Repository{repository.BaseRepository{DB: tx}}
 
 			userA := newTestUser(t, ctx, repo)
 			userB := newTestUser(t, ctx, repo)
@@ -583,7 +542,7 @@ func TestSessionIsolationBetweenUsers_Integration(t *testing.T) {
 			So(err, ShouldBeNil)
 
 			t.Cleanup(func() {
-				repo.queryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id IN ($1,$2)", userA, userB)
+				repo.QueryRunner(ctx).Exec(ctx, "DELETE FROM user_sessions WHERE user_id IN ($1,$2)", userA, userB)
 			})
 
 			err = repo.RevokeAllUserSessions(ctx, userA, &userA, authdomain.RevokeReasonLogout)
@@ -607,5 +566,27 @@ func TestSessionIsolationBetweenUsers_Integration(t *testing.T) {
 			So(len(activeB), ShouldEqual, 1)
 			So(activeB[0].UserID, ShouldEqual, userB)
 		})
+	})
+}
+
+func TestGetUserSessionByRefreshTokenLocked_Integration(t *testing.T) {
+	pool := testutil.NewTestPool(t)
+
+	Convey("GetUserSessionByRefreshToken while another transaction holds the row lock", t, func() {
+		ctx := context.Background()
+		poolRepo := &Repository{repository.BaseRepository{DB: pool}}
+		_, seed, _ := newSessionFixture(t, ctx, poolRepo)
+
+		holder, err := pool.Begin(ctx)
+		So(err, ShouldBeNil)
+		defer holder.Rollback(ctx) //nolint:errcheck // rollback of a read-only holder tx; nothing to act on
+
+		_, err = (&Repository{repository.BaseRepository{DB: holder}}).GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
+		So(err, ShouldBeNil)
+
+		got, err := poolRepo.GetUserSessionByRefreshToken(ctx, seed.RefreshHash)
+
+		So(errors.Is(err, authdomain.ErrRequestInProgress), ShouldBeTrue)
+		So(got, ShouldBeNil)
 	})
 }

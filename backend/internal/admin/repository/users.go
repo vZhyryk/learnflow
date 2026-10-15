@@ -1,0 +1,117 @@
+package adminrepository
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	admindomain "learnflow_backend/internal/admin/domain"
+	"learnflow_backend/internal/infrastructure/db"
+	"learnflow_backend/internal/shared/pagination"
+	"learnflow_backend/internal/shared/repository"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// GetUsersData returns a page of users including soft-deleted ones (deliberate: admin view) and the total user count.
+func (rep *Repository) GetUsersData(ctx context.Context, params pagination.Params) ([]*admindomain.UserData, int, error) {
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getUserDataSQL, countUsersSQL, "GetUsersData", params, scanUserData, nil)
+}
+
+// GetUserDataByID returns one user's admin view, including soft-deleted ones (deliberate: admin view).
+func (rep *Repository) GetUserDataByID(ctx context.Context, userID string) (*admindomain.UserData, error) {
+	user, err := scanUserData(rep.QueryRunner(ctx).QueryRow(ctx, getUserDetailsByIDSQL, userID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, admindomain.ErrUserNotFound
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetUserDataByID: %w", err)
+	}
+
+	return user, nil
+}
+
+// RevokeUserRole demotes a subadmin to a regular user.
+func (rep *Repository) RevokeUserRole(ctx context.Context, userID string) error {
+	return rep.changeUserField(ctx, revokeUserRoleSQL, "RevokeUserRole", userID)
+}
+
+// AssignUserRole promotes a regular user to subadmin.
+func (rep *Repository) AssignUserRole(ctx context.Context, userID string) error {
+	return rep.changeUserField(ctx, assignUserRoleSQL, "AssignUserRole", userID)
+}
+
+// DeleteUser soft-deletes a user account.
+func (rep *Repository) DeleteUser(ctx context.Context, userID string) error {
+	return rep.changeUserField(ctx, deleteUserSQL, "DeleteUser", userID)
+}
+
+// RestoreUser reactivates a soft-deleted user account.
+func (rep *Repository) RestoreUser(ctx context.Context, userID string) error {
+	return rep.changeUserField(ctx, restoreUserSQL, "RestoreUser", userID)
+}
+
+// BlockUser blocks an active user account.
+func (rep *Repository) BlockUser(ctx context.Context, userID string) error {
+	return rep.changeUserField(ctx, blockUserSQL, "BlockUser", userID)
+}
+
+// UnBlockUser reactivates a blocked user account.
+func (rep *Repository) UnBlockUser(ctx context.Context, userID string) error {
+	return rep.changeUserField(ctx, unblockUserSQL, "UnBlockUser", userID)
+}
+
+// changeUserField executes a single-row account mutation. 0 rows affected maps to ErrUserNotFound
+// when the user does not exist, or ErrInvalidUserState when the state/role guard in the query rejected it.
+func (rep *Repository) changeUserField(ctx context.Context, sql, methodName, userID string) error {
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, sql, userID)
+	if err != nil {
+		return fmt.Errorf("repository.%s: %w", methodName, err)
+	}
+
+	if tag.RowsAffected() > 0 {
+		return nil
+	}
+
+	var exists bool
+	if err = rep.QueryRunner(ctx).QueryRow(ctx, existsUserSQL, userID).Scan(&exists); err != nil {
+		return fmt.Errorf("repository.%s exists: %w", methodName, err)
+	}
+
+	if !exists {
+		return admindomain.ErrUserNotFound
+	}
+
+	return admindomain.ErrInvalidUserState
+}
+
+const (
+	courseAccessActiveUniqueIndex  = "idx_user_course_access_user_id_course_id_active_unique"
+	contentAccessActiveUniqueIndex = "idx_user_content_access_user_id_content_item_id_active_unique"
+)
+
+// GrantUserCourseAccess inserts an admin-granted course access; ErrAccessAlreadyGranted if the user already has an active one.
+func (rep *Repository) GrantUserCourseAccess(ctx context.Context, userID, courseID string) error {
+	_, err := rep.QueryRunner(ctx).Exec(ctx, grantUserCourseAccessSQL, userID, courseID)
+	if db.IsUniqueViolation(err, courseAccessActiveUniqueIndex) {
+		return admindomain.ErrAccessAlreadyGranted
+	}
+	if err != nil {
+		return fmt.Errorf("repository.GrantUserCourseAccess: %w", err)
+	}
+
+	return nil
+}
+
+// GrantUserContentAccess inserts an admin-granted content access; ErrAccessAlreadyGranted if the user already has an active one.
+func (rep *Repository) GrantUserContentAccess(ctx context.Context, userID, contentItemID string) error {
+	_, err := rep.QueryRunner(ctx).Exec(ctx, grantUserContentAccessSQL, userID, contentItemID)
+	if db.IsUniqueViolation(err, contentAccessActiveUniqueIndex) {
+		return admindomain.ErrAccessAlreadyGranted
+	}
+	if err != nil {
+		return fmt.Errorf("repository.GrantUserContentAccess: %w", err)
+	}
+
+	return nil
+}

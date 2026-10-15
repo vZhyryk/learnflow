@@ -1,7 +1,12 @@
--include .env
-export
-
 SHELL := /bin/bash
+
+# .env is not included as make syntax (it would expand `$` and keep quotes) and nothing is
+# exported globally; only recipes that run the Go binaries load it, via with_env.
+SONAR_TOKEN ?= $(shell sed -n 's/^SONAR_TOKEN=//p' .env 2>/dev/null)
+
+define with_env
+set -a; while IFS='=' read -r k v; do case "$$k" in ''|\#*) ;; *) export "$$k=$$v";; esac; done < .env; set +a;
+endef
 
 BACKEND_DIR := backend
 BUILD_DIR := builds
@@ -20,7 +25,7 @@ CODE_REVIEW_GRAPH_BIN := code-review-graph
 REPO_ROOT := $(CURDIR)
 MIGRATE_DIRECTION ?= up
 
-.PHONY: help tidy_and_verify cleanup run run_obs run_full stop logs migrate migrate_up migrate_down migrate_docker run_no_docker run_with_graph_watch run_no_docker_with_graph_watch run_dev_all run_init_sonar run_sonar_backend run_sonar_frontend run_sonar_all run_test_sonar test_integration_up test_integration_migrate test_integration test_integration_down run_graph_build run_graph_watch run_graph_status push_code run_test_coverage_backend run_test_coverage_once_backend run_test_coverage_frontend run_test_coverage_once_frontend run_test_goconvey lint lint_backend lint_frontend backup backup_list restore
+.PHONY: help tidy_and_verify cleanup run run_obs run_full stop logs migrate migrate_up migrate_down migrate_docker run_no_docker run_with_graph_watch run_no_docker_with_graph_watch run_dev_all run_init_sonar run_sonar_backend run_sonar_frontend run_sonar_all run_test_sonar test_integration_up test_integration_migrate test_integration test_integration_coverage test_integration_down run_graph_build run_graph_watch run_graph_status push_code run_test_coverage_backend run_test_coverage_once_backend run_test_coverage_frontend run_test_coverage_once_frontend run_test_goconvey lint lint_backend lint_frontend backup backup_list restore
 
 help:
 	@printf '%s\n' \
@@ -28,6 +33,7 @@ help:
 		'  make tidy_and_verify        - tidy and verify Go module dependencies in backend' \
 		'  make cleanup                - clean Go build and module cache' \
 		'  make run                    - run the main dev docker compose stack' \
+		'  make run_rebuild             - run the main dev docker compose stack, forcing an image rebuild' \
 		'  make run_obs                - run observability services (expects dev network or use run_full)' \
 		'  make run_full               - run dev stack together with observability' \
 		'  make stop                   - stop dev, observability, and sonar compose stacks' \
@@ -47,6 +53,7 @@ help:
 		'  make test_integration_up    - start sonar_db + redis for integration tests (no sonarqube app)' \
 		'  make test_integration_migrate - apply migrations against the learnflow_test database' \
 		'  make test_integration       - run backend integration tests (-tags=integration) against real Postgres/Redis' \
+		'  make test_integration_coverage - integration tests + merged coverage, fails below COVERAGE_MIN (default $(COVERAGE_MIN))' \
 		'  make test_integration_down  - stop the integration test stack' \
 		'  make run_graph_build        - rebuild code-review-graph for the repo' \
 		'  make run_graph_watch        - watch repo changes and auto-update graph' \
@@ -72,37 +79,40 @@ cleanup:
 	go clean -testcache
 
 run:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up --build
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' up
+
+run_rebuild:
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' up --build
 
 run_obs:
 	$(DOCKER_COMPOSE) -f '$(OBS_COMPOSE_FILE)' up --build
 
 run_full:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' -f '$(OBS_COMPOSE_FILE)' up --build
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' -f '$(OBS_COMPOSE_FILE)' up --build
 
 stop:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' down
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' down
 	$(DOCKER_COMPOSE) -f '$(OBS_COMPOSE_FILE)' down
 	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' down
 
 logs:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' logs -f
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' logs -f
 
 migrate:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up --build 'migrate'
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' up --build 'migrate'
 
 migrate_up:
-	cd $(BACKEND_DIR) && go run ./cmd/migrate -steps=1 -direction=up
+	@$(with_env) cd $(BACKEND_DIR) && go run ./cmd/migrate -steps=1 -direction=up
 
 migrate_down:
-	cd $(BACKEND_DIR) && go run ./cmd/migrate -steps=0 -direction=down
+	@$(with_env) cd $(BACKEND_DIR) && go run ./cmd/migrate -steps=0 -direction=down
 
 migrate_docker:
-	$(DOCKER_COMPOSE) -f '$(DEV_COMPOSE_FILE)' up 'migrate'
+	$(DOCKER_COMPOSE) --env-file .env -f '$(DEV_COMPOSE_FILE)' up 'migrate'
 
 run_no_docker:
-	$(DOCKER_COMPOSE) -f '$(NO_DOCKER_COMPOSE_FILE)' up --build -d
-	cd $(BACKEND_DIR) && go run ./cmd/api
+	$(DOCKER_COMPOSE) --env-file .env -f '$(NO_DOCKER_COMPOSE_FILE)' up --build -d
+	@$(with_env) cd $(BACKEND_DIR) && go run ./cmd/api
 
 
 run_graph_build:
@@ -183,8 +193,20 @@ test_integration_migrate: test_integration_up
 
 test_integration: test_integration_migrate
 	cd $(BACKEND_DIR) && \
-		env $$(grep -v '^#' ../.env.test | xargs) DB_HOST=localhost DB_PORT=5433 \
+		env $$(grep -v '^#' ../.env.test | xargs) DB_HOST=localhost DB_PORT=5434 \
 		go test -tags=integration ./...
+
+# Merged unit+integration coverage gate; baseline 93.3% (2026-09-29), COVERAGE_MIN keeps ~1 pp of headroom.
+COVERAGE_MIN ?= 92.0
+COVERAGE_OUT := $(CURDIR)/$(TESTS_DIR)/coverage_all.out
+
+test_integration_coverage: test_integration_migrate
+	mkdir -p tests
+	cd $(BACKEND_DIR) && \
+		env $$(grep -v '^#' ../.env.test | xargs) DB_HOST=localhost DB_PORT=5434 \
+		go test -tags=integration -coverpkg=./... -coverprofile=$(COVERAGE_OUT) ./...
+	cd $(BACKEND_DIR) && go tool cover -func=$(COVERAGE_OUT) | awk -v min=$(COVERAGE_MIN) \
+		'/^total:/ { gsub("%", "", $$3); printf "total coverage: %s%% (min %s%%)\n", $$3, min; if ($$3 + 0 < min + 0) { print "FAIL: coverage below minimum"; exit 1 } }'
 
 test_integration_down:
 	$(DOCKER_COMPOSE) -f '$(TESTS_COMPOSE_FILE)' down
@@ -234,11 +256,15 @@ lint_verify:
 	cd $(BACKEND_DIR) && golangci-lint config verify
 
 # lint_repo_interfaces: golangci-lint has no linter for *missing* compile-time interface
-# assertions (it catches bad patterns, not absent enforcement). Every repository.go must
-# assert `var _ domain.XRepository = (*Repository)(nil)` so a method added to a domain
-# interface without a matching Repository implementation fails at compile time, not at
-# runtime via a type assertion panic. This grep-based check fills that gap until a real
-# linter rule exists.
+# assertions (it catches bad patterns, not absent enforcement). Every domain-module
+# repository.go must assert `var _ domain.XRepository = (*Repository)(nil)` so a method
+# added to a domain interface without a matching Repository implementation fails at
+# compile time, not at runtime via a type assertion panic. This grep-based check fills
+# that gap until a real linter rule exists.
+#
+# internal/shared/repository/repository.go is excluded: it's the shared BaseRepository
+# embed helper (db.QueryRunner plumbing), not a domain module implementing a
+# domain.XRepository interface, so there is nothing for it to assert against.
 lint_repo_interfaces:
 	@fail=0; \
 	while IFS= read -r -d '' f; do \
@@ -246,7 +272,7 @@ lint_repo_interfaces:
 			echo "missing compile-time interface check: $$f"; \
 			fail=1; \
 		fi; \
-	done < <(find $(BACKEND_DIR)/internal -path "*/repository/repository.go" -print0); \
+	done < <(find $(BACKEND_DIR)/internal -path "*/repository/repository.go" -not -path "*/shared/repository/repository.go" -print0); \
 	exit $$fail
 
 lint_frontend:
@@ -256,9 +282,13 @@ backup:
 	docker exec learnflow_backup backup.sh
 
 backup_list:
-	docker exec learnflow_backup mc ls local/${BACKUP_BUCKET:-learnflow-backups}
+	docker exec learnflow_backup sh -c 'mc ls local/$${BACKUP_BUCKET:-learnflow-backups}'
 
 restore:
 	@test -n "$$FILE" || (echo "No FILE. Use: make restore FILE=learnflow_20240101_120000.sql.gz"; exit 1)
-	@echo "$$FILE" | grep -qE '^learnflow_[0-9]{8}_[0-9]{6}\.sql\.gz$$' || (echo "Invalid FILE: expected format learnflow_YYYYMMDD_HHMMSS.sql.gz, got: $$FILE"; exit 1)
+	@echo "$$FILE" | grep -qE '^[A-Za-z0-9_-]+\.sql\.gz$$' || (echo "Invalid FILE: expected <POSTGRES_DB>_YYYYMMDD_HHMMSS.sql.gz, got: $$FILE"; exit 1)
 	docker exec learnflow_backup restore.sh "$$FILE"
+
+
+vuln:
+	cd $(BACKEND_DIR) && govulncheck ./...

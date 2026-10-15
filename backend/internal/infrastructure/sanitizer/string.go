@@ -9,12 +9,8 @@ import (
 var opaquePathSegment = regexp.MustCompile(`^[A-Za-z0-9_\-.]{20,}$`)
 var uuidPathSegment = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
-// SanitizePath redacts path segments that look like opaque secrets (e.g. a
-// verification/reset token embedded directly in the URL, such as
-// "/auth/reset-password/<token>") while leaving UUID resource IDs and
-// ordinary path segments untouched. MaskInlineSecrets, by contrast, only
-// catches "key=value"/"key: value" patterns and does not see plain path
-// segments, which is why this needs to be a separate pass.
+// SanitizePath redacts opaque-secret-looking path segments (e.g. a token in the URL)
+// while leaving UUIDs untouched — a separate pass, since MaskInlineSecrets only sees "key=value" pairs.
 func (s *Sanitizer) SanitizePath(path string) string {
 	segments := strings.Split(path, "/")
 	for i, seg := range segments {

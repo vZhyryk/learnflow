@@ -6,19 +6,33 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
-	"learnflow_backend/internal/shared/ptr"
 	"learnflow_backend/internal/shared/tokens"
 	"strings"
 	"time"
 )
 
-// InitiateEmailChange sends an email change confirmation token to the user's new address.
+// InitiateEmailChange sends an email change confirmation token to the user's new address. An address that belongs to
+// another account is answered like a free one (no token, no email), so the endpoint cannot be used to probe emails.
+// The password check runs outside the transaction so a failed attempt still counts towards the login lock.
 func (s *Service) InitiateEmailChange(ctx context.Context, req authdomain.RequestEmailChangeRequest) error {
+	user, err := s.getUserForEmailChange(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	if verifyErr := s.verifyCurrentPassword(ctx, user, req.Password, "init_email_change"); verifyErr != nil {
+		return verifyErr
+	}
+
+	userProfile, err := s.getProfileForNewEmail(ctx, req, user.ID)
+	if errors.Is(err, authdomain.ErrEmailAlreadyInUse) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
 	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
-		userProfile, err := s.getExistsUserProfileChangeEmail(ctx, req)
-		if err != nil {
-			return err
-		}
 		return s.emitTokenEvent(ctx, req.UserID, emailChangeTokenTTL, events.AggregationTypeEmail, events.EventEmailChange,
 			func(ctx context.Context, rawToken, hashToken string, expiresAt time.Time) (any, error) {
 				token := &authdomain.EmailChangeToken{
@@ -29,25 +43,17 @@ func (s *Service) InitiateEmailChange(ctx context.Context, req authdomain.Reques
 					},
 					NewEmail: req.NewEmail,
 				}
-				_, err := s.tokenRepo.CreateEmailChangeToken(ctx, token)
 
-				if err != nil {
+				if _, err := s.tokenRepo.CreateEmailChangeToken(ctx, token); err != nil {
 					return nil, fmt.Errorf("init_email_change: create token: %w", err)
 				}
 
-				return events.InitEmailChangeToken{
-					UserID:    req.UserID,
-					Email:     req.NewEmail,
-					ExpiresAt: expiresAt,
-					RawToken:  rawToken,
-					UserName:  ptr.StringOrEmpty(userProfile.FirstName),
-				}, nil
-			},
-		)
+				return newTokenPayload(req.UserID, req.NewEmail, rawToken, expiresAt, userProfile), nil
+			})
 	})
 }
 
-func (s *Service) getExistsUserProfileChangeEmail(ctx context.Context, req authdomain.RequestEmailChangeRequest) (*authdomain.UserProfile, error) {
+func (s *Service) getUserForEmailChange(ctx context.Context, req authdomain.RequestEmailChangeRequest) (*authdomain.User, error) {
 	user, err := s.userRepo.GetUserByID(ctx, req.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("init_email_change: get user: %w", err)
@@ -56,6 +62,10 @@ func (s *Service) getExistsUserProfileChangeEmail(ctx context.Context, req authd
 		return nil, authdomain.ErrEmailAlreadyInUse
 	}
 
+	return user, nil
+}
+
+func (s *Service) getProfileForNewEmail(ctx context.Context, req authdomain.RequestEmailChangeRequest, userID string) (*authdomain.UserProfile, error) {
 	existingUserAtNewEmail, err := s.userRepo.GetUserByEmail(ctx, req.NewEmail)
 	if err != nil && !errors.Is(err, authdomain.ErrUserNotFound) {
 		return nil, fmt.Errorf("init_email_change: check new email exists: %w", err)
@@ -65,7 +75,7 @@ func (s *Service) getExistsUserProfileChangeEmail(ctx context.Context, req authd
 		return nil, authdomain.ErrEmailAlreadyInUse
 	}
 
-	userProfile, err := s.userRepo.GetUserProfileByUserID(ctx, user.ID)
+	userProfile, err := s.userRepo.GetUserProfileByUserID(ctx, userID)
 	if err != nil && !errors.Is(err, authdomain.ErrUserNotFound) {
 		return nil, fmt.Errorf("init_email_change: get user profile: %w", err)
 	}
@@ -96,13 +106,9 @@ func (s *Service) ChangeEmail(ctx context.Context, req authdomain.EmailChangeReq
 			return fmt.Errorf("change_email: mark token used: %w", err)
 		}
 
-		if req.IsAllSessionsLogout {
-			return s.revokeUserSessions(ctx, "change_email", req.JTI, req.AccessTokenExpiresAt, func(ctx context.Context) error {
-				return s.sessionRepo.RevokeAllUserSessions(ctx, token.UserID, nil, authdomain.RevokeReasonEmailChanged)
-			})
-		}
-
-		return nil
+		return s.logoutEverywhere(ctx, "change_email", token.UserID, func(ctx context.Context) error {
+			return s.sessionRepo.RevokeAllUserSessions(ctx, token.UserID, nil, authdomain.RevokeReasonEmailChanged)
+		})
 	})
 }
 

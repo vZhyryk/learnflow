@@ -8,7 +8,7 @@ import (
 
 func (h *Handler) initRecoverAccount(w http.ResponseWriter, r *http.Request) {
 	var req authdomain.RequestRecoverAccountRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 
@@ -28,14 +28,14 @@ func (h *Handler) initRecoverAccount(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) recoverAccount(w http.ResponseWriter, r *http.Request) {
 	var req authdomain.RecoverAccountRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 
 	ctx := r.Context()
 	err := h.svc.RecoverAccount(ctx, req)
 	if err != nil {
-		h.handleErrorResponse(w, r, err)
+		h.handleRecoverAccountError(w, r, err)
 		return
 	}
 

@@ -9,19 +9,12 @@ import (
 
 func (h *Handler) changeProfile(w http.ResponseWriter, r *http.Request) {
 	var req usersdomain.ChangeUserProfileRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 
 	ctx := r.Context()
-	user, ok := appcontext.UserFromContext(ctx)
-	if !ok {
-		if err := helpers.InvalidCredentialsResponse(w); err != nil {
-			h.jsonLogger.Error(err, map[string]any{"case": "invalid_credentials", "path": r.URL.Path})
-		}
-
-		return
-	}
+	user := appcontext.MustUserFromContext(ctx)
 	req.UserID = &user.ID
 
 	err := h.svc.ChangeUserProfile(ctx, req)

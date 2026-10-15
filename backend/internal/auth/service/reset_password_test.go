@@ -43,7 +43,7 @@ func TestInitiatePasswordResetUserLookup(t *testing.T) {
 }
 
 func validInitiateResetGetUserByEmail(_ context.Context, _ string) (*authdomain.User, error) {
-	return &authdomain.User{ID: "user-123", Email: "user@example.com"}, nil
+	return &authdomain.User{ID: TestUserID, Email: "user@example.com"}, nil
 }
 
 func TestInitiatePasswordResetProfileLookupFails(t *testing.T) {
@@ -73,7 +73,7 @@ func TestInitiatePasswordResetSuccess(t *testing.T) {
 				getUserByEmail: validInitiateResetGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
 					aliceName := "Alice"
-					return &authdomain.UserProfile{UserID: "user-123", FirstName: &aliceName}, nil
+					return &authdomain.UserProfile{UserID: TestUserID, FirstName: &aliceName}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -81,14 +81,14 @@ func TestInitiatePasswordResetSuccess(t *testing.T) {
 					return t, nil
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newCapturingOutbox(&captured), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewCapturingOutbox(&captured), nil)
 
 			err := srv.InitiatePasswordReset(context.Background(), authdomain.RequestPasswordResetRequest{Email: "user@example.com"})
 
 			So(err, ShouldBeNil)
 			So(captured, ShouldNotBeEmpty)
 			So(captured[0], ShouldEqual, "password")
-			So(captured[1], ShouldEqual, "user-123")
+			So(captured[1], ShouldEqual, TestUserID)
 		})
 	})
 }
@@ -99,7 +99,7 @@ func TestInitiatePasswordResetTokenCreationFails(t *testing.T) {
 			uRepo := &mockUserRepo{
 				getUserByEmail: validInitiateResetGetUserByEmail,
 				getUserProfileByUserID: func(_ context.Context, _ string) (*authdomain.UserProfile, error) {
-					return &authdomain.UserProfile{UserID: "user-123"}, nil
+					return &authdomain.UserProfile{UserID: TestUserID}, nil
 				},
 			}
 			tRepo := &mockTokenRepo{
@@ -107,7 +107,7 @@ func TestInitiatePasswordResetTokenCreationFails(t *testing.T) {
 					return nil, testutil.ErrDBUnexpected
 				},
 			}
-			srv := newTestService(uRepo, nil, tRepo, newNoopOutbox(), nil)
+			srv := newTestService(uRepo, nil, tRepo, testutil.NewNoopOutbox(), nil)
 
 			err := srv.InitiatePasswordReset(context.Background(), authdomain.RequestPasswordResetRequest{Email: "user@example.com"})
 
@@ -136,7 +136,7 @@ func TestResetPasswordTokenLookup(t *testing.T) {
 			tRepo := &mockTokenRepo{
 				getPasswordResetToken: func(_ context.Context, _ string) (*authdomain.PasswordResetToken, error) {
 					return &authdomain.PasswordResetToken{
-						TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(-time.Hour)},
+						TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(-time.Hour)},
 					}, nil
 				},
 			}
@@ -151,12 +151,12 @@ func TestResetPasswordTokenLookup(t *testing.T) {
 
 func validResetPasswordToken(_ context.Context, _ string) (*authdomain.PasswordResetToken, error) {
 	return &authdomain.PasswordResetToken{
-		TokenBase: authdomain.TokenBase{UserID: "user-123", ExpiresAt: time.Now().UTC().Add(time.Hour)},
+		TokenBase: authdomain.TokenBase{UserID: TestUserID, ExpiresAt: time.Now().UTC().Add(time.Hour)},
 	}, nil
 }
 
 func validResetPasswordGetUserByID(_ context.Context, _ string) (*authdomain.User, error) {
-	return &authdomain.User{ID: "user-123"}, nil
+	return &authdomain.User{ID: TestUserID}, nil
 }
 
 func TestResetPasswordUserLookupFails(t *testing.T) {
@@ -196,10 +196,8 @@ func TestResetPasswordMarkTokenUsedFails(t *testing.T) {
 	Convey("Given an auth service", t, func() {
 		Convey("When marking the token as used fails", func() {
 			tRepo := &mockTokenRepo{
-				getPasswordResetToken: validResetPasswordToken,
-				markPasswordResetTokenUsed: func(_ context.Context, _ string) error {
-					return testutil.ErrDBUnexpected
-				},
+				getPasswordResetToken:      validResetPasswordToken,
+				markPasswordResetTokenUsed: testutil.AlwaysFailsDB,
 			}
 			uRepo := &mockUserRepo{
 				getUserByID:        validResetPasswordGetUserByID,
@@ -260,13 +258,36 @@ func TestResetPasswordSuccess(t *testing.T) {
 					return nil
 				},
 			}
-			srv := newTestService(uRepo, sRepo, tRepo, nil, nil)
+			var revokedTokensUserID string
+			blocklist := newSuccessfulMockBlocklist()
+			blocklist.revokeUserTokens = func(_ context.Context, userID string, _ time.Duration) error {
+				revokedTokensUserID = userID
+				return nil
+			}
+			srv := newTestService(uRepo, sRepo, tRepo, nil, blocklist)
 
 			err := srv.ResetPassword(context.Background(), authdomain.ResetPasswordRequest{Token: "tok", NewPassword: "new-password"})
 
 			So(err, ShouldBeNil)
-			So(gotRevokeUserID, ShouldEqual, "user-123")
+			So(gotRevokeUserID, ShouldEqual, TestUserID)
 			So(gotReason, ShouldEqual, authdomain.RevokeReasonPasswordReset)
+			So(revokedTokensUserID, ShouldEqual, TestUserID)
+		})
+
+		Convey("When the Redis revocation fails, the reset fails with ErrBlocklistUnavailable", func() {
+			blocklist := newSuccessfulMockBlocklist()
+			blocklist.revokeUserTokens = func(_ context.Context, _ string, _ time.Duration) error {
+				return testutil.ErrRedisUnavailable
+			}
+			srv := newTestService(
+				&mockUserRepo{getUserByID: validResetPasswordGetUserByID, updatePasswordHash: testutil.AlwaysNil2},
+				&mockSessionRepo{revokeAllUserSessions: func(_ context.Context, _ string, _ *string, _ authdomain.RevokeReason) error { return nil }},
+				&mockTokenRepo{getPasswordResetToken: validResetPasswordToken, markPasswordResetTokenUsed: testutil.AlwaysNil},
+				nil, blocklist)
+
+			err := srv.ResetPassword(context.Background(), authdomain.ResetPasswordRequest{Token: "tok", NewPassword: "new-password"})
+
+			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
 		})
 	})
 }

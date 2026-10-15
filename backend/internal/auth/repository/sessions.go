@@ -5,13 +5,14 @@ import (
 	"errors"
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
+	"learnflow_backend/internal/shared/repository"
 
 	"github.com/jackc/pgx/v5"
 )
 
 // CreateUserSession persists a new user session and returns it with DB-generated fields.
 func (rep *Repository) CreateUserSession(ctx context.Context, session *authdomain.UserSession) (*authdomain.UserSession, error) {
-	createdSession, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, createUserSessionSQL, session.UserID, session.RefreshHash, session.UserAgent, session.IPAddress, session.ExpiresAt))
+	createdSession, err := scanUserSession(rep.QueryRunner(ctx).QueryRow(ctx, createUserSessionSQL, session.UserID, session.RefreshHash, session.UserAgent, session.IPAddress, session.ExpiresAt))
 	if err != nil {
 		return nil, fmt.Errorf("repository.CreateUserSession: %w", err)
 	}
@@ -21,7 +22,7 @@ func (rep *Repository) CreateUserSession(ctx context.Context, session *authdomai
 
 // GetUserSessionByRefreshToken retrieves an active session by its refresh token hash.
 func (rep *Repository) GetUserSessionByRefreshToken(ctx context.Context, refreshTokenHash string) (*authdomain.UserSession, error) {
-	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, getSessionByTokenSQL, refreshTokenHash))
+	session, err := scanUserSession(rep.QueryRunner(ctx).QueryRow(ctx, getSessionByTokenSQL, refreshTokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrSessionNotFound
 	}
@@ -34,7 +35,7 @@ func (rep *Repository) GetUserSessionByRefreshToken(ctx context.Context, refresh
 
 // GetSessionByPrevHash retrieves a session by its previous refresh token hash (rotation detection).
 func (rep *Repository) GetSessionByPrevHash(ctx context.Context, prevRefreshTokenHash string) (*authdomain.UserSession, error) {
-	session, err := scanUserSession(rep.queryRunner(ctx).QueryRow(ctx, getSessionByPrevHashSQL, prevRefreshTokenHash))
+	session, err := scanUserSession(rep.QueryRunner(ctx).QueryRow(ctx, getSessionByPrevHashSQL, prevRefreshTokenHash))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, authdomain.ErrSessionNotFound
 	}
@@ -48,9 +49,9 @@ func (rep *Repository) GetSessionByPrevHash(ctx context.Context, prevRefreshToke
 // RevokeUserSession marks a single session as revoked with the given reason.
 func (rep *Repository) RevokeUserSession(ctx context.Context, sessionID, revokedByUserID string, revokeReason authdomain.RevokeReason) error {
 	if !revokeReason.Valid() {
-		return fmt.Errorf("repository.RevokeUserSession: invalid revoke reason: %s", revokeReason)
+		return fmt.Errorf("repository.RevokeUserSession: invalid revoke reason (programmer error): %s", revokeReason)
 	}
-	tag, err := rep.queryRunner(ctx).Exec(ctx, revokeUserSessionSQL, revokeReason, revokedByUserID, sessionID)
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, revokeUserSessionSQL, revokeReason, revokedByUserID, sessionID)
 	if err != nil {
 		return fmt.Errorf("repository.RevokeUserSession: %w", err)
 	}
@@ -64,9 +65,9 @@ func (rep *Repository) RevokeUserSession(ctx context.Context, sessionID, revoked
 // RevokeAllUserSessions revokes all active sessions for a user with the given reason.
 func (rep *Repository) RevokeAllUserSessions(ctx context.Context, userID string, revokedByUserID *string, revokeReason authdomain.RevokeReason) error {
 	if !revokeReason.Valid() {
-		return fmt.Errorf("repository.RevokeAllUserSessions: invalid revoke reason: %s", revokeReason)
+		return fmt.Errorf("repository.RevokeAllUserSessions: invalid revoke reason (programmer error): %s", revokeReason)
 	}
-	_, err := rep.queryRunner(ctx).Exec(ctx, revokeAllUserSessionsSQL, revokeReason, revokedByUserID, userID)
+	_, err := rep.QueryRunner(ctx).Exec(ctx, revokeAllUserSessionsSQL, revokeReason, revokedByUserID, userID)
 	if err != nil {
 		return fmt.Errorf("repository.RevokeAllUserSessions: %w", err)
 	}
@@ -74,34 +75,24 @@ func (rep *Repository) RevokeAllUserSessions(ctx context.Context, userID string,
 	return nil
 }
 
+// RevokeAllUserSessionsAdmin revokes all active sessions for a user on behalf of an admin (reason "admin").
+func (rep *Repository) RevokeAllUserSessionsAdmin(ctx context.Context, userID, revokedByUserID string) error {
+	_, err := rep.QueryRunner(ctx).Exec(ctx, revokeAllUserSessionsSQL, authdomain.RevokeReasonAdmin, revokedByUserID, userID)
+	if err != nil {
+		return fmt.Errorf("repository.RevokeAllUserSessionsAdmin: %w", err)
+	}
+
+	return nil
+}
+
 // GetActiveSessionsByUserID returns all non-revoked sessions for the given user.
 func (rep *Repository) GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
-	rows, err := rep.queryRunner(ctx).Query(ctx, getActiveUserSessionSQL, userID)
-	if err != nil {
-		return nil, fmt.Errorf("repository.GetActiveSessionsByUserID: %w", err)
-	}
-
-	defer rows.Close()
-
-	var sessions []*authdomain.UserSession
-	for rows.Next() {
-		session, err := scanUserSession(rows)
-		if err != nil {
-			return nil, fmt.Errorf("repository.GetActiveSessionsByUserID scan: %w", err)
-		}
-		sessions = append(sessions, session)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repository.GetActiveSessionsByUserID rows: %w", err)
-	}
-
-	return sessions, nil
+	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getActiveUserSessionSQL, "GetActiveSessionsByUserID", nil, scanUserSession, []any{userID})
 }
 
 // UpdateSessionToken replaces the refresh token hash for a session (token rotation).
 func (rep *Repository) UpdateSessionToken(ctx context.Context, sessionID, tokenHash, userAgent, ipAddress string) error {
-	tag, err := rep.queryRunner(ctx).Exec(ctx, updateSessionTokenSQL, sessionID, tokenHash, userAgent, ipAddress)
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateSessionTokenSQL, sessionID, tokenHash, userAgent, ipAddress)
 	if err != nil {
 		return fmt.Errorf("repository.UpdateSessionToken: %w", err)
 	}
@@ -112,40 +103,7 @@ func (rep *Repository) UpdateSessionToken(ctx context.Context, sessionID, tokenH
 	return nil
 }
 
-// UpdateFailedLoginAttempts increments the failed attempt counter and locks the session when the limit is reached.
-func (rep *Repository) UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error {
-	tag, err := rep.queryRunner(ctx).Exec(ctx, updateFailedLoginAttemptsSQL, sessionID, loginCountLimit, lockInterval)
-	if err != nil {
-		return fmt.Errorf("repository.UpdateFailedLoginAttempts: %w", err)
-	}
-
-	if tag.RowsAffected() == 0 {
-		return authdomain.ErrSessionNotFound
-	}
-	return nil
-}
-
 // GetAllSessionsByUserID returns all sessions belonging to the given user.
 func (rep *Repository) GetAllSessionsByUserID(ctx context.Context, userID string) ([]*authdomain.UserSession, error) {
-	rows, err := rep.queryRunner(ctx).Query(ctx, getAllUserSessionSQL, userID)
-	if err != nil {
-		return nil, fmt.Errorf("repository.GetAllSessionsByUserID: %w", err)
-	}
-
-	defer rows.Close()
-
-	var sessions []*authdomain.UserSession
-	for rows.Next() {
-		session, err := scanUserSession(rows)
-		if err != nil {
-			return nil, fmt.Errorf("repository.GetAllSessionsByUserID scan: %w", err)
-		}
-		sessions = append(sessions, session)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("repository.GetAllSessionsByUserID rows: %w", err)
-	}
-
-	return sessions, nil
+	return repository.GetAndParseListWithArgs(ctx, &rep.BaseRepository, getAllUserSessionSQL, "GetAllSessionsByUserID", nil, scanUserSession, []any{userID})
 }

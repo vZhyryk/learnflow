@@ -12,26 +12,28 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-const validChangePasswordBody = `{"UserID":"user-123","OldPassword":"oldpass12","NewPassword":"newpass12"}`
+const validChangePasswordBody = `{"old_password":"oldpass12","new_password":"newpass12"}`
 
 type changePasswordFixture struct {
 	*httpFixture
 	svcErr error
+	gotReq authdomain.ChangePasswordRequest
 }
 
 func newChangePasswordFixture() *changePasswordFixture {
 	f := &changePasswordFixture{}
 	svc := &mockService{
-		changePassword: func(_ context.Context, _ authdomain.ChangePasswordRequest) error {
+		changePassword: func(_ context.Context, req authdomain.ChangePasswordRequest) error {
+			f.gotReq = req
 			return f.svcErr
 		},
 	}
-	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/users/auth/password/change")
+	f.httpFixture = newHTTPFixture(svc, http.MethodPut, "/api/v1/auth/password/change")
 	return f
 }
 
 func TestChangePasswordRequestValidation(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/password/change — request validation", t, func() {
+	Convey("PUT /api/v1/auth/password/change — request validation", t, func() {
 		f := newChangePasswordFixture()
 
 		Convey("Empty body → 400", func() {
@@ -40,40 +42,47 @@ func TestChangePasswordRequestValidation(t *testing.T) {
 		})
 
 		Convey("Empty OldPassword → 400", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"UserID":"user-123","OldPassword":"","NewPassword":"newpass12"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"old_password":"","new_password":"newpass12"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("NewPassword too short → 400", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"UserID":"user-123","OldPassword":"oldpass12","NewPassword":"short"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"old_password":"oldpass12","new_password":"short"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("NewPassword too long → 400", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"UserID":"user-123","OldPassword":"oldpass12","NewPassword":"`+strings.Repeat("a", 73)+`"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"old_password":"oldpass12","new_password":"`+strings.Repeat("a", 73)+`"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
 		Convey("OldPassword == NewPassword → 400 (validation layer)", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(`{"UserID":"user-123","OldPassword":"samepass1","NewPassword":"samepass1"}`))
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"old_password":"samepass1","new_password":"samepass1"}`))
 			So(w.Code, ShouldEqual, http.StatusBadRequest)
 		})
 
-		Convey("No user in context → 401", func() {
-			w := testutil.ServeHTTP(f.mux, f.newReq(validChangePasswordBody))
-			So(w.Code, ShouldEqual, http.StatusUnauthorized)
+		Convey("No user in context → panics (middleware invariant violated)", func() {
+			So(func() {
+				testutil.ServeHTTP(f.mux, f.newReq(validChangePasswordBody))
+			}, ShouldPanic)
 		})
 
-		Convey("UserID mismatch → 401", func() {
-			r := withUser(f.newReq(`{"UserID":"other-user","OldPassword":"oldpass12","NewPassword":"newpass12"}`))
+		Convey("A user_id in the body is an unknown field → 400", func() {
+			r := withUser(f.newReq(`{"user_id":"other-user","old_password":"oldpass12","new_password":"newpass12"}`))
 			w := testutil.ServeHTTP(f.mux, r)
-			So(w.Code, ShouldEqual, http.StatusUnauthorized)
+			So(w.Code, ShouldEqual, http.StatusBadRequest)
+		})
+
+		Convey("The service receives the authenticated user's ID", func() {
+			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(validChangePasswordBody)))
+			So(w.Code, ShouldEqual, http.StatusOK)
+			So(f.gotReq.UserID, ShouldNotBeEmpty)
 		})
 	})
 }
 
 func TestChangePasswordServiceOutcomes(t *testing.T) {
-	Convey("PUT /api/v1/users/auth/password/change — service outcomes", t, func() {
+	Convey("PUT /api/v1/auth/password/change — service outcomes", t, func() {
 		f := newChangePasswordFixture()
 
 		Convey("Service ErrWrongPassword → 422", func() {
@@ -86,6 +95,12 @@ func TestChangePasswordServiceOutcomes(t *testing.T) {
 			f.svcErr = authdomain.ErrSamePassword
 			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(validChangePasswordBody)))
 			So(w.Code, ShouldEqual, http.StatusUnprocessableEntity)
+		})
+
+		Convey("Blocklist unavailable → 503", func() {
+			f.svcErr = authdomain.ErrBlocklistUnavailable
+			w := testutil.ServeHTTP(f.mux, withUser(f.newReq(validChangePasswordBody)))
+			So(w.Code, ShouldEqual, http.StatusServiceUnavailable)
 		})
 
 		Convey("Unexpected service error → 500", func() {

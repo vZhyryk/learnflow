@@ -65,21 +65,62 @@ func (h *Handler) handleErrorResponse(w http.ResponseWriter, r *http.Request, er
 			return helpers.ErrorResponse(w, http.StatusUnprocessableEntity, "new password must differ from current")
 		})
 
-	case errors.Is(err, authdomain.ErrInvalidAccountState):
+	case errors.Is(err, authdomain.ErrInvalidAccountState), errors.Is(err, authdomain.ErrDeletedByAdmin):
 		h.handleErrorRespond(r, "invalid_account_state", func() error {
 			return helpers.WriteJSON(w, http.StatusOK, helpers.Envelope{"message": "if your account is eligible, you will receive an email"}, nil)
 		})
-
 	default:
-		h.jsonLogger.Error(err, map[string]any{
-			"path":       r.URL.Path,
-			"ip":         appcontext.IPAddressFromContext(r.Context()),
-			"error_type": fmt.Sprintf("%T", err),
-		})
-		h.handleErrorRespond(r, "server_error_response_write", func() error {
-			return helpers.ServerErrorResponse(w)
-		})
+		h.handleOtherError(w, r, err)
 	}
+}
+
+// handleRecoverAccountError handles errors of the token-based recovery endpoint. Unlike the init endpoint (which answers
+// 200 for every account state to avoid account enumeration), the caller here holds a one-time token, so telling them
+// the account was not recovered reveals nothing: it answers 403.
+func (h *Handler) handleRecoverAccountError(w http.ResponseWriter, r *http.Request, err error) {
+	if !errors.Is(err, authdomain.ErrInvalidAccountState) && !errors.Is(err, authdomain.ErrDeletedByAdmin) {
+		h.handleErrorResponse(w, r, err)
+		return
+	}
+
+	h.logAuthFailure(r, r.URL.Path, "account_not_recoverable", userIDProps(r))
+	h.handleErrorRespond(r, "account_not_recoverable", func() error {
+		return helpers.ForbiddenResponse(w, helpers.Envelope{"error": "account cannot be recovered", "code": "account_not_recoverable"})
+	})
+}
+
+// handleOtherError answers errors without a dedicated case: a request that lost a row lock to a concurrent one gets
+// 409 + Retry-After (a client error, so not logged); anything else goes to handleServerError.
+func (h *Handler) handleOtherError(w http.ResponseWriter, r *http.Request, err error) {
+	if !errors.Is(err, authdomain.ErrRequestInProgress) {
+		h.handleServerError(w, r, err)
+		return
+	}
+
+	w.Header().Set("Retry-After", "1")
+	h.handleErrorRespond(r, "request_in_progress", func() error {
+		return helpers.ErrorResponse(w, http.StatusConflict, "another request is in progress, retry shortly")
+	})
+}
+
+// handleServerError logs err and answers 503 when the Redis blocklist could not be updated, 500 otherwise.
+func (h *Handler) handleServerError(w http.ResponseWriter, r *http.Request, err error) {
+	h.jsonLogger.Error(err, map[string]any{
+		"path":       r.URL.Path,
+		"ip":         appcontext.IPAddressFromContext(r.Context()),
+		"error_type": fmt.Sprintf("%T", err),
+	})
+
+	if errors.Is(err, authdomain.ErrBlocklistUnavailable) {
+		h.handleErrorRespond(r, "blocklist_unavailable", func() error {
+			return helpers.ErrorResponse(w, http.StatusServiceUnavailable, "service temporarily unavailable, try again")
+		})
+		return
+	}
+
+	h.handleErrorRespond(r, "server_error_response_write", func() error {
+		return helpers.ServerErrorResponse(w)
+	})
 }
 
 func setAccountLockHeader(err error) string {
@@ -92,9 +133,8 @@ func setAccountLockHeader(err error) string {
 	return "900"
 }
 
-// handleErrorRespond runs fn (a response-writing call) and logs a failure to write the
-// response itself. The write error is only logged, never returned — by this point the
-// handler has already decided what to respond with, and callers have nothing left to do.
+// handleErrorRespond runs fn and logs (never returns) a failure to write the response —
+// by this point the handler has nothing left to do about it.
 func (h *Handler) handleErrorRespond(r *http.Request, caseName string, fn func() error) {
 	helpers.LogRespondError(h.jsonLogger, r, caseName, nil, fn)
 }

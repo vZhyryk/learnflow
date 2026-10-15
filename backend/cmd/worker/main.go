@@ -2,11 +2,16 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	adminrepository "learnflow_backend/internal/admin/repository"
+	articlerepository "learnflow_backend/internal/article/repository"
+	contentrepository "learnflow_backend/internal/content/repository"
+	courserepository "learnflow_backend/internal/courses/repository"
 	"learnflow_backend/internal/infrastructure/bootstrap"
 	"learnflow_backend/internal/infrastructure/db"
 	"learnflow_backend/internal/infrastructure/env"
@@ -34,20 +39,26 @@ func main() {
 
 	baseURL := env.GetStringEnv("BASE_URL", "")
 	if baseURL == "" {
-		jsonLogger.Fatal(fmt.Errorf("base url is not valid"), nil)
+		jsonLogger.Fatal(errors.New("BASE_URL env var is required and must not be empty"), nil)
 	}
 
-	workers := []worker.Worker{
+	adminRepo := adminrepository.NewRepository(dbInstance)
+	contentRepo := contentrepository.NewRepository(dbInstance)
+	articleRepo := articlerepository.NewRepository(dbInstance)
+	courseRepo := courserepository.NewRepository(dbInstance)
+
+	cleanUpPollInterval := 24 * time.Hour
+
+	workers := append([]worker.Worker{
 		worker.NewOutboxPoller(dbInstance, app.Publisher, app.Logger, transactor),
 		worker.NewDLQRetryWorker(dbInstance, app.Publisher, app.Logger, transactor),
-		worker.NewEmailVerificationWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
-		worker.NewEmailChangeWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
-		worker.NewPasswordResetWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
-		worker.NewRegistrationAttemptsWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
-		worker.NewAccountRecoveryWorker(dbInstance, redisClient, app.Logger, app.Mailer, baseURL),
-		// worker.NewBriefSubmittedWorker(dbInstance, app.Publisher, app.Logger, transactor),
-		// worker.NewNotificationWorker(dbInstance, app.Publisher, app.Logger, transactor),
-	}
+		worker.NewAnnouncementDeliveryPoller(dbInstance, app.Publisher, app.Logger, transactor),
+		worker.NewOutboxCleanupWorker(dbInstance, app.Logger, cleanUpPollInterval),
+		worker.NewAnnouncementCleanUpWorker(dbInstance, app.Logger, cleanUpPollInterval),
+		worker.NewSessionCleanupWorker(dbInstance, app.Logger, cleanUpPollInterval),
+		worker.NewAnnouncementFanOutWorker(dbInstance, redisClient.Raw(), app.Logger, adminRepo, contentRepo, courseRepo, articleRepo),
+	}, worker.NewEmailWorkers(dbInstance, redisClient.Raw(), app.Logger, app.Mailer, baseURL)...)
+	workers = append(workers, worker.NewTokenCleanupWorkers(dbInstance, app.Logger, cleanUpPollInterval)...)
 
 	for _, w := range workers {
 		app.Wg.Add(1)
@@ -77,6 +88,10 @@ func getAppConfig(environment string) (Config, error) {
 		return cfg, err
 	}
 
+	if err := bootstrap.ValidateRedisConfig(environment); err != nil {
+		return cfg, err
+	}
+
 	if err := getMailerConfig(&cfg, environment); err != nil {
 		return cfg, err
 	}
@@ -94,19 +109,19 @@ func getMailerConfig(cfg *Config, environment string) error {
 	}
 
 	if cfg.SMTP.Host == "" || (cfg.SMTP.Host == "stub" && environment == "production") {
-		return fmt.Errorf("smtp host is not valid")
+		return errors.New("SMTP_HOST env var is required in production and must not be the stub value")
 	}
 
 	if cfg.SMTP.Username == "" {
-		return fmt.Errorf("smtp username is not valid")
+		return errors.New("SMTP_USERNAME env var is required and must not be empty")
 	}
 
 	if cfg.SMTP.Password == "" {
-		return fmt.Errorf("smtp password is not valid")
+		return errors.New("SMTP_PASSWORD env var is required and must not be empty")
 	}
 
 	if cfg.SMTP.Sender == "" {
-		return fmt.Errorf("smtp sender is not valid")
+		return errors.New("SMTP_SENDER env var is required and must not be empty")
 	}
 
 	return nil

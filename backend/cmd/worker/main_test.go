@@ -3,16 +3,10 @@ package main
 import (
 	"testing"
 
+	"learnflow_backend/internal/shared/testutil"
+
 	. "github.com/smartystreets/goconvey/convey"
 )
-
-func setValidDBEnv(t *testing.T) {
-	t.Helper()
-	t.Setenv("DB_NAME", "learnflow")
-	t.Setenv("DB_USER", "learnflow")
-	t.Setenv("DB_HOST", "localhost")
-	t.Setenv("DB_PASSWORD", "secret")
-}
 
 func setValidSMTPEnv(t *testing.T) {
 	t.Helper()
@@ -42,7 +36,7 @@ func TestGetMailerConfig(t *testing.T) {
 			err := getMailerConfig(cfg, "production")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "smtp host")
+			So(err.Error(), ShouldContainSubstring, "SMTP_HOST")
 		})
 
 		Convey("When SMTP_HOST is unset outside production, it falls back to the stub host", func() {
@@ -66,7 +60,7 @@ func TestGetMailerConfig(t *testing.T) {
 			err := getMailerConfig(cfg, "production")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "smtp username")
+			So(err.Error(), ShouldContainSubstring, "SMTP_USERNAME")
 		})
 
 		Convey("When SMTP_PASSWORD is missing, it errors", func() {
@@ -77,7 +71,7 @@ func TestGetMailerConfig(t *testing.T) {
 			err := getMailerConfig(cfg, "production")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "smtp password")
+			So(err.Error(), ShouldContainSubstring, "SMTP_PASSWORD")
 		})
 
 		Convey("When SMTP_SENDER is missing, it errors", func() {
@@ -88,22 +82,29 @@ func TestGetMailerConfig(t *testing.T) {
 			err := getMailerConfig(cfg, "production")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "smtp sender")
+			So(err.Error(), ShouldContainSubstring, "SMTP_SENDER")
 		})
 	})
+}
+
+func setValidRedisEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("REDIS_PASSWORD", "redis-secret")
+	t.Setenv("REDIS_TLS", "false")
 }
 
 func TestGetAppConfig(t *testing.T) {
 	Convey("getAppConfig", t, func() {
 		Convey("When DB and SMTP env vars are all valid, it succeeds", func() {
-			setValidDBEnv(t)
+			testutil.SetRequiredDBEnv(t)
 			setValidSMTPEnv(t)
+			setValidRedisEnv(t)
 
 			cfg, err := getAppConfig("production")
 
 			So(err, ShouldBeNil)
 			So(cfg.Env, ShouldEqual, "production")
-			So(cfg.Database.DSN, ShouldContainSubstring, "learnflow")
+			So(cfg.Database.DSN, ShouldContainSubstring, "testdb")
 		})
 
 		Convey("When DB config is invalid (missing DB_NAME), it errors before touching SMTP", func() {
@@ -119,13 +120,26 @@ func TestGetAppConfig(t *testing.T) {
 		})
 
 		Convey("When DB config is valid but SMTP is invalid, it errors", func() {
-			setValidDBEnv(t)
+			testutil.SetRequiredDBEnv(t)
+			setValidRedisEnv(t)
 			t.Setenv("SMTP_HOST", "")
 
 			_, err := getAppConfig("production")
 
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldContainSubstring, "smtp")
+			So(err.Error(), ShouldContainSubstring, "SMTP_")
+		})
+
+		Convey("When Redis has no password in production, it errors", func() {
+			testutil.SetRequiredDBEnv(t)
+			setValidSMTPEnv(t)
+			t.Setenv("REDIS_PASSWORD", "")
+			t.Setenv("REDIS_TLS", "false")
+
+			_, err := getAppConfig("production")
+
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "REDIS_PASSWORD")
 		})
 	})
 }

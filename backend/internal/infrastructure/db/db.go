@@ -8,11 +8,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// InitDatabase opens a PostgreSQL connection and configures pool settings.
-// Field/param names here (MaxOpenConns/MinOpenConns/MaxIdleTime/MaxLifetime) follow
-// pgxpool's own Config naming — see internal/infrastructure/redis.PoolConfig for the
-// equivalent Redis pool knobs, which intentionally use go-redis's own naming instead
-// (PoolSize/MinIdleConns/ConnMaxLifetime) since each wraps its own client library.
+// InitDatabase opens a PostgreSQL connection and configures pool settings. Param names
+// follow pgxpool's own Config naming (see redis.PoolConfig for the Redis equivalent).
 func InitDatabase(dsn, maxIdleTime, maxLifetime string, maxOpenConns, minOpenConns int32) (*pgxpool.Pool, error) {
 	config, err := parseConfigs(dsn, maxIdleTime, maxLifetime, maxOpenConns, minOpenConns)
 	if err != nil {
@@ -39,9 +36,8 @@ func parseConfigs(dsn, maxIdleTime, maxLifetime string, maxOpenConns, minOpenCon
 		return nil, fmt.Errorf("db: failed to parse config: %w", err)
 	}
 
-	// 100 caps a single app instance at PostgreSQL's default max_connections, leaving
-	// headroom for other clients (migrations, admin sessions, other instances) rather
-	// than letting misconfiguration exhaust the server's entire connection budget.
+	// 100 caps one instance at PostgreSQL's default max_connections, leaving headroom
+	// for other clients so misconfiguration can't exhaust the server's budget.
 	if maxOpenConns <= 0 || maxOpenConns > 100 {
 		return nil, fmt.Errorf("db: maxOpenConns must be between 1 and 100, got %d", maxOpenConns)
 	}
@@ -67,6 +63,11 @@ func parseConfigs(dsn, maxIdleTime, maxLifetime string, maxOpenConns, minOpenCon
 		return nil, fmt.Errorf("db: minOpenConns (%d) must be less than maxOpenConns (%d)", minOpenConns, maxOpenConns)
 	}
 	config.MaxConnLifetime = lifetime
+	// MaxConnIdleTime should stay below the upstream proxy/DB idle timeout (e.g. AWS RDS
+	// closes idle connections after 5m by default) so pgxpool retires connections on its
+	// own schedule instead of racing a server-side disconnect. MaxConns sizing guideline:
+	// (peak concurrent handlers/workers per instance) + small headroom, capped well under
+	// postgres max_connections (see the <=100 guard below) to leave room for other clients.
 	config.MaxConnIdleTime = idleDuration
 	config.MaxConns = maxOpenConns
 	config.MinConns = minOpenConns

@@ -1,8 +1,7 @@
 package usersrepository
 
 import (
-	"context"
-	"learnflow_backend/internal/infrastructure/db"
+	"learnflow_backend/internal/shared/repository"
 	usersdomain "learnflow_backend/internal/users/domain"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -10,20 +9,12 @@ import (
 
 // Repository implements usersdomain.UserProfileRepository using pgxpool.
 type Repository struct {
-	db db.QueryRunner
+	repository.BaseRepository
 }
 
 // NewRepository returns a new Repository backed by the given connection pool.
 func NewRepository(pool *pgxpool.Pool) *Repository {
-	return &Repository{db: pool}
-}
-
-// queryRunner returns the active transaction from ctx if one was started by the
-// caller (see db.ExtractTx), otherwise falls back to the connection pool. This lets
-// service-layer code wrap multiple repository calls in a single transaction
-// transparently, without every method taking an explicit tx parameter.
-func (rep *Repository) queryRunner(ctx context.Context) db.QueryRunner {
-	return db.FallbackQueryRunner(ctx, rep.db)
+	return &Repository{BaseRepository: *repository.NewBaseRepository(pool)}
 }
 
 var _ usersdomain.UserProfileRepository = (*Repository)(nil)

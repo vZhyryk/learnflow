@@ -286,3 +286,22 @@ func TestLogRespondErrorWithProps(t *testing.T) {
 		So(props["ip"], ShouldEqual, "1.2.3.4")
 	})
 }
+
+func TestRootError(t *testing.T) {
+	sentinel := errors.New("invalid title")
+
+	Convey("RootError", t, func() {
+		Convey("When the error is a plain sentinel, it is returned as is", func() {
+			So(helpers.RootError(sentinel), ShouldEqual, sentinel)
+		})
+
+		Convey("When the sentinel is wrapped several times, the innermost error is returned and no wrapper text is left", func() {
+			wrapped := fmt.Errorf("service.Create: %w", fmt.Errorf("repository.Create: %w", sentinel))
+
+			got := helpers.RootError(wrapped)
+
+			So(got, ShouldEqual, sentinel)
+			So(got.Error(), ShouldEqual, "invalid title")
+		})
+	})
+}

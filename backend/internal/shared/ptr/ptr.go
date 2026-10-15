@@ -1,6 +1,5 @@
-// Package ptr provides string/pointer conversion helpers for the boundary
-// between wire-level DTOs (plain string, "" means "not provided") and domain
-// models (*string, nil means "not provided" / SQL NULL).
+// Package ptr converts between wire-level DTOs ("" = not provided) and domain
+// models (*string, nil = not provided / SQL NULL).
 package ptr
 
 // StringOrNil converts an unset (empty) wire-level string to nil for a

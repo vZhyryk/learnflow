@@ -1,0 +1,122 @@
+package contentrepository
+
+const (
+	contentColumns = `
+    id, slug, title, content_type, description, body, video_url, file_url, estimated_minutes,
+	estimated_pages, thumbnail_url, seo_title, seo_description, og_image_url, canonical_url,
+    is_indexable, status, created_by_user_id, created_at, updated_at, updated_by_user_id,
+	published_at, published_by_user_id, deleted_at, deleted_by_user_id, archived_at, archived_by_user_id
+	`
+
+	createDraftContentItemSQL = `
+		INSERT INTO content_items (slug, title, content_type, description, body, video_url, file_url, thumbnail_url, estimated_minutes, estimated_pages, seo_title, seo_description, og_image_url, canonical_url, is_indexable, created_by_user_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		RETURNING` + contentColumns
+
+	publishContentItemSQL = `
+		UPDATE content_items
+		SET status = 'published',
+		published_at = now(),
+		published_by_user_id = $2
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	archiveContentItemSQL = `
+		UPDATE content_items
+		SET status = 'archived',
+		archived_at = now(),
+		archived_by_user_id = $2
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	deleteContentItemSQL = `
+		UPDATE content_items
+		SET deleted_at = now(),
+		deleted_by_user_id = $2
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	updateContentItemSQL = `
+		UPDATE content_items
+		SET
+			slug = $2,
+			title = $3,
+			description = $4,
+			body = $5,
+    		video_url = $6,
+    		file_url = $7,
+			estimated_minutes = $8,
+			estimated_pages = $9,
+			thumbnail_url = $10,
+			seo_title = $11,
+			seo_description = $12,
+			og_image_url = $13,
+			canonical_url = $14,
+			is_indexable = $15,
+			updated_by_user_id = $16,
+			updated_at = now()
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	getAllPublishedContentItemsSQL = `
+		SELECT` + contentColumns + `
+		FROM content_items WHERE status = 'published' AND deleted_at IS NULL
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	countPublishedContentItemsSQL = `
+		SELECT COUNT(*) FROM content_items WHERE status = 'published' AND deleted_at IS NULL
+	`
+
+	getAllDraftContentItemsSQL = `
+		SELECT` + contentColumns + `
+		FROM content_items WHERE status = 'draft' AND deleted_at IS NULL
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	countDraftContentItemsSQL = `
+		SELECT COUNT(*) FROM content_items WHERE status = 'draft' AND deleted_at IS NULL
+	`
+
+	getAllArchivedContentItemsSQL = `
+		SELECT` + contentColumns + `
+		FROM content_items WHERE status = 'archived'
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	countArchivedContentItemsSQL = `
+		SELECT COUNT(*) FROM content_items WHERE status = 'archived'
+	`
+
+	getAllContentItemsSQL = `
+		SELECT` + contentColumns + `
+		FROM content_items
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
+	`
+
+	countAllContentItemsSQL = `
+		SELECT COUNT(*) FROM content_items
+	`
+
+	getContentItemByIDSQL = `
+		SELECT` + contentColumns + `
+		FROM content_items WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	getContentItemBySlugSQL = `
+		SELECT` + contentColumns + `
+		FROM content_items WHERE slug = $1 AND deleted_at IS NULL
+	`
+
+	checkIfContentExistsByID = `
+		SELECT EXISTS(SELECT 1 FROM content_items WHERE id = $1 AND deleted_at IS NULL)
+	`
+
+	checkIfContentExistsActiveByID = `
+		SELECT EXISTS(SELECT 1 FROM content_items WHERE id = $1 AND deleted_at IS NULL AND status = 'published')
+	`
+)

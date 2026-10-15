@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"learnflow_backend/internal/infrastructure/bootstrap"
+	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -43,13 +44,6 @@ func unsetDatabaseConfigEnv() {
 	for _, key := range []string{envDBOpenConnLimit, envDBMinConnLimit, envDBMaxIdleTime, envDBMaxLifetime, envDBName, envDBUser, envDBHost, envDBPassword} {
 		So(os.Unsetenv(key), ShouldBeNil)
 	}
-}
-
-func setDSNData() {
-	So(os.Setenv(envDBName, "testdb"), ShouldBeNil)
-	So(os.Setenv(envDBUser, "testuser"), ShouldBeNil)
-	So(os.Setenv(envDBHost, "localhost"), ShouldBeNil)
-	So(os.Setenv(envDBPassword, "testpass"), ShouldBeNil)
 }
 
 func TestGetDatabaseConfig(t *testing.T) {
@@ -90,7 +84,7 @@ func TestLoadDatabaseConfig(t *testing.T) {
 
 		Convey("When required DSN env vars are set", func() {
 			unsetDatabaseConfigEnv()
-			setDSNData()
+			testutil.SetRequiredDBEnv(t)
 
 			cfg, err := bootstrap.LoadDatabaseConfig()
 			So(err, ShouldBeNil)
@@ -155,6 +149,37 @@ func TestMustInitInfraExitsOnDatabaseFailure(t *testing.T) {
 			var entry map[string]any
 			So(json.Unmarshal(out.Bytes(), &entry), ShouldBeNil)
 			So(entry["message"], ShouldContainSubstring, "db: failed to parse config")
+		})
+	})
+}
+
+func TestValidateRedisConfig(t *testing.T) {
+	Convey("ValidateRedisConfig", t, func() {
+		Convey("outside production any config is accepted", func() {
+			t.Setenv("REDIS_PASSWORD", "")
+			So(bootstrap.ValidateRedisConfig("dev"), ShouldBeNil)
+		})
+
+		Convey("in production a missing password fails", func() {
+			t.Setenv("REDIS_PASSWORD", "")
+			t.Setenv("REDIS_TLS", "true")
+			err := bootstrap.ValidateRedisConfig("production")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "REDIS_PASSWORD")
+		})
+
+		Convey("in production an unset REDIS_TLS fails", func() {
+			t.Setenv("REDIS_PASSWORD", "secret")
+			os.Unsetenv("REDIS_TLS") //nolint:errcheck,gosec // test setup
+			err := bootstrap.ValidateRedisConfig("production")
+			So(err, ShouldNotBeNil)
+			So(err.Error(), ShouldContainSubstring, "REDIS_TLS")
+		})
+
+		Convey("in production password and explicit TLS pass", func() {
+			t.Setenv("REDIS_PASSWORD", "secret")
+			t.Setenv("REDIS_TLS", "false")
+			So(bootstrap.ValidateRedisConfig("production"), ShouldBeNil)
 		})
 	})
 }

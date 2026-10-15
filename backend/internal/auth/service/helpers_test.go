@@ -3,6 +3,7 @@ package authservice
 import (
 	"context"
 	"errors"
+	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
@@ -14,9 +15,9 @@ import (
 func TestRevokeUserSessions(t *testing.T) {
 	Convey("revokeUserSessions", t, func() {
 		Convey("when fn fails, it wraps and returns the error without touching Redis", func() {
-			// mockRedis with setNX left unset — if revokeUserSessions ever calls SetNX
+			// mockBlocklist with blockToken left unset — if revokeUserSessions ever calls BlockToken
 			// here, the mock panics with a clear "not set" message, failing the test.
-			srv := newTestService(nil, nil, nil, nil, &mockRedis{})
+			srv := newTestService(nil, nil, nil, nil, &mockBlocklist{})
 
 			fnErr := errors.New("db failure")
 			err := srv.revokeUserSessions(context.Background(), "test_caller", "jti-1", time.Now().Add(time.Hour), func(context.Context) error {
@@ -51,8 +52,8 @@ func TestRevokeUserSessions(t *testing.T) {
 			So(err, ShouldBeNil)
 		})
 
-		Convey("when fn succeeds and Redis SetNX succeeds", func() {
-			srv := newTestService(nil, nil, nil, nil, newSuccessfulMockRedis())
+		Convey("when fn succeeds and BlockToken succeeds", func() {
+			srv := newTestService(nil, nil, nil, nil, newSuccessfulMockBlocklist())
 
 			err := srv.revokeUserSessions(context.Background(), "test_caller", "jti-1", time.Now().Add(time.Hour), func(context.Context) error {
 				return nil
@@ -61,9 +62,9 @@ func TestRevokeUserSessions(t *testing.T) {
 			So(err, ShouldBeNil)
 		})
 
-		Convey("when fn succeeds but Redis SetNX fails, the error is wrapped and returned", func() {
+		Convey("when fn succeeds but BlockToken fails, the error is wrapped and returned", func() {
 			redisErr := testutil.ErrRedisUnavailable
-			srv := newTestService(nil, nil, nil, nil, mockRedisSetNXError(redisErr))
+			srv := newTestService(nil, nil, nil, nil, mockBlocklistBlockTokenError(redisErr))
 
 			err := srv.revokeUserSessions(context.Background(), "test_caller", "jti-1", time.Now().Add(time.Hour), func(context.Context) error {
 				return nil
@@ -72,6 +73,7 @@ func TestRevokeUserSessions(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "test_caller: session blocklist")
 			So(errors.Is(err, redisErr), ShouldBeTrue)
+			So(errors.Is(err, authdomain.ErrBlocklistUnavailable), ShouldBeTrue)
 		})
 	})
 }
@@ -80,7 +82,7 @@ func TestEmitTokenEvent(t *testing.T) {
 	Convey("emitTokenEvent", t, func() {
 		Convey("when token generation succeeds and fn succeeds, the event is emitted via outbox", func() {
 			var captured []any
-			srv := newTestService(nil, nil, nil, newCapturingOutbox(&captured), nil)
+			srv := newTestService(nil, nil, nil, testutil.NewCapturingOutbox(&captured), nil)
 
 			var gotRaw, gotHash string
 			var gotExpiry time.Time
@@ -98,8 +100,8 @@ func TestEmitTokenEvent(t *testing.T) {
 			So(captured, ShouldNotBeEmpty)
 		})
 
-		Convey("when fn returns an error, it is returned as-is without wrapping and outbox.Emit is never called", func() {
-			srv := newTestService(nil, nil, nil, newFailingOutbox(errors.New("should not be reached")), nil)
+		Convey("when fn returns an error, it is wrapped and outbox.Emit is never called", func() {
+			srv := newTestService(nil, nil, nil, testutil.NewFailingOutbox(errors.New("should not be reached")), nil)
 
 			fnErr := errors.New("token persistence failed")
 			err := srv.emitTokenEvent(context.Background(), "user-1", time.Hour, events.AggregationTypeUser, events.EventUserRegistered,
@@ -107,12 +109,12 @@ func TestEmitTokenEvent(t *testing.T) {
 					return nil, fnErr
 				})
 
-			So(err, ShouldEqual, fnErr)
+			So(errors.Is(err, fnErr), ShouldBeTrue)
 		})
 
 		Convey("when fn succeeds but outbox.Emit fails, the error propagates", func() {
 			outboxErr := errors.New("outbox insert failed")
-			srv := newTestService(nil, nil, nil, newFailingOutbox(outboxErr), nil)
+			srv := newTestService(nil, nil, nil, testutil.NewFailingOutbox(outboxErr), nil)
 
 			err := srv.emitTokenEvent(context.Background(), "user-1", time.Hour, events.AggregationTypeUser, events.EventUserRegistered,
 				func(context.Context, string, string, time.Time) (any, error) {

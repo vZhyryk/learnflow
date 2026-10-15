@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -37,7 +35,7 @@ func TestNew(t *testing.T) {
 }
 
 // newTestService assembles a Service from mocks
-func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockTokenRepo, outbox *events.OutboxWriter, redisClient *mockRedis) *Service {
+func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockTokenRepo, outbox *events.OutboxWriter, blocklist *mockBlocklist) *Service {
 	if uRepo == nil {
 		uRepo = &mockUserRepo{}
 	}
@@ -51,9 +49,10 @@ func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockToke
 	srv, err := New(
 		Repos{UserRepo: uRepo, SessionRepo: sRepo, TokenRepo: tRepo, Transactor: &testutil.NoopTransactor{}},
 		Utils{
-			Token:       tokens.NewTokens("test-secret", "", "learnflow", "learnflow-users"),
-			Outbox:      outbox,
-			RedisClient: redisClient,
+			Token:     tokens.NewTokens("test-secret", "", "learnflow", "learnflow-users"),
+			Outbox:    outbox,
+			Blocklist: blocklist,
+			Audit:     mockAuditDeletedByAdmin(false, nil),
 		},
 		Options{BcryptCost: 4},
 	)
@@ -63,39 +62,10 @@ func newTestService(uRepo *mockUserRepo, sRepo *mockSessionRepo, tRepo *mockToke
 	return srv
 }
 
-// newNoopOutbox returns an OutboxWriter whose Emit always succeeds without touching a real DB.
-func newNoopOutbox() *events.OutboxWriter {
-	return events.NewOutboxWriterWithRunner(&testutil.MockQueryRunner{
-		ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-			return pgconn.CommandTag{}, nil
-		},
-	})
-}
-
-// newFailingOutbox returns an OutboxWriter whose Emit always fails with err.
-func newFailingOutbox(err error) *events.OutboxWriter {
-	return events.NewOutboxWriterWithRunner(&testutil.MockQueryRunner{
-		ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-			return pgconn.CommandTag{}, err
-		},
-	})
-}
-
-// newCapturingOutbox returns an OutboxWriter that records the Exec args of the last Emit call.
-func newCapturingOutbox(captured *[]any) *events.OutboxWriter {
-	return events.NewOutboxWriterWithRunner(&testutil.MockQueryRunner{
-		ExecFn: func(_ context.Context, _ string, args ...any) (pgconn.CommandTag, error) {
-			*captured = args
-			return pgconn.CommandTag{}, nil
-		},
-	})
-}
-
-func newSuccessfulMockRedis() *mockRedis {
-	return &mockRedis{
-		setNX: func(_ context.Context, _ string, _ any, _ time.Duration) *redis.BoolCmd {
-			return redis.NewBoolResult(true, nil)
-		},
+func newSuccessfulMockBlocklist() *mockBlocklist {
+	return &mockBlocklist{
+		blockToken:       func(_ context.Context, _ string, _ time.Duration) error { return nil },
+		revokeUserTokens: func(_ context.Context, _ string, _ time.Duration) error { return nil },
 	}
 }
 
@@ -104,5 +74,5 @@ func newChangePasswordTestUser() *authdomain.User {
 	if err != nil {
 		panic(err)
 	}
-	return &authdomain.User{ID: "user-123", PasswordHash: string(hash)}
+	return &authdomain.User{ID: TestUserID, PasswordHash: string(hash)}
 }

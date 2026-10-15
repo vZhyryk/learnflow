@@ -1,21 +1,33 @@
 package authrepository
 
 import (
+	"errors"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/infrastructure/convert"
+	"learnflow_backend/internal/shared/repository"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type rowScanner interface {
-	Scan(dest ...any) error
+// lockNotAvailableCode is the SQLSTATE PostgreSQL returns when FOR UPDATE NOWAIT hits a row locked by another transaction.
+const lockNotAvailableCode = "55P03"
+
+// mapLockNotAvailable turns a lock_not_available error into ErrRequestInProgress and passes any other error through.
+func mapLockNotAvailable(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == lockNotAvailableCode {
+		return authdomain.ErrRequestInProgress
+	}
+
+	return err
 }
 
 // dobLayout matches authdomain's DateOfBirth string format and the
 // validator.IsValidDateOfBirth parse layout.
 const dobLayout = "2006-01-02"
 
-func scanUser(row rowScanner) (*authdomain.User, error) {
+func scanUser(row repository.RowScanner) (*authdomain.User, error) {
 	user := &authdomain.User{}
 	err := row.Scan(
 		&user.ID,
@@ -40,7 +52,7 @@ func scanUser(row rowScanner) (*authdomain.User, error) {
 	return user, nil
 }
 
-func scanUserProfile(row rowScanner) (*authdomain.UserProfile, error) {
+func scanUserProfile(row repository.RowScanner) (*authdomain.UserProfile, error) {
 	userProfile := &authdomain.UserProfile{}
 	var dob pgtype.Date
 	err := row.Scan(
@@ -66,7 +78,7 @@ func scanUserProfile(row rowScanner) (*authdomain.UserProfile, error) {
 	return userProfile, nil
 }
 
-func scanUserSession(row rowScanner) (*authdomain.UserSession, error) {
+func scanUserSession(row repository.RowScanner) (*authdomain.UserSession, error) {
 	session := &authdomain.UserSession{}
 	err := row.Scan(
 		&session.ID,
@@ -88,12 +100,12 @@ func scanUserSession(row rowScanner) (*authdomain.UserSession, error) {
 		&session.LastSeenIP,
 	)
 	if err != nil {
-		return nil, err
+		return nil, mapLockNotAvailable(err)
 	}
 	return session, nil
 }
 
-func scanToken(row rowScanner) (*authdomain.TokenBase, error) {
+func scanToken(row repository.RowScanner) (*authdomain.TokenBase, error) {
 	token := &authdomain.TokenBase{}
 	err := row.Scan(
 		&token.ID,
@@ -106,12 +118,12 @@ func scanToken(row rowScanner) (*authdomain.TokenBase, error) {
 		&token.InvalidatedByUserID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, mapLockNotAvailable(err)
 	}
 	return token, nil
 }
 
-func scanEmailChangeToken(row rowScanner) (*authdomain.EmailChangeToken, error) {
+func scanEmailChangeToken(row repository.RowScanner) (*authdomain.EmailChangeToken, error) {
 	token := &authdomain.EmailChangeToken{}
 	err := row.Scan(
 		&token.ID,
@@ -125,7 +137,7 @@ func scanEmailChangeToken(row rowScanner) (*authdomain.EmailChangeToken, error) 
 		&token.InvalidatedByUserID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, mapLockNotAvailable(err)
 	}
 	return token, nil
 }

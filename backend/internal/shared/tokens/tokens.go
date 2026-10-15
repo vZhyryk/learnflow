@@ -13,6 +13,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// AccessTokenTTL is the lifetime of an access JWT.
+const AccessTokenTTL = 15 * time.Minute
+
+// BlockMarkTTL is how long a Redis block marker lives: one access-token lifetime plus a minute of margin, so a token
+// issued by a refresh that was already in flight when the user was blocked is still covered.
+const BlockMarkTTL = AccessTokenTTL + time.Minute
+
 const (
 	tokenByteLength = 32
 	jtibyteLength   = 32

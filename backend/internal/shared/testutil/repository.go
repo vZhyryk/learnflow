@@ -10,13 +10,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// MockQueryRunner implements db.QueryRunner (internal/infrastructure/db) via
-// function fields. Any unset field panics with a descriptive message on use,
-// which surfaces missing test setup immediately instead of nil-pointer-panicking.
+// MockQueryRunner implements db.QueryRunner via function fields; an unset field panics
+// with a descriptive message, surfacing missing test setup immediately.
 type MockQueryRunner struct {
 	QueryRowFn func(ctx context.Context, sql string, args ...any) pgx.Row
 	QueryFn    func(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
 	ExecFn     func(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+}
+
+// AlwaysFailsQuery satisfies MockQueryRunner.QueryFn, failing unconditionally with ErrDBUnexpected.
+func AlwaysFailsQuery(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
+	return nil, ErrDBUnexpected
+}
+
+// AlwaysFailsExec satisfies MockQueryRunner.ExecFn, failing unconditionally with ErrDBUnexpected.
+func AlwaysFailsExec(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+	return pgconn.CommandTag{}, ErrDBUnexpected
 }
 
 // QueryRow delegates to QueryRowFn, panicking if it was not set for this test.
@@ -51,52 +60,49 @@ type MockRow struct {
 // Scan delegates to ScanFn.
 func (r *MockRow) Scan(dest ...any) error { return r.ScanFn(dest...) }
 
-// CastStr safely type-asserts a scan destination to *string, panicking with context on failure.
-func CastStr(v any, idx int) *string {
-	s, ok := v.(*string)
+// castAs safely type-asserts a scan destination to *T, panicking with context on failure.
+// It backs all the Cast*/CastEnum helpers below — they exist as named, non-generic entry
+// points so call sites read naturally (CastStr(v, idx)) without spelling out a type param.
+func castAs[T any](v any, idx int) *T {
+	t, ok := v.(*T)
 	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *string, got %T", idx, v))
+		panic(fmt.Sprintf("dest[%d]: expected *%T, got %T", idx, t, v))
 	}
-	return s
+	return t
 }
+
+// CastStr safely type-asserts a scan destination to *string, panicking with context on failure.
+func CastStr(v any, idx int) *string { return castAs[string](v, idx) }
 
 // CastPtrStr safely type-asserts a scan destination to **string.
-func CastPtrStr(v any, idx int) **string {
-	s, ok := v.(**string)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected **string, got %T", idx, v))
-	}
-	return s
-}
+func CastPtrStr(v any, idx int) **string { return castAs[*string](v, idx) }
 
 // CastTime safely type-asserts a scan destination to *time.Time.
-func CastTime(v any, idx int) *time.Time {
-	s, ok := v.(*time.Time)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *time.Time, got %T", idx, v))
-	}
-	return s
-}
+func CastTime(v any, idx int) *time.Time { return castAs[time.Time](v, idx) }
 
 // CastInt safely type-asserts a scan destination to *int.
-func CastInt(v any, idx int) *int {
-	s, ok := v.(*int)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *int, got %T", idx, v))
-	}
-	return s
-}
+func CastInt(v any, idx int) *int { return castAs[int](v, idx) }
 
-// CastPgtypeDate safely type-asserts a scan destination to *pgtype.Date —
-// the scan target repositories use for nullable `date` columns (pgx v5 has
-// no native scan support for `date` into *string/**string).
-func CastPgtypeDate(v any, idx int) *pgtype.Date {
-	d, ok := v.(*pgtype.Date)
-	if !ok {
-		panic(fmt.Sprintf("dest[%d]: expected *pgtype.Date, got %T", idx, v))
-	}
-	return d
-}
+// CastFloat64 safely type-asserts a scan destination to *float64.
+func CastFloat64(v any, idx int) *float64 { return castAs[float64](v, idx) }
+
+// CastPgtypeDate safely type-asserts a scan destination to *pgtype.Date — used for
+// nullable `date` columns since pgx v5 can't scan `date` into *string.
+func CastPgtypeDate(v any, idx int) *pgtype.Date { return castAs[pgtype.Date](v, idx) }
+
+// CastBool safely type-asserts a scan destination to *bool.
+func CastBool(v any, idx int) *bool { return castAs[bool](v, idx) }
+
+// CastPtrInt safely type-asserts a scan destination to **int, for nullable integer columns.
+func CastPtrInt(v any, idx int) **int { return castAs[*int](v, idx) }
+
+// CastPtrTime safely type-asserts a scan destination to **time.Time, for nullable
+// timestamptz columns.
+func CastPtrTime(v any, idx int) **time.Time { return castAs[*time.Time](v, idx) }
+
+// CastEnum safely type-asserts a scan destination to *T, for domain-specific string-enum
+// columns (e.g. CourseStatus, ContentType, UserRole) that can't live in a stdlib Cast* helper.
+func CastEnum[T any](v any, idx int) *T { return castAs[T](v, idx) }
 
 // MockRows implements pgx.Rows for controlled multi-row Scan injection in
 // repository/worker tests. Rows are consumed front-to-back by successive Scan calls.
@@ -119,7 +125,7 @@ func (r *MockRows) Scan(dest ...any) error {
 
 // Close is a no-op; MockRows has no underlying connection to release.
 func (r *MockRows) Close() {
-	// no-op: MockRows has no underlying connection to release.
+	// intentionally empty — see doc comment above
 }
 
 // Err returns RowsErr, the error to surface after iteration completes.

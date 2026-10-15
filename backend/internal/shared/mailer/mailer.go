@@ -43,7 +43,7 @@ func (m Mailer) Send(templateFile string, data any, ccUser CCUser, attachmentLis
 
 	subject, plainBody, htmlBody, err := renderEmail(templateFile, data)
 	if err != nil {
-		return err
+		return fmt.Errorf("mailer.Send: %w", err)
 	}
 
 	msg := mail.NewMessage()
@@ -74,7 +74,7 @@ var templateFS embed.FS
 func renderEmail(templateFile string, data any) (subject, plainBody, htmlBody string, err error) {
 	tmpl, err := template.New("email").ParseFS(templateFS, "templates/"+templateFile)
 	if err != nil {
-		return "", "", "", fmt.Errorf("mailer.renderEmail parse template: %w", err)
+		return "", "", "", fmt.Errorf("mailer.renderEmail: parse template: %w", err)
 	}
 
 	var buf bytes.Buffer

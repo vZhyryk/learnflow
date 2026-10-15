@@ -20,6 +20,8 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 	}
 
 	if user != nil {
+		// Dummy bcrypt (same cost as hashing a new password) keeps this path as slow as a fresh registration.
+		s.compareHash(s.dummyPasswordHash, []byte(req.Password)) //nolint:errcheck,gosec // discarded intentionally, only used to consume constant time
 		return "", s.handleGetUserByEmailRegisterError(ctx, user)
 	}
 
@@ -49,6 +51,10 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 			return fmt.Errorf("register: create user profile: %w", err)
 		}
 
+		if err = s.userRepo.CreateNotificationPreferences(ctx, id); err != nil {
+			return fmt.Errorf("register: create notification preferences: %w", err)
+		}
+
 		userID = id
 
 		return s.emitTokenEvent(ctx, id, emailVerificationTokenTTL, events.AggregationTypeUser, events.EventUserRegistered, func(ctx context.Context, rawToken, hashToken string, expiresAt time.Time) (any, error) {
@@ -65,13 +71,7 @@ func (s *Service) Register(ctx context.Context, req authdomain.RegisterRequest) 
 				return nil, fmt.Errorf("register: create verification token: %w", err)
 			}
 
-			return events.UserRegisteredPayload{
-				UserID:    id,
-				Email:     user.Email,
-				ExpiresAt: expiresAt,
-				RawToken:  rawToken,
-				UserName:  ptr.StringOrEmpty(userProfile.FirstName),
-			}, nil
+			return newTokenPayload(id, user.Email, rawToken, expiresAt, userProfile), nil
 		})
 	})
 
@@ -91,7 +91,7 @@ func (s *Service) handleGetUserByEmailRegisterError(ctx context.Context, user *a
 	emitErr := s.outbox.Emit(ctx, events.AggregationTypeUser, user.ID, events.EventRegistrationAttemptOnExistingEmail, events.RegistrationAttemptPayload{
 		Email:    user.Email,
 		UserID:   user.ID,
-		UserName: ptr.StringOrEmpty(userEmailUserProfile.FirstName),
+		UserName: userEmailUserProfile.GetFirstName(),
 	})
 	if emitErr != nil {
 		return fmt.Errorf("register: inform user: %w", emitErr)
@@ -99,15 +99,12 @@ func (s *Service) handleGetUserByEmailRegisterError(ctx context.Context, user *a
 	return authdomain.ErrUserAlreadyExists
 }
 
-// defaultUILanguage matches user_profiles.ui_language's DB-level DEFAULT —
-// applied here, not in the repository, because "what a new profile defaults
-// to" is a business rule, not a persistence concern.
+// defaultUILanguage matches user_profiles.ui_language's DB DEFAULT — applied here
+// (business rule), not in the repository (persistence concern).
 const defaultUILanguage = "uk"
 
-// newUserProfileFromRegisterRequest maps the wire-level RegisterRequest
-// (plain strings, "" means "not provided") onto the domain UserProfile
-// (*string, nil means "not provided") for the fields that back nullable
-// user_profiles columns.
+// newUserProfileFromRegisterRequest maps RegisterRequest ("" = not provided) onto
+// UserProfile (*string, nil = not provided) for nullable user_profiles columns.
 func newUserProfileFromRegisterRequest(userID string, req authdomain.RegisterRequest) *authdomain.UserProfile {
 	uiLanguage := req.UILanguage
 	if uiLanguage == "" {

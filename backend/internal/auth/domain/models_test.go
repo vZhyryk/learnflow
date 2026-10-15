@@ -437,7 +437,22 @@ func TestRequestEmailChangeRequestValidate(t *testing.T) {
 
 		Convey("valid request", func() {
 			email := "test@gmail.com"
-			So((&RequestEmailChangeRequest{NewEmail: email}).Validate(), ShouldBeNil)
+			So((&RequestEmailChangeRequest{NewEmail: email, Password: "password123"}).Validate(), ShouldBeNil)
+		})
+
+		Convey("missing password", func() {
+			err := (&RequestEmailChangeRequest{NewEmail: "test@gmail.com"}).Validate()
+			So(errors.Is(err, ErrInvalidCredentialFormat), ShouldBeTrue)
+		})
+
+		Convey("password too short", func() {
+			err := (&RequestEmailChangeRequest{NewEmail: "test@gmail.com", Password: "short"}).Validate()
+			So(errors.Is(err, ErrInvalidCredentialFormat), ShouldBeTrue)
+		})
+
+		Convey("password too long", func() {
+			err := (&RequestEmailChangeRequest{NewEmail: "test@gmail.com", Password: strings.Repeat("a", 73)}).Validate()
+			So(errors.Is(err, ErrInvalidCredentialFormat), ShouldBeTrue)
 		})
 	})
 }
@@ -520,6 +535,75 @@ func TestTokenBaseIsExpired(t *testing.T) {
 		Convey("When ExpiresAt is in the future", func() {
 			tb := TokenBase{ExpiresAt: time.Now().UTC().Add(time.Hour)}
 			So(tb.IsExpired(), ShouldBeFalse)
+		})
+	})
+}
+
+func TestRegisterRequestValidateProfileFields(t *testing.T) {
+	base := func() *RegisterRequest {
+		return &RegisterRequest{Email: "test@gmail.com", Password: "validpassword"}
+	}
+
+	Convey("Register profile fields validation", t, func() {
+		Convey("a fully populated valid profile passes", func() {
+			r := base()
+			r.FirstName, r.LastName, r.PhoneNumber, r.City = "Anna", "Nowak", "+380501234567", "Kyiv"
+			r.AvatarURL, r.Timezone, r.Bio = "https://cdn.example.com/a.png", "Europe/Kyiv", "hi"
+			So(r.Validate(), ShouldBeNil)
+		})
+		Convey("first name over 100 runes is rejected", func() {
+			r := base()
+			r.FirstName = strings.Repeat("a", 101)
+			So(errors.Is(r.Validate(), ErrInvalidFirstName), ShouldBeTrue)
+		})
+		Convey("last name over 100 runes is rejected", func() {
+			r := base()
+			r.LastName = strings.Repeat("a", 101)
+			So(errors.Is(r.Validate(), ErrInvalidLastName), ShouldBeTrue)
+		})
+		Convey("phone number over 20 bytes is rejected", func() {
+			r := base()
+			r.PhoneNumber = strings.Repeat("1", 21)
+			So(errors.Is(r.Validate(), ErrInvalidPhoneNumber), ShouldBeTrue)
+		})
+		Convey("city over 100 runes is rejected", func() {
+			r := base()
+			r.City = strings.Repeat("a", 101)
+			So(errors.Is(r.Validate(), ErrInvalidCity), ShouldBeTrue)
+		})
+		Convey("non-https avatar url is rejected", func() {
+			r := base()
+			r.AvatarURL = "http://cdn.example.com/a.png"
+			So(errors.Is(r.Validate(), ErrInvalidAvatarURL), ShouldBeTrue)
+		})
+		Convey("unknown timezone is rejected", func() {
+			r := base()
+			r.Timezone = "Mars/Olympus"
+			So(errors.Is(r.Validate(), ErrInvalidTimezone), ShouldBeTrue)
+		})
+		Convey("bio over 500 runes is rejected", func() {
+			r := base()
+			r.Bio = strings.Repeat("a", 501)
+			So(errors.Is(r.Validate(), ErrInvalidBio), ShouldBeTrue)
+		})
+	})
+}
+
+func TestUserProfileGetFirstName(t *testing.T) {
+	Convey("UserProfile.GetFirstName", t, func() {
+		name, empty := "Anna", ""
+		Convey("returns the name when set", func() {
+			So((&UserProfile{FirstName: &name}).GetFirstName(), ShouldEqual, "Anna")
+		})
+		Convey("falls back to User for an empty name", func() {
+			So((&UserProfile{FirstName: &empty}).GetFirstName(), ShouldEqual, "User")
+		})
+		Convey("falls back to User for a nil name", func() {
+			So((&UserProfile{}).GetFirstName(), ShouldEqual, "User")
+		})
+		Convey("falls back to User for a nil profile", func() {
+			var p *UserProfile
+			So(p.GetFirstName(), ShouldEqual, "User")
 		})
 	})
 }

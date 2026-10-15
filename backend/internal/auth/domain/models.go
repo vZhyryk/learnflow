@@ -3,13 +3,7 @@ package authdomain
 import (
 	"learnflow_backend/internal/shared/validator"
 	"time"
-
-	"golang.org/x/text/unicode/norm"
 )
-
-func normalizePassword(password string) string {
-	return norm.NFC.String(password)
-}
 
 // UserRole represents the permission level of a user account.
 type UserRole string
@@ -114,9 +108,7 @@ type TokenBase struct {
 	InvalidatedByUserID *string
 }
 
-// IsExpired reports whether the token's expiry has passed. The repository query that
-// fetches the token already filters on expires_at, so this is a defense-in-depth check,
-// not the primary enforcement point.
+// IsExpired is a defense-in-depth check — the repository query already filters on expires_at.
 func (t TokenBase) IsExpired() bool {
 	return t.ExpiresAt.Before(time.Now().UTC())
 }
@@ -144,16 +136,14 @@ type AccountRecoveryToken struct {
 
 // AuthTokens holds the access and refresh tokens issued after successful authentication.
 type AuthTokens struct {
-	AccessToken  string
-	RefreshToken string
-	ExpiresAt    time.Time
-	UserID       string
+	AccessToken  string    `json:"access_token"`
+	RefreshToken string    `json:"refresh_token"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	UserID       string    `json:"user_id"`
 }
 
-// UserProfile holds public profile data for a user. Fields backed by
-// nullable columns are *string: nil means the column is SQL NULL ("not
-// provided"), distinct from an empty string. UILanguage stays a plain string
-// because its column is NOT NULL DEFAULT 'uk'.
+// UserProfile holds public profile data. Nullable-column fields are *string (nil = not
+// provided); UILanguage stays plain string since its column is NOT NULL DEFAULT 'uk'.
 type UserProfile struct {
 	UserID      string
 	FirstName   *string
@@ -171,21 +161,30 @@ type UserProfile struct {
 	UpdatedAt   time.Time
 }
 
+// GetFirstName returns the first name, or "User" when the profile or name is not set, so emails always have a greeting.
+func (u *UserProfile) GetFirstName() string {
+	if u != nil && u.FirstName != nil && *u.FirstName != "" {
+		return *u.FirstName
+	}
+
+	return "User"
+}
+
 // RegisterRequest carries credentials and profile data for new account creation.
 type RegisterRequest struct {
-	Email       string
-	Password    string
-	FirstName   string
-	LastName    string
-	PhoneNumber string
-	Country     string
-	City        string
-	Gender      string
-	DateOfBirth *string
-	UILanguage  string
-	AvatarURL   string
-	Timezone    string
-	Bio         string
+	Email       string  `json:"email"`
+	Password    string  `json:"password"`
+	FirstName   string  `json:"first_name"`
+	LastName    string  `json:"last_name"`
+	PhoneNumber string  `json:"phone_number"`
+	Country     string  `json:"country"`
+	City        string  `json:"city"`
+	Gender      string  `json:"gender"`
+	DateOfBirth *string `json:"date_of_birth"`
+	UILanguage  string  `json:"ui_language"`
+	AvatarURL   string  `json:"avatar_url"`
+	Timezone    string  `json:"timezone"`
+	Bio         string  `json:"bio"`
 }
 
 // Validate checks that email, password, and any provided optional profile
@@ -193,10 +192,16 @@ type RegisterRequest struct {
 func (r *RegisterRequest) Validate() error {
 	checks := []func() error{
 		r.validateCredentials,
+		r.validateNames,
+		r.validatePhoneNumber,
 		r.validateCountry,
+		r.validateCity,
 		r.validateGender,
 		r.validateDateOfBirth,
 		r.validateUILanguage,
+		r.validateAvatarURL,
+		r.validateTimezone,
+		r.validateBio,
 	}
 	for _, check := range checks {
 		if err := check(); err != nil {
@@ -210,9 +215,54 @@ func (r *RegisterRequest) validateCredentials() error {
 	if len(r.Email) < 3 || !validator.MatchesEmail(r.Email) {
 		return ErrInvalidCredentialFormat
 	}
-	r.Password = normalizePassword(r.Password)
+	r.Password = validator.NormalizePassword(r.Password)
 	if len(r.Password) < 8 || len(r.Password) > 72 {
 		return ErrInvalidCredentialFormat
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateNames() error {
+	if r.FirstName != "" && !validator.IsValidFirstName(r.FirstName) {
+		return ErrInvalidFirstName
+	}
+	if !validator.IsValidLastName(r.LastName) {
+		return ErrInvalidLastName
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validatePhoneNumber() error {
+	if !validator.IsValidPhoneNumber(r.PhoneNumber) {
+		return ErrInvalidPhoneNumber
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateCity() error {
+	if !validator.IsValidCity(r.City) {
+		return ErrInvalidCity
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateAvatarURL() error {
+	if r.AvatarURL != "" && !validator.IsValidAvatarURL(r.AvatarURL) {
+		return ErrInvalidAvatarURL
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateTimezone() error {
+	if r.Timezone != "" && !validator.IsValidTimezone(r.Timezone) {
+		return ErrInvalidTimezone
+	}
+	return nil
+}
+
+func (r *RegisterRequest) validateBio() error {
+	if !validator.IsValidBio(r.Bio) {
+		return ErrInvalidBio
 	}
 	return nil
 }
@@ -247,8 +297,8 @@ func (r *RegisterRequest) validateUILanguage() error {
 
 // LoginRequest carries credentials and client metadata for session creation.
 type LoginRequest struct {
-	Email     string
-	Password  string
+	Email     string `json:"email"`
+	Password  string `json:"password"`
 	UserAgent string `json:"-"`
 	IPAddress string `json:"-"`
 }
@@ -258,7 +308,7 @@ func (r *LoginRequest) Validate() error {
 	if len(r.Email) < 3 || !validator.MatchesEmail(r.Email) {
 		return ErrInvalidCredentialFormat
 	}
-	r.Password = normalizePassword(r.Password)
+	r.Password = validator.NormalizePassword(r.Password)
 	if len(r.Password) < 8 || len(r.Password) > 72 {
 		return ErrInvalidCredentialFormat
 	}
@@ -271,9 +321,9 @@ func (r *LoginRequest) Validate() error {
 
 // RefreshRequest carries a refresh token and client metadata for token rotation.
 type RefreshRequest struct {
-	RefreshToken string
-	UserAgent    string
-	IPAddress    string
+	RefreshToken string `json:"refresh_token"`
+	UserAgent    string `json:"-"`
+	IPAddress    string `json:"-"`
 }
 
 // Validate checks that the refresh request fields are valid.
@@ -286,9 +336,9 @@ func (r *RefreshRequest) Validate() error {
 
 // LogoutRequest carries the refresh token to be revoked on logout.
 type LogoutRequest struct {
-	RefreshToken         string `json:"refresh_token"`
-	JTI                  string
-	AccessTokenExpiresAt time.Time
+	RefreshToken         string    `json:"refresh_token"`
+	JTI                  string    `json:"-"`
+	AccessTokenExpiresAt time.Time `json:"-"`
 }
 
 // Validate checks that the logout request fields are valid.
@@ -301,7 +351,7 @@ func (r *LogoutRequest) Validate() error {
 
 // VerifyEmailRequest carries the token submitted to confirm an email address.
 type VerifyEmailRequest struct {
-	Token string // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
+	Token string `json:"token"` // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
 }
 
 // Validate checks that the token field is present.
@@ -315,7 +365,7 @@ func (r *VerifyEmailRequest) Validate() error {
 
 // RequestPasswordResetRequest carries the email for which a reset link should be sent.
 type RequestPasswordResetRequest struct {
-	Email string
+	Email string `json:"email"`
 }
 
 // Validate checks that the request password reset fields are valid.
@@ -328,8 +378,8 @@ func (r *RequestPasswordResetRequest) Validate() error {
 
 // ResetPasswordRequest carries the reset token and the new password.
 type ResetPasswordRequest struct {
-	Token       string // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
-	NewPassword string
+	Token       string `json:"token"` // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
+	NewPassword string `json:"new_password"`
 }
 
 // Validate checks that the reset password fields are valid.
@@ -337,7 +387,7 @@ func (r *ResetPasswordRequest) Validate() error {
 	if r.Token == "" {
 		return ErrInvalidCredentialFormat
 	}
-	r.NewPassword = normalizePassword(r.NewPassword)
+	r.NewPassword = validator.NormalizePassword(r.NewPassword)
 	if len(r.NewPassword) < 8 || len(r.NewPassword) > 72 {
 		return ErrInvalidCredentialFormat
 	}
@@ -346,21 +396,18 @@ func (r *ResetPasswordRequest) Validate() error {
 
 // ChangePasswordRequest carries the user ID, current password, and desired new password.
 type ChangePasswordRequest struct {
-	UserID               string
-	OldPassword          string
-	NewPassword          string
-	IsAllSessionsLogout  bool
-	JTI                  string
-	AccessTokenExpiresAt time.Time
+	UserID      string `json:"-"`
+	OldPassword string `json:"old_password"`
+	NewPassword string `json:"new_password"`
 }
 
 // Validate checks that the change password fields are valid.
 func (r *ChangePasswordRequest) Validate() error {
-	r.OldPassword = normalizePassword(r.OldPassword)
+	r.OldPassword = validator.NormalizePassword(r.OldPassword)
 	if r.OldPassword == "" {
 		return ErrInvalidCredentialFormat
 	}
-	r.NewPassword = normalizePassword(r.NewPassword)
+	r.NewPassword = validator.NormalizePassword(r.NewPassword)
 	if len(r.NewPassword) < 8 || len(r.NewPassword) > 72 {
 		return ErrInvalidCredentialFormat
 	}
@@ -373,8 +420,9 @@ func (r *ChangePasswordRequest) Validate() error {
 
 // RequestEmailChangeRequest carries the user ID and the desired new email address.
 type RequestEmailChangeRequest struct {
-	UserID   string
-	NewEmail string
+	UserID   string `json:"-"`
+	NewEmail string `json:"new_email"`
+	Password string `json:"password"`
 }
 
 // Validate checks that the request email change fields are valid.
@@ -382,16 +430,18 @@ func (r *RequestEmailChangeRequest) Validate() error {
 	if len(r.NewEmail) < 3 || !validator.MatchesEmail(r.NewEmail) {
 		return ErrInvalidCredentialFormat
 	}
+
+	r.Password = validator.NormalizePassword(r.Password)
+	if len(r.Password) < 8 || len(r.Password) > 72 {
+		return ErrInvalidCredentialFormat
+	}
 	return nil
 }
 
 // EmailChangeRequest carries the token submitted to confirm an email address change.
 type EmailChangeRequest struct {
-	Token                string // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
-	UserID               string
-	IsAllSessionsLogout  bool
-	JTI                  string
-	AccessTokenExpiresAt time.Time
+	Token  string `json:"token"` // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
+	UserID string `json:"-"`
 }
 
 // Validate checks that the email change fields are valid.
@@ -404,7 +454,7 @@ func (r *EmailChangeRequest) Validate() error {
 
 // RecoverAccountRequest carries the recovery token submitted to restore a deleted account.
 type RecoverAccountRequest struct {
-	Token string // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
+	Token string `json:"token"` // raw token as submitted by the client — never persist; hash via tokens.MakeHash before lookup/storage
 }
 
 // Validate checks that the recover account fields are valid.
@@ -417,7 +467,7 @@ func (r *RecoverAccountRequest) Validate() error {
 
 // RequestRecoverAccountRequest carries the email for which account recovery should be initiated.
 type RequestRecoverAccountRequest struct {
-	Email string
+	Email string `json:"email"`
 }
 
 // Validate checks that the recover account request fields are valid.

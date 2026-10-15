@@ -8,11 +8,27 @@ import (
 	"strings"
 )
 
-// IsSensitiveKey reports whether key matches any known sensitive key after normalisation.
+// sensitiveKeySuffixes catch variants the exact list misses (raw_token, old_password, refresh_hash...).
+var sensitiveKeySuffixes = []string{
+	"password", "passwd", "secret", "token", "apikey",
+	"passwordhash", "tokenhash", "refreshhash",
+}
+
+// IsSensitiveKey reports whether key matches a known sensitive key, exactly or by a sensitive suffix,
+// after normalisation.
 func (s *Sanitizer) IsSensitiveKey(key string) bool {
 	key = normalizeSensitiveKey(key)
-	_, ok := s.normalizedSensitiveKeys[key]
-	return ok
+	if _, ok := s.normalizedSensitiveKeys[key]; ok {
+		return true
+	}
+
+	for _, suffix := range sensitiveKeySuffixes {
+		if strings.HasSuffix(key, suffix) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func normalizeSensitiveKeys(keys map[string]struct{}) map[string]struct{} {
@@ -39,11 +55,8 @@ func (s *Sanitizer) SanitizeString(value string) string {
 	return stringsx.TruncateString(s.MaskInlineSecrets(value), s.maxStringLen)
 }
 
-// pathLikeKeys are property keys whose string value is a URL/request path —
-// these get segment-aware redaction via SanitizePath instead of the generic
-// key=value scan, since a secret embedded directly in a path segment (e.g.
-// "/auth/reset-password/<token>") has no "key=value" marker for
-// MaskInlineSecrets to find.
+// pathLikeKeys are keys whose value is a URL path — redacted via SanitizePath instead of
+// the generic key=value scan, since a path-embedded secret has no "key=value" marker.
 var pathLikeKeys = map[string]struct{}{
 	"path": {}, "urlpath": {}, "requestpath": {}, "requesturi": {},
 }

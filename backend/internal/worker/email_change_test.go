@@ -2,76 +2,25 @@ package worker
 
 import (
 	"learnflow_backend/internal/events"
-	"learnflow_backend/internal/shared/mailer"
+	"learnflow_backend/internal/shared/testutil"
 	"testing"
-
-	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestValidateInitEmailChangePayload(t *testing.T) {
-	Convey("Given an InitEmailChangeToken payload", t, func() {
-		Convey("When all required fields are present", func() {
-			payload := events.InitEmailChangeToken{
-				UserID:   "user-123",
-				Email:    "user@example.com",
-				RawToken: "token",
-			}
-
-			err := ValidateInitEmailChangePayload(payload)
-
-			So(err, ShouldBeNil)
-		})
-
-		Convey("When required fields are missing", func() {
-			payload := events.InitEmailChangeToken{
-				UserID: "user-123",
-				Email:  "user@example.com",
-			}
-
-			err := ValidateInitEmailChangePayload(payload)
-
-			So(err, ShouldNotBeNil)
-		})
-	})
-}
-
-func TestGenerateInitEmailChangeIdempotencyKey(t *testing.T) {
-	Convey("Given an InitEmailChangeToken payload", t, func() {
-		payload := events.InitEmailChangeToken{
-			UserID:   "user-123",
-			RawToken: "token",
-		}
-
-		Convey("When generating the idempotency key", func() {
-			key := GenerateInitEmailChangeIdempotencyKey(payload)
-			So(key, ShouldEqual, "processed:email_change:user-123:token")
-		})
-	})
-}
-
-func TestHandleInitEmailChangeProcess(t *testing.T) {
-	Convey("Given an InitEmailChangeToken payload", t, func() {
-		payload := events.InitEmailChangeToken{
-			UserID:   "user-123",
-			UserName: "John Doe",
-			Email:    "user@example.com",
-		}
-		baseURL := "https://example.com"
-
-		Convey("When sending the email change email", func() {
-			m := &mockMailer{
-				send: func(templateFile string, data any, ccUser mailer.CCUser, _ []string) error {
-					So(templateFile, ShouldEqual, "email_change.html")
-					dataMap, ok := data.(map[string]string)
-					So(ok, ShouldBeTrue)
-					So(dataMap["name"], ShouldEqual, "John Doe")
-					So(dataMap["confirmationUrl"], ShouldStartWith, baseURL)
-					So(ccUser.Mail, ShouldEqual, "user@example.com")
-					return nil
-				},
-			}
-			err := HandleInitEmailChangeProcess(payload, baseURL, m)
-			So(err, ShouldBeNil)
-		})
+func TestEmailChangeWorker(t *testing.T) {
+	runEmailWorkerCase(t, "email_change", emailWorkerCase[events.TokenPayload]{
+		worker: NewEmailChangeWorker(nil, nil, testutil.NewTestLogger(), nil, testBaseURL),
+		valid: events.TokenPayload{
+			UserID: "user-123", Email: "new@example.com", RawToken: "token", UserName: "John Doe", ExpiresAt: testExpiresAt,
+		},
+		invalid:     events.TokenPayload{UserID: "user-123", Email: "new@example.com"},
+		wantMissing: []string{"RawToken", "UserName", "ExpiresAt"},
+		wantKey:     "processed:email_change:user-123:" + tokenKeyPart,
+		wantData: map[string]string{
+			"name":            "John Doe",
+			"newEmail":        "new@example.com",
+			"confirmationUrl": testBaseURL + "/api/v1/auth/email/change?token=token",
+			"expirationTime":  "2 Jan 2026, 15:04 UTC",
+		},
+		wantTo: "new@example.com",
 	})
 }

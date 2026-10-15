@@ -1,6 +1,6 @@
 -- LearnFlow database initialization — annotated version
 -- PostgreSQL 17+; run once on empty volume via /docker-entrypoint-initdb.d/
--- Synced through: migration 000005
+-- Synced through: migration 000015
 --
 -- GLOBAL DESIGN DECISIONS
 -- ───────────────────────
@@ -303,7 +303,9 @@ CREATE TABLE courses (
     --         inside a transaction if other migrations follow.
     --   text+CHECK: ALTER TABLE courses ADD CONSTRAINT ... CHECK (..., 'suspended')
     --         — fully transactional, rollback-safe.
-    status              text        NOT NULL CONSTRAINT courses_status_check CHECK (status IN ('draft', 'published', 'archived')),
+    -- [DEFAULT 'draft']: added in migration 000007 — new courses default to draft
+    -- without the API having to send an explicit status on create.
+    status              text        NOT NULL DEFAULT 'draft' CONSTRAINT courses_status_check CHECK (status IN ('draft', 'published', 'archived')),
 
     -- [CHECK estimated_minutes > 0]: A course advertised as "0 minutes" or negative is a
     -- data entry error. NULL is allowed — not all courses have a duration estimate.
@@ -315,17 +317,42 @@ CREATE TABLE courses (
     is_indexable        boolean     NOT NULL DEFAULT true,
     created_by_user_id  uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now(),
+
+    -- [updated_at nullable, no DEFAULT — migration 000012]: previously NOT NULL DEFAULT
+    -- now(), which made the pairing CHECK below unsatisfiable (updated_at always set,
+    -- updated_by_user_id never set on INSERT). Now stays NULL until the first explicit
+    -- UpdateCourse call, which sets both columns together.
+    updated_at          timestamptz,
+    updated_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
 
     -- [nullable published_at]: Set when status transitions to 'published'.
     -- Used in SEO (sitemap lastmod), analytics (time-to-publish), and feeds.
     published_at        timestamptz,
+    published_by_user_id uuid       REFERENCES users(id) ON DELETE RESTRICT,
 
     -- [deleted_at on courses]: Soft delete mirrors the users pattern. Allows a course
     -- to be "removed" without breaking FK references from payments, access records,
     -- and progress rows that depend on it. WHERE deleted_at IS NULL in all listing queries.
     deleted_at          timestamptz,
-    CONSTRAINT courses_slug_unique UNIQUE (slug)
+    deleted_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+
+    -- [archived_at/archived_by_user_id — migration 000012]: distinct from deleted_at —
+    -- archiving is a lifecycle transition (still visible to admins, listed via
+    -- GetAllArchivedCourses), soft-delete is removal. A course can be archived without
+    -- being deleted.
+    archived_at         timestamptz,
+    archived_by_user_id uuid        REFERENCES users(id) ON DELETE RESTRICT,
+
+    -- [announcement/announcement_expires_at removed — migration 000012]: superseded by
+    -- the unified `announcements` table (entity_type/entity_id polymorphic link), which
+    -- supports both platform-wide and per-course/content/article announcements with a
+    -- draft→approve workflow and multi-channel delivery. See REQUIREMENTS.md NOTI-11.
+    CONSTRAINT courses_slug_unique UNIQUE (slug),
+    CONSTRAINT courses_description_nonempty CHECK (description IS NULL OR btrim(description) <> ''),
+    CONSTRAINT courses_published_by_user_id_and_published_at CHECK ((published_at IS NULL) = (published_by_user_id IS NULL)),
+    CONSTRAINT courses_deleted_by_user_id_and_deleted_at CHECK ((deleted_at IS NULL) = (deleted_by_user_id IS NULL)),
+    CONSTRAINT courses_updated_by_user_id_and_updated_at CHECK ((updated_at IS NULL) = (updated_by_user_id IS NULL)),
+    CONSTRAINT courses_archived_by_user_id_and_archived_at CHECK ((archived_at IS NULL) = (archived_by_user_id IS NULL))
 );
 
 -- [status index]: Most common listing query: WHERE status = 'published'.
@@ -380,17 +407,37 @@ CREATE TABLE content_items (
     og_image_url        text,
     canonical_url       text,
     is_indexable        boolean     NOT NULL DEFAULT true,
-    status              text        NOT NULL CONSTRAINT content_items_status_check CHECK (status IN ('draft', 'published', 'archived')),
+    -- [DEFAULT 'draft']: added in migration 000009 — new content items default to draft
+    status              text        NOT NULL DEFAULT 'draft' CONSTRAINT content_items_status_check CHECK (status IN ('draft', 'published', 'archived')),
     created_by_user_id  uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now(),
+
+    -- [updated_at nullable, no DEFAULT — migration 000012]: same fix as courses above —
+    -- stays NULL until the first explicit UpdateContentItem call.
+    updated_at          timestamptz,
+    updated_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
     published_at        timestamptz,
+    published_by_user_id uuid       REFERENCES users(id) ON DELETE RESTRICT,
 
     -- [deleted_at on content_items]: Same rationale as courses. Content items may be
     -- referenced by user_content_progress, user_video_engagement, course_content_items,
     -- and user_content_access. Physical delete would violate all these FKs.
     deleted_at          timestamptz,
-    CONSTRAINT content_items_slug_unique UNIQUE (slug)
+    deleted_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+
+    -- [archived_at/archived_by_user_id — migration 000012]: same rationale as courses —
+    -- archiving is a lifecycle transition, distinct from soft-delete.
+    archived_at         timestamptz,
+    archived_by_user_id uuid        REFERENCES users(id) ON DELETE RESTRICT,
+
+    -- [announcement/announcement_expires_at removed — migration 000012]: same rationale
+    -- as courses above — superseded by the unified `announcements` table.
+    CONSTRAINT content_items_slug_unique UNIQUE (slug),
+    CONSTRAINT content_items_description_nonempty CHECK (description IS NULL OR btrim(description) <> ''),
+    CONSTRAINT content_items_published_by_user_id_and_published_at CHECK ((published_at IS NULL) = (published_by_user_id IS NULL)),
+    CONSTRAINT content_items_deleted_by_user_id_and_deleted_at CHECK ((deleted_at IS NULL) = (deleted_by_user_id IS NULL)),
+    CONSTRAINT content_items_updated_by_user_id_and_updated_at CHECK ((updated_at IS NULL) = (updated_by_user_id IS NULL)),
+    CONSTRAINT content_items_archived_by_user_id_and_archived_at CHECK ((archived_at IS NULL) = (archived_by_user_id IS NULL))
 );
 
 -- [Composite (content_type, status)]: Covers two query patterns with one index:
@@ -460,7 +507,19 @@ CREATE TABLE course_reviews (
     comment     text,
     created_at  timestamptz NOT NULL DEFAULT now(),
     updated_at  timestamptz NOT NULL DEFAULT now(),
-    deleted_at  timestamptz
+    deleted_at  timestamptz,
+
+    -- [deleted_by_user_id]: added in migration 000011 — records WHO deleted a review,
+    -- distinct from deleted_at (WHEN). Needed because delete can be self (owner deletes
+    -- own review, REVW-03) or admin (moderation, any review) — deleted_by_user_id is the
+    -- only way to tell them apart, since admin-delete-review isn't currently covered by
+    -- ADMN-10's admin_actions audit trail. Nullable, not backfilled for pre-migration
+    -- deletes (unknown). Not yet read back via any API — DB-only audit trail for now.
+    deleted_by_user_id uuid REFERENCES users(id),
+    CONSTRAINT course_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    -- [comment_length CHECK]: added in migration 000010 — prevents comment spam.
+    -- Limits review comments to 2000 characters. NULL is allowed (rating-only reviews).
+    CONSTRAINT course_reviews_comment_length_check CHECK (comment IS NULL OR char_length(comment) <= 2000)
 );
 
 -- [Partial unique WHERE deleted_at IS NULL]: One active review per user per course.
@@ -493,7 +552,15 @@ CREATE TABLE content_reviews (
     comment         text,
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now(),
-    deleted_at      timestamptz
+    deleted_at      timestamptz,
+
+    -- [deleted_by_user_id]: added in migration 000011 — same rationale as
+    -- course_reviews.deleted_by_user_id above (see that comment).
+    deleted_by_user_id uuid REFERENCES users(id),
+    CONSTRAINT content_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    -- [comment_length CHECK]: added in migration 000010 — prevents comment spam.
+    -- Limits review comments to 2000 characters. NULL is allowed (rating-only reviews).
+    CONSTRAINT content_reviews_comment_length_check CHECK (comment IS NULL OR char_length(comment) <= 2000)
 );
 
 -- [Partial unique WHERE deleted_at IS NULL]: Same rationale as course_reviews —
@@ -774,6 +841,11 @@ CREATE TABLE user_content_access (
 -- Allows re-purchase after refund while enforcing one active access at a time.
 CREATE UNIQUE INDEX idx_user_content_access_user_id_content_item_id_active_unique
     ON user_content_access(user_id, content_item_id) WHERE status = 'active';
+
+-- [Partial WHERE status='active']: added in migration 000004 — admin query "who has access to this item?"
+-- The unique index above leads with user_id, so it cannot serve lookups by content_item_id alone.
+CREATE INDEX idx_user_content_access_content_item_id_active
+    ON user_content_access(content_item_id) WHERE status = 'active';
 
 -- ---------------------------------------------------------------------------
 -- 12. USER NOTES
@@ -1230,14 +1302,48 @@ CREATE INDEX idx_notifications_user_id_unread
 -- [expires_at nullable]: A NULL expires_at means the announcement is permanent
 -- (e.g., a persistent welcome banner). Non-NULL means it auto-expires at that time.
 -- The partial index below leverages this to only index active announcements.
+--
+-- [entity_type/entity_id, channels, approved_at — migration 000012]: unified this table
+-- to also carry entity-scoped announcements (course/content_item/article), replacing the
+-- per-table announcement/announcement_expires_at columns that used to live on courses,
+-- content_items, and articles directly. entity_type/entity_id is a deliberate polymorphic
+-- FK (no actual foreign key — documented exception to the project's "always FK" rule in
+-- db-conventions.md, since a single column can't reference three different tables).
+-- channels is text[] (not an enum) for the same rollback-safety reason as status CHECKs
+-- elsewhere. approved_at/approved_by_user_id implement a draft→approve workflow: an
+-- announcement with approved_at IS NULL is inert — no email/banner/inapp delivery fires
+-- until an admin approves it. See REQUIREMENTS.md NOTI-11 / PLAT-01/02/03.
 CREATE TABLE announcements (
-    id                 uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    title              text        NOT NULL,
-    body               text        NOT NULL,
-    created_by_user_id uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    expires_at         timestamptz,
-    created_at         timestamptz NOT NULL DEFAULT now(),
-    updated_at         timestamptz NOT NULL DEFAULT now()
+    id                   uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    title                text        NOT NULL,
+    body                 text        NOT NULL,
+    created_by_user_id   uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    expires_at           timestamptz,
+    created_at           timestamptz NOT NULL DEFAULT now(),
+
+    -- [updated_at nullable, no DEFAULT — migration 000012]: same rationale as courses —
+    -- pairs with updated_by_user_id via the CHECK below.
+    updated_at           timestamptz,
+    updated_by_user_id   uuid        REFERENCES users(id) ON DELETE RESTRICT,
+
+    -- [entity_type/entity_id polymorphic pair]: both NULL = platform-wide announcement;
+    -- both set = scoped to that course/content_item/article. Never one without the other.
+    entity_type          text,
+    entity_id            uuid,
+
+    -- [channels text[] DEFAULT '{}']: NOT NULL with an empty-array default rather than
+    -- nullable — an announcement with no channels is valid (draft, not yet configured),
+    -- but "no channels" should read as an empty set, not a missing value.
+    channels             text[]      NOT NULL DEFAULT '{}',
+
+    -- [approved_at/approved_by_user_id]: draft→approve gate — see table comment above.
+    approved_at          timestamptz,
+    approved_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT announcements_entity_type_check CHECK (entity_type IS NULL OR entity_type IN ('course', 'content_item', 'article')),
+    CONSTRAINT announcements_entity_pairing_check CHECK ((entity_type IS NULL) = (entity_id IS NULL)),
+    CONSTRAINT announcements_channels_valid CHECK (channels <@ ARRAY['email','banner','inapp']::text[]),
+    CONSTRAINT announcements_approved_by_user_id_and_approved_at CHECK ((approved_at IS NULL) = (approved_by_user_id IS NULL)),
+    CONSTRAINT announcements_updated_by_user_id_and_updated_at CHECK ((updated_at IS NULL) = (updated_by_user_id IS NULL))
 );
 
 -- [Two indexes, not one partial with now()]:
@@ -1253,6 +1359,37 @@ CREATE TABLE announcements (
 -- ORDER BY created_at DESC — uses both indexes via bitmap scan or index scan.
 CREATE INDEX idx_announcements_created_at ON announcements(created_at DESC);
 CREATE INDEX idx_announcements_expires_at ON announcements(expires_at) WHERE expires_at IS NOT NULL;
+
+-- [migration 000013]: durable checkpoint between the fan-out worker (Worker A, which
+-- resolves the recipient list once and bulk-inserts one row per recipient here) and the
+-- delivery worker (Worker Б, which reads status='pending' rows, denormalizes them for
+-- Redis, and marks them sent/failed) — see NOTIFICATION_FLOW.md for the full pipeline.
+-- Kept as its own table rather than reusing event_outbox purely for schema hygiene: a
+-- single announcement can fan out to thousands of rows, which would dwarf the low-volume
+-- generic event_outbox table.
+CREATE TABLE announcement_email_deliveries (
+    id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    announcement_id uuid        NOT NULL REFERENCES announcements(id) ON DELETE RESTRICT,
+    status          text        NOT NULL DEFAULT 'pending' CONSTRAINT announcement_email_deliveries_status_check CHECK (status IN ('pending', 'sent', 'failed')),
+    last_error      text,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    -- [attempt_count]: added in migration 000017 — failed publishes retry (status stays 'pending') until
+    -- the poller's max attempts, then status becomes 'failed'; no available_at, retry is on the next tick.
+    attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT announcement_email_deliveries_attempt_count_check CHECK (attempt_count >= 0)
+);
+
+-- [Partial index WHERE status='pending']: the delivery poller only ever queries pending
+-- rows — same rationale as idx_event_outbox_status_available_at_pending above.
+CREATE INDEX idx_announcement_email_deliveries_pending
+    ON announcement_email_deliveries(status) WHERE status = 'pending';
+
+-- [UNIQUE(user_id, announcement_id)]: the fan-out worker retries its whole bulk-insert
+-- (batches of 500) via retry.Do on transient failure — without this constraint, a batch
+-- that partially succeeded before the failure gets re-inserted on retry, duplicating rows.
+CREATE UNIQUE INDEX idx_announcement_email_deliveries_user_id_announcement_id_unique
+    ON announcement_email_deliveries(user_id, announcement_id);
 
 -- ---------------------------------------------------------------------------
 -- 20. ACTIVITY LOG
@@ -1316,11 +1453,6 @@ CREATE TABLE event_outbox (
     -- without a separate scheduler process.
     available_at    timestamptz NOT NULL DEFAULT now(),
 
-    -- [locked_until for distributed locking]: Multiple worker instances could pick
-    -- up the same event simultaneously without this. A worker claims an event by
-    -- setting locked_until = now() + 30s before processing. If the worker crashes,
-    -- the lock expires and another worker picks it up (at-least-once semantics).
-    locked_until    timestamptz,
     published_at    timestamptz,
     last_error      text,
     created_at      timestamptz NOT NULL DEFAULT now(),
@@ -1332,11 +1464,14 @@ CREATE TABLE event_outbox (
 CREATE INDEX idx_event_outbox_status_available_at_pending
     ON event_outbox(status, available_at) WHERE status = 'pending';
 
--- [locked_until index]: Cleanup job resets stale locks:
---   UPDATE event_outbox SET locked_until=NULL WHERE locked_until < now() AND status='pending'
--- Without this index, the cleanup job scans all events.
-CREATE INDEX idx_event_outbox_locked_until
-    ON event_outbox(locked_until) WHERE locked_until IS NOT NULL;
+-- [migration 000013]: locked_until dropped — dead column, never written by any
+-- query (FOR UPDATE SKIP LOCKED already handles concurrent-poller safety).
+-- [migration 000008]: OutboxCleanupWorker deletes published rows older than 7 days
+-- (internal/worker/outbox_cleanup.go) — without this index that DELETE is a full seq
+-- scan, growing more expensive the larger the table gets (i.e. exactly the scenario
+-- retention exists to prevent).
+CREATE INDEX idx_event_outbox_published_at_published
+    ON event_outbox(published_at) WHERE status = 'published';
 
 -- [Dead Letter Queue — failed_jobs]:
 -- CLAUDE.md: "On failure: retry 3× with exponential backoff, then → DLQ".
@@ -1348,7 +1483,10 @@ CREATE TABLE failed_jobs (
     id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     event_type      text        NOT NULL,
     queue_name      text        NOT NULL,
-    payload_json    jsonb,
+
+    -- [payload_json NOT NULL]: made NOT NULL in migration 000006 — a DLQ entry without
+    -- its original payload can't be inspected or replayed.
+    payload_json    jsonb       NOT NULL,
     attempt_count   integer     NOT NULL DEFAULT 0 CONSTRAINT failed_jobs_attempt_count_check CHECK (attempt_count >= 0 AND attempt_count <= 10),
     error_message   text,
     failed_at       timestamptz NOT NULL DEFAULT now(),
@@ -1385,18 +1523,24 @@ CREATE TABLE admin_actions (
     admin_user_id   uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
 
     -- [Extended action_type list]: Covers all admin operations in scope.
+    -- 'unblock_user' / 'restore_user' — added in migration 000014 (reverse of block/delete);
+    -- 'deactivate_user' dropped in 000014 — redundant with 'block_user', never written.
     -- 'create_gift_coupon' / 'revoke_gift_coupon' — gift coupon lifecycle management.
-    -- 'publish_article' / 'delete_article' — admin-managed editorial content.
+    -- 'create_item' / 'update_item' / 'publish_item' / 'archive_item' / 'delete_item' / 'approve_item' —
+    -- generic entity lifecycle actions (courses, content items, articles, reviews, announcements),
+    -- discriminated by target_type; replace 'publish_article' / 'delete_article' in migration 000014.
+    -- 'grant_course_access' renamed to 'grant_item_access' in 000014 (covers content items too).
     -- admin_user_id references users.role which includes 'subadmin' — so subadmin
     -- actions are also captured here using the same table.
-    action_type     text        NOT NULL CONSTRAINT admin_actions_action_type_check CHECK (action_type IN ('confirm_booking', 'cancel_booking', 'grant_course_access', 'issue_refund', 'record_expense', 'block_user', 'reschedule_booking', 'close_support_chat', 'assign_subadmin', 'revoke_subadmin', 'deactivate_user', 'delete_user', 'create_gift_coupon', 'revoke_gift_coupon', 'publish_article', 'delete_article')),
+    action_type     text        NOT NULL CONSTRAINT admin_actions_action_type_check CHECK (action_type IN ('confirm_booking', 'cancel_booking', 'grant_item_access', 'issue_refund', 'record_expense', 'block_user', 'unblock_user', 'reschedule_booking', 'close_support_chat', 'assign_subadmin', 'revoke_subadmin', 'delete_user', 'create_gift_coupon', 'revoke_gift_coupon', 'publish_item', 'delete_item', 'archive_item', 'create_item', 'update_item', 'approve_item', 'restore_user')),
 
     -- [Extended target_type list]: 'review' and 'announcement' cover course_reviews/
     -- content_reviews and announcements. 'article' and 'gift_coupon' added for
-    -- the new editorial and coupon management flows.
+    -- the new editorial and coupon management flows. 'content_item' and 'expense'
+    -- added in migration 000014 (content admin actions, P&L expense recording).
     -- The polymorphic pattern (no FK, discriminated by target_type) is the same
     -- as payment_line_items.resource_id.
-    target_type     text        NOT NULL CONSTRAINT admin_actions_target_type_check CHECK (target_type IN ('user', 'booking', 'course', 'failed_job', 'payment', 'support_chat', 'review', 'announcement', 'article', 'gift_coupon')),
+    target_type     text        NOT NULL CONSTRAINT admin_actions_target_type_check CHECK (target_type IN ('user', 'booking', 'course', 'failed_job', 'payment', 'support_chat', 'review', 'announcement', 'article', 'gift_coupon', 'content_item', 'expense')),
 
     -- [no FK on target_id — polymorphic reference]:
     -- target_id may reference users, bookings, courses, failed_jobs, payments, etc.
@@ -1413,6 +1557,27 @@ CREATE INDEX idx_admin_actions_admin_user_id_created_at ON admin_actions(admin_u
 
 -- [target_type + target_id]: "Show all admin actions on booking #X" — per-resource audit.
 CREATE INDEX idx_admin_actions_target_type_target_id ON admin_actions(target_type, target_id);
+
+-- [idx_admin_actions_created_at_id]: added in migration 000016 — serves the unfiltered audit journal ORDER BY created_at DESC, id DESC.
+CREATE INDEX idx_admin_actions_created_at_id ON admin_actions(created_at DESC, id DESC);
+
+-- [append-only trigger]: added in migration 000015 — ADMN-10 requires an immutable audit trail.
+-- A trigger (not REVOKE) so it also binds the table owner the app connects as; rows can only be INSERTed (UPDATE/DELETE per row, TRUNCATE per statement via admin_actions_no_truncate, 000016).
+
+CREATE FUNCTION admin_actions_reject_modification() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION 'admin_actions is append-only: % is not allowed', TG_OP
+        USING ERRCODE = 'restrict_violation';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER admin_actions_append_only
+    BEFORE UPDATE OR DELETE ON admin_actions
+    FOR EACH ROW EXECUTE FUNCTION admin_actions_reject_modification();
+
+CREATE TRIGGER admin_actions_no_truncate
+    BEFORE TRUNCATE ON admin_actions
+    FOR EACH STATEMENT EXECUTE FUNCTION admin_actions_reject_modification();
 
 -- ---------------------------------------------------------------------------
 -- 23. SUPPORT CHAT
@@ -1613,9 +1778,13 @@ CREATE TABLE articles (
     slug                text        NOT NULL,
     title               text        NOT NULL,
 
-    -- [excerpt nullable]: Optional short summary shown in article listings and OG tags.
-    -- If NULL, the frontend falls back to the first N characters of body.
-    excerpt             text,
+    -- [description, not excerpt]: renamed from `excerpt` in migration 000011 — unified
+    -- naming with courses/content_items, which both use `description` for the same
+    -- "short editorial intro" concept. Existing excerpt values were backfilled into
+    -- description before the excerpt column was dropped (data-preserving rename, not
+    -- a plain drop+recreate). Optional short summary shown in article listings and OG
+    -- tags; if NULL, the frontend falls back to the first N characters of body.
+    description         text,
 
     body                text        NOT NULL,
     seo_title           text,
@@ -1627,20 +1796,38 @@ CREATE TABLE articles (
     -- to publish. Prevents accidentally exposing unfinished content.
     status              text        NOT NULL DEFAULT 'draft',
     published_at        timestamptz,
+    published_by_user_id uuid       REFERENCES users(id) ON DELETE RESTRICT,
     created_by_user_id  uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     deleted_at          timestamptz,
+    deleted_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+
+    -- [archived_at/archived_by_user_id — migration 000012]: same rationale as courses —
+    -- archiving ('archived' status) is a lifecycle transition distinct from soft-delete.
+    archived_at         timestamptz,
+    archived_by_user_id uuid        REFERENCES users(id) ON DELETE RESTRICT,
+
     created_at          timestamptz NOT NULL DEFAULT now(),
-    updated_at          timestamptz NOT NULL DEFAULT now(),
+
+    -- [updated_at nullable, no DEFAULT — migration 000012]: same rationale as courses —
+    -- pairs with updated_by_user_id via the CHECK below.
+    updated_at          timestamptz,
+    updated_by_user_id  uuid        REFERENCES users(id) ON DELETE RESTRICT,
+
+    -- [announcement/announcement_expires_at removed — migration 000012]: superseded by
+    -- the unified `announcements` table — see the comment on that table.
 
     CONSTRAINT articles_slug_unique                     UNIQUE (slug),
-    CONSTRAINT articles_status_check                    CHECK (status IN ('draft', 'published')),
+
+    -- [CHECK: draft | published | archived]: 'archived' added in migration
+    -- 000009 to match the courses/content_items status lifecycle.
+    CONSTRAINT articles_status_check                    CHECK (status IN ('draft', 'published', 'archived')),
 
     -- [nonempty CHECKs]: Guards against inserting whitespace-only values.
     -- btrim() strips leading/trailing whitespace before the empty-string comparison.
     CONSTRAINT articles_title_nonempty                  CHECK (btrim(title) <> ''),
     CONSTRAINT articles_slug_nonempty                   CHECK (btrim(slug) <> ''),
     CONSTRAINT articles_body_nonempty                   CHECK (btrim(body) <> ''),
-    CONSTRAINT articles_excerpt_nonempty                CHECK (excerpt IS NULL OR btrim(excerpt) <> ''),
+    CONSTRAINT articles_description_nonempty            CHECK (description IS NULL OR btrim(description) <> ''),
 
     -- [Chronological ordering constraints]: Prevents impossible timestamp combinations
     -- caused by clock bugs or incorrect field assignments.
@@ -1649,7 +1836,15 @@ CREATE TABLE articles (
 
     -- [published_requires_published_at]: A published article without published_at would
     -- break sitemap lastmod and SEO tooling. This constraint closes the gap.
-    CONSTRAINT articles_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL)
+    CONSTRAINT articles_published_requires_published_at CHECK (status != 'published' OR published_at IS NOT NULL),
+
+    -- [audit-column pairing CHECKs — migration 000012]: same "who did it" pattern as
+    -- courses/content_items — a timestamp and its by_user_id column are always set or
+    -- unset together.
+    CONSTRAINT articles_published_by_user_id_and_published_at CHECK ((published_at IS NULL) = (published_by_user_id IS NULL)),
+    CONSTRAINT articles_deleted_by_user_id_and_deleted_at CHECK ((deleted_at IS NULL) = (deleted_by_user_id IS NULL)),
+    CONSTRAINT articles_archived_by_user_id_and_archived_at CHECK ((archived_at IS NULL) = (archived_by_user_id IS NULL)),
+    CONSTRAINT articles_updated_by_user_id_and_updated_at CHECK ((updated_at IS NULL) = (updated_by_user_id IS NULL))
 );
 
 -- [created_at DESC]: Default article listing order — newest first.
@@ -1660,6 +1855,37 @@ CREATE INDEX idx_articles_created_at ON articles(created_at DESC);
 -- working set, matching the exact WHERE clause used by Nuxt SSR pages.
 CREATE INDEX idx_articles_published_at
     ON articles(published_at DESC) WHERE status = 'published' AND deleted_at IS NULL;
+
+-- ---------------------------------------------------------------------------
+-- 26a. ARTICLE REVIEWS
+-- ---------------------------------------------------------------------------
+
+-- [article_reviews — migration 000012]: mirrors course_reviews/content_reviews exactly
+-- (see the comment on course_reviews above for the full rationale — separate table for
+-- rating history, soft delete for moderation). Added when article reviews (REVW-01/02/03
+-- extended to articles) were introduced alongside the audit-column work in this migration.
+CREATE TABLE article_reviews (
+    id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    article_id      uuid        NOT NULL REFERENCES articles(id) ON DELETE RESTRICT,
+    user_id         uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    rating          integer     NOT NULL CONSTRAINT article_reviews_rating_check CHECK (rating BETWEEN 1 AND 5),
+    comment         text,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    deleted_at      timestamptz,
+
+    -- [deleted_by_user_id]: same REVW-07 audit trail as course_reviews/content_reviews
+    -- (migration 000011) — no pairing CHECK by design, consistent with those two tables;
+    -- the app layer (DeleteArticleReview) always sets both columns together.
+    deleted_by_user_id uuid REFERENCES users(id),
+    CONSTRAINT article_reviews_deleted_at_after_created CHECK (deleted_at IS NULL OR deleted_at >= created_at),
+    CONSTRAINT article_reviews_comment_length_check CHECK (comment IS NULL OR char_length(comment) <= 2000)
+);
+
+CREATE UNIQUE INDEX idx_article_reviews_user_id_article_id_active_unique
+    ON article_reviews(user_id, article_id) WHERE deleted_at IS NULL;
+
+CREATE INDEX idx_article_reviews_article_id_active ON article_reviews(article_id) WHERE deleted_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- 27. GIFT COUPONS

@@ -8,7 +8,7 @@ import (
 
 func (h *Handler) verifyEmail(w http.ResponseWriter, r *http.Request) {
 	var req authdomain.VerifyEmailRequest
-	if !h.decodeAndValidate(w, r, &req, nil) {
+	if !helpers.DecodeAndValidate(w, r, h.jsonLogger, &req, nil) {
 		return
 	}
 

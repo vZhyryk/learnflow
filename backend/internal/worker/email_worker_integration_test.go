@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"learnflow_backend/internal/events"
+	"learnflow_backend/internal/shared/mailer"
 	"learnflow_backend/internal/shared/testutil"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/redis/go-redis/v9"
 
 	. "github.com/smartystreets/goconvey/convey"
@@ -18,17 +20,16 @@ import (
 
 // newRealRedisEmailWorker returns an EmailWorker wired to the docker-compose Redis
 // (localhost:6379) with a unique idempotency key for this test run, cleaned up after.
-func newRealRedisEmailWorker(t *testing.T, keyPrefix string) (*EmailWorker[map[string]string], string) {
+func newRealRedisEmailWorker(t *testing.T, keyPrefix string) (*EmailWorker[testPayload], string) {
 	t.Helper()
 	w := newTestEmailWorker()
 	w.redisClient = redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-	key := fmt.Sprintf("%s:%d", keyPrefix, time.Now().UnixNano())
+	w.cfg.Name = fmt.Sprintf("%s:%d", keyPrefix, time.Now().UnixNano())
+	key := GenerateIdempotencyKey(w.cfg.Name, testPayload{Value: "value"})
 	t.Cleanup(func() {
 		w.redisClient.Del(context.Background(), key)
 		w.redisClient.Close()
 	})
-	w.cfg.Validate = func(p map[string]string) error { return nil }
-	w.cfg.IdempotencyKey = func(p map[string]string) string { return key }
 	return w, key
 }
 
@@ -37,13 +38,6 @@ func TestHandleMessage_Integration(t *testing.T) {
 		Convey("Unreachable redis (broken SetNX)", func() {
 			w := newTestEmailWorker()
 			w.redisClient = testutil.UnreachableRedis()
-			w.cfg.Validate = func(p map[string]string) error {
-				return nil
-			}
-
-			w.cfg.IdempotencyKey = func(p map[string]string) string {
-				return "test_key:test_key"
-			}
 
 			result, idempotencyKey, err := w.handleMessage(context.Background(), `{"value": "value"}`)
 			So(err, ShouldNotBeNil)
@@ -69,7 +63,7 @@ func TestHandleMessage_Integration(t *testing.T) {
 
 			result, idempotencyKey, err := w.handleMessage(context.Background(), `{"value": "value"}`)
 			So(err, ShouldBeNil)
-			So(result, ShouldResemble, &map[string]string{"value": "value"})
+			So(result, ShouldResemble, &testPayload{Value: "value"})
 			So(idempotencyKey, ShouldEqual, key)
 		})
 
@@ -89,23 +83,60 @@ func TestHandleMessage_Integration(t *testing.T) {
 				logger: testutil.NewTestLogger(),
 				cfg: Config[events.RegistrationAttemptPayload]{
 					EventType: "registration_attempt",
-					Validate:  ValidateRegistrationAttemptsPayload,
+					Name:      fmt.Sprintf("registration_attempt:unknown-field:%d", time.Now().UnixNano()),
 				},
 			}
 			w.redisClient = redis.NewClient(&redis.Options{Addr: "localhost:6379"})
-			key := fmt.Sprintf("test_key:unknown-field:%d", time.Now().UnixNano())
+			key := GenerateIdempotencyKey(w.cfg.Name, events.RegistrationAttemptPayload{UserID: "user-123"})
 			t.Cleanup(func() {
 				w.redisClient.Del(context.Background(), key) //nolint:errcheck // best-effort cleanup
 				w.redisClient.Close()                        //nolint:errcheck // best-effort cleanup
 			})
-			w.cfg.IdempotencyKey = func(_ events.RegistrationAttemptPayload) string { return key }
 
-			message := `{"user_id": "user-123", "email": "user@example.com", "unexpected_new_field": "from a newer producer"}`
+			message := `{"user_id": "user-123", "email": "user@example.com", "user_name": "John", "unexpected_new_field": "from a newer producer"}`
 			result, idempotencyKey, err := w.handleMessage(context.Background(), message)
 
 			So(err, ShouldBeNil)
-			So(result, ShouldResemble, &events.RegistrationAttemptPayload{UserID: "user-123", Email: "user@example.com"})
+			So(result, ShouldResemble, &events.RegistrationAttemptPayload{UserID: "user-123", Email: "user@example.com", UserName: "John"})
 			So(idempotencyKey, ShouldEqual, key)
+		})
+	})
+}
+
+func TestProcessAndHandleFailureAfterShutdown_Integration(t *testing.T) {
+	Convey("Given a worker whose context is cancelled while a send keeps failing", t, func() {
+		w, key := newRealRedisEmailWorker(t, "test_key:shutdown")
+		w.cfg.Schema = "test.html"
+		w.mailer = &mockMailer{send: func(_ string, _ any, _ mailer.CCUser, _ []string) error { return errSendFailed }}
+
+		var dlqCalled bool
+		var dlqCtxErr error
+		w.dlq = NewDLQ(&testutil.MockQueryRunner{
+			ExecFn: func(ctx context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+				dlqCalled, dlqCtxErr = true, ctx.Err()
+				return pgconn.NewCommandTag("INSERT 0 1"), nil
+			},
+		}, testutil.NewTestLogger())
+
+		bg := context.Background()
+		So(w.redisClient.Set(bg, key, 1, time.Minute).Err(), ShouldBeNil)
+
+		ctx, cancel := context.WithCancel(bg)
+		cancel()
+		payload := testPayload{Value: "value"}
+
+		w.processAndHandleFailure(ctx, &payload, key)
+
+		Convey("The DLQ write runs on a live context, so the failed email is not lost", func() {
+			So(dlqCalled, ShouldBeTrue)
+			So(dlqCtxErr, ShouldBeNil)
+		})
+
+		Convey("The idempotency key is cleared, so a later requeue is not skipped", func() {
+			exists, err := w.redisClient.Exists(bg, key).Result()
+
+			So(err, ShouldBeNil)
+			So(exists, ShouldEqual, int64(0))
 		})
 	})
 }

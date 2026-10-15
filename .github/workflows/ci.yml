@@ -23,8 +23,14 @@ jobs:
             - name: Set up Go
               uses: actions/setup-go@v6
               with:
-                  go-version: "1.26.3"
+                  go-version: "1.26.9"
                   cache-dependency-path: backend/go.sum
+
+            - name: govulncheck
+              uses: golang/govulncheck-action@v1
+              with:
+                go-version-input: "1.26.9"
+                work-dir: backend
 
             - name: Vet
               working-directory: backend
@@ -36,17 +42,13 @@ jobs:
                   version: v2.12
                   working-directory: backend
 
-            - name: Test race conditions
-              working-directory: backend
-              run: go test ./... -race -count=1
-
-            - name: Test coverage
+            - name: Test with race detector and coverage
               run: |
                   mkdir -p tests
-                  cd backend && go test ./... -coverpkg=./... -coverprofile=../tests/coverage.out
+                  cd backend && go test ./... -race -count=1 -coverpkg=./... -coverprofile=../tests/coverage.out
 
             - name: Install Sonar
-              run: npm install -g @sonar/scan
+              run: npm install -g @sonar/scan@4.3.8
 
             - name: SonarQube Scan
               working-directory: backend
@@ -65,7 +67,7 @@ jobs:
             - name: Set up Go
               uses: actions/setup-go@v6
               with:
-                  go-version: "1.26.3"
+                  go-version: "1.26.9"
                   cache-dependency-path: backend/go.sum
 
             - name: Prepare test env
@@ -78,8 +80,16 @@ jobs:
                   DB_SSLMODE=disable
                   EOF
 
-            - name: Integration tests
-              run: make test_integration
+            - name: Integration tests and coverage gate
+              run: make test_integration_coverage
+
+            - name: Upload coverage profile
+              if: always()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: backend-coverage-all
+                  path: tests/coverage_all.out
+                  if-no-files-found: ignore
 
             - name: Cleanup integration stack
               if: always()
@@ -113,7 +123,7 @@ jobs:
               run: npm run type-check
 
             - name: Install Sonar
-              run: npm install -g @sonar/scan
+              run: npm install -g @sonar/scan@4.3.8
 
             - name: SonarQube Scan
               working-directory: frontend

@@ -1,0 +1,144 @@
+package courserepository
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	coursedomain "learnflow_backend/internal/courses/domain"
+	"learnflow_backend/internal/infrastructure/db"
+	apperrors "learnflow_backend/internal/shared/errors"
+	"learnflow_backend/internal/shared/pagination"
+	"learnflow_backend/internal/shared/repository"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// coursesSlugUniqueConstraint is the DB-level backstop for the check-then-insert slug race.
+const coursesSlugUniqueConstraint = "courses_slug_unique"
+
+// CreateCourse inserts a new draft course.
+func (rep *Repository) CreateCourse(ctx context.Context, course *coursedomain.Course) (*coursedomain.Course, error) {
+	course, err := scanCourse(rep.QueryRunner(ctx).QueryRow(ctx, createDraftCourseSQL, course.Slug, course.Title, course.Description, course.ThumbnailURL, course.PreviewVideoURL, course.EstimatedMinutes, course.SeoTitle, course.SeoDescription, course.OgImageURL, course.CanonicalURL, course.IsIndexable, course.CreatedByUserID))
+	if db.IsUniqueViolation(err, coursesSlugUniqueConstraint) {
+		return nil, coursedomain.ErrInvalidSlug
+	}
+	if err != nil {
+		return nil, fmt.Errorf("repository.CreateCourse: %w", err)
+	}
+
+	return course, nil
+}
+
+// PublishCourse marks a course as published.
+func (rep *Repository) PublishCourse(ctx context.Context, courseID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, publishCourseSQL, "PublishCourse", courseID, userID, coursedomain.ErrCourseNotFound)
+}
+
+// ArchiveCourse marks a course as archived.
+func (rep *Repository) ArchiveCourse(ctx context.Context, courseID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, archiveCourseSQL, "ArchiveCourse", courseID, userID, coursedomain.ErrCourseNotFound)
+}
+
+// DeleteCourse soft-deletes a course.
+func (rep *Repository) DeleteCourse(ctx context.Context, courseID, userID string) error {
+	return repository.ExecUpdateByID(ctx, &rep.BaseRepository, deleteCourseSQL, "DeleteCourse", courseID, userID, coursedomain.ErrCourseNotFound)
+}
+
+// UpdateCourse persists changes to an existing course.
+func (rep *Repository) UpdateCourse(ctx context.Context, course *coursedomain.Course, userID string) error {
+	tag, err := rep.QueryRunner(ctx).Exec(ctx, updateCourseSQL, course.ID, course.Slug, course.Title, course.Description, course.ThumbnailURL, course.PreviewVideoURL, course.EstimatedMinutes, course.SeoTitle, course.SeoDescription, course.OgImageURL, course.CanonicalURL, course.IsIndexable, userID)
+	if db.IsUniqueViolation(err, coursesSlugUniqueConstraint) {
+		return coursedomain.ErrInvalidSlug
+	}
+	if err != nil {
+		return fmt.Errorf("repository.UpdateCourse: %w", err)
+	}
+
+	if tag.RowsAffected() == 0 {
+		return coursedomain.ErrCourseNotFound
+	}
+
+	return nil
+}
+
+// GetAllPublishedCourses returns every non-deleted published course.
+func (rep *Repository) GetAllPublishedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllPublishedCoursesSQL, countPublishedCoursesSQL, "GetAllPublishedCourses", params, scanCourse, nil)
+}
+
+// GetAllDraftCourses returns every non-deleted draft course.
+func (rep *Repository) GetAllDraftCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllDraftCoursesSQL, countDraftCoursesSQL, "GetAllDraftCourses", params, scanCourse, nil)
+}
+
+// GetAllArchivedCourses returns every archived course, including soft-deleted ones.
+func (rep *Repository) GetAllArchivedCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllArchivedCoursesSQL, countArchivedCoursesSQL, "GetAllArchivedCourses", params, scanCourse, nil)
+}
+
+// GetAllCourses returns every course regardless of status, including soft-deleted ones.
+func (rep *Repository) GetAllCourses(ctx context.Context, params pagination.Params) ([]*coursedomain.Course, int, error) {
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllCoursesSQL, countAllCoursesSQL, "GetAllCourses", params, scanCourse, nil)
+}
+
+// GetCourseByID retrieves a non-deleted course by ID.
+func (rep *Repository) GetCourseByID(ctx context.Context, courseID string) (*coursedomain.Course, error) {
+	course, err := scanCourse(rep.QueryRunner(ctx).QueryRow(ctx, getCourseByIDSQL, courseID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, coursedomain.ErrCourseNotFound
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetCourseByID: %w", err)
+	}
+
+	return course, nil
+}
+
+// GetCourseBySlug retrieves a non-deleted course by slug.
+func (rep *Repository) GetCourseBySlug(ctx context.Context, slug string) (*coursedomain.Course, error) {
+	course, err := scanCourse(rep.QueryRunner(ctx).QueryRow(ctx, getCourseBySlugSQL, slug))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, coursedomain.ErrCourseNotFound
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetCourseBySlug: %w", err)
+	}
+
+	return course, nil
+}
+
+// CheckIfCourseExistsByID reports whether a course with the given ID exists.
+func (rep *Repository) CheckIfCourseExistsByID(ctx context.Context, courseID string) (bool, error) {
+	var exists bool
+	if err := rep.QueryRunner(ctx).QueryRow(ctx, checkIfCourseExistsByID, courseID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("repository.CheckIfCourseExistsByID: %w", err)
+	}
+
+	return exists, nil
+}
+
+// CheckIfCourseExistsActiveByID reports whether a published, non-deleted course with the given ID exists.
+func (rep *Repository) CheckIfCourseExistsActiveByID(ctx context.Context, courseID string) (bool, error) {
+	var exists bool
+	if err := rep.QueryRunner(ctx).QueryRow(ctx, checkIfCourseExistsActiveByID, courseID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("repository.CheckIfCourseExistsActiveByID: %w", err)
+	}
+
+	return exists, nil
+}
+
+// GetCourseTitleByID returns the title of a non-deleted course. A missing course is reported as both
+// coursedomain.ErrCourseNotFound (for this module) and apperrors.ErrNotFound (for other modules, e.g. admin).
+func (rep *Repository) GetCourseTitleByID(ctx context.Context, courseID string) (string, error) {
+	course, err := scanCourse(rep.QueryRunner(ctx).QueryRow(ctx, getCourseByIDSQL, courseID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", fmt.Errorf("repository.GetCourseTitleByID: %w: %w", coursedomain.ErrCourseNotFound, apperrors.ErrNotFound)
+	}
+	if err != nil {
+		return "", fmt.Errorf("repository.GetCourseTitleByID: %w", err)
+	}
+
+	return course.Title, nil
+}

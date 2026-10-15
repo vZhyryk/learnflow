@@ -1,0 +1,395 @@
+package adminservice
+
+import (
+	"context"
+	admindomain "learnflow_backend/internal/admin/domain"
+	auditdomain "learnflow_backend/internal/audit/domain"
+	"learnflow_backend/internal/events"
+	"learnflow_backend/internal/shared/pagination"
+	"learnflow_backend/internal/shared/testutil"
+	"time"
+)
+
+// mockAnnouncementRepo implements admindomain.AnnouncementRepository via function fields.
+type mockAnnouncementRepo struct {
+	createAnnouncement         func(ctx context.Context, announcement *admindomain.Announcement) (*admindomain.Announcement, error)
+	updateAnnouncement         func(ctx context.Context, announcement *admindomain.Announcement) error
+	approveAnnouncement        func(ctx context.Context, announcementID, userID string) error
+	setExpiredNowAnnouncement  func(ctx context.Context, announcementID string) error
+	getAnnouncements           func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error)
+	getUnApprovedAnnouncements func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error)
+	getApprovedAnnouncements   func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error)
+	getExpiredAnnouncements    func(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error)
+	getAnnouncementByID        func(ctx context.Context, id string) (*admindomain.Announcement, error)
+	getPublicAnnouncements     func(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, int, error)
+}
+
+func (m *mockAnnouncementRepo) CreateAnnouncement(ctx context.Context, announcement *admindomain.Announcement) (*admindomain.Announcement, error) {
+	if m.createAnnouncement == nil {
+		panic("mockAnnouncementRepo.CreateAnnouncement not set")
+	}
+	return m.createAnnouncement(ctx, announcement)
+}
+
+func (m *mockAnnouncementRepo) UpdateAnnouncement(ctx context.Context, announcement *admindomain.Announcement) error {
+	if m.updateAnnouncement == nil {
+		panic("mockAnnouncementRepo.UpdateAnnouncement not set")
+	}
+	return m.updateAnnouncement(ctx, announcement)
+}
+
+func (m *mockAnnouncementRepo) ApproveAnnouncement(ctx context.Context, announcementID, userID string) error {
+	if m.approveAnnouncement == nil {
+		panic("mockAnnouncementRepo.ApproveAnnouncement not set")
+	}
+	return m.approveAnnouncement(ctx, announcementID, userID)
+}
+
+func (m *mockAnnouncementRepo) SetExpiredNowAnnouncement(ctx context.Context, announcementID string) error {
+	if m.setExpiredNowAnnouncement == nil {
+		panic("mockAnnouncementRepo.SetExpiredNowAnnouncement not set")
+	}
+	return m.setExpiredNowAnnouncement(ctx, announcementID)
+}
+
+func (m *mockAnnouncementRepo) GetAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
+	if m.getAnnouncements == nil {
+		panic("mockAnnouncementRepo.GetAnnouncements not set")
+	}
+	return m.getAnnouncements(ctx, params)
+}
+
+func (m *mockAnnouncementRepo) GetUnApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
+	if m.getUnApprovedAnnouncements == nil {
+		panic("mockAnnouncementRepo.GetUnApprovedAnnouncements not set")
+	}
+	return m.getUnApprovedAnnouncements(ctx, params)
+}
+
+func (m *mockAnnouncementRepo) GetApprovedAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
+	if m.getApprovedAnnouncements == nil {
+		panic("mockAnnouncementRepo.GetApprovedAnnouncements not set")
+	}
+	return m.getApprovedAnnouncements(ctx, params)
+}
+
+func (m *mockAnnouncementRepo) GetExpiredAnnouncements(ctx context.Context, params pagination.Params) ([]*admindomain.Announcement, int, error) {
+	if m.getExpiredAnnouncements == nil {
+		panic("mockAnnouncementRepo.GetExpiredAnnouncements not set")
+	}
+	return m.getExpiredAnnouncements(ctx, params)
+}
+
+func (m *mockAnnouncementRepo) GetAnnouncementByID(ctx context.Context, id string) (*admindomain.Announcement, error) {
+	if m.getAnnouncementByID == nil {
+		panic("mockAnnouncementRepo.GetAnnouncementByID not set")
+	}
+	return m.getAnnouncementByID(ctx, id)
+}
+
+func (m *mockAnnouncementRepo) GetPublicAnnouncements(ctx context.Context, params pagination.Params, userID string) ([]*admindomain.AnnouncementPublic, int, error) {
+	if m.getPublicAnnouncements == nil {
+		panic("mockAnnouncementRepo.GetPublicAnnouncements not set")
+	}
+	return m.getPublicAnnouncements(ctx, params, userID)
+}
+
+func newTestService(repo *mockAnnouncementRepo) *Service {
+	return newTestServiceWithActions(repo, noopAdminActions())
+}
+
+func newTestServiceWithActions(repo *mockAnnouncementRepo, actions *mockAdminActionRepo) *Service {
+	return newService(repo, &mockUserRepo{}, actions, noopSessions(), &testutil.NoopTransactor{}, testutil.NewNoopOutbox(), noopBlocklist())
+}
+
+// mockUserRepo implements admindomain.UserRepository via function fields.
+type mockUserRepo struct {
+	revokeUserRole  func(ctx context.Context, userID string) error
+	assignUserRole  func(ctx context.Context, userID string) error
+	deleteUser      func(ctx context.Context, userID string) error
+	restoreUser     func(ctx context.Context, userID string) error
+	blockUser       func(ctx context.Context, userID string) error
+	unBlockUser     func(ctx context.Context, userID string) error
+	getUsersData    func(ctx context.Context, params pagination.Params) ([]*admindomain.UserData, int, error)
+	getUserDataByID func(ctx context.Context, userID string) (*admindomain.UserData, error)
+
+	grantUserCourseAccess  func(ctx context.Context, userID, courseID string) error
+	grantUserContentAccess func(ctx context.Context, userID, contentItemID string) error
+}
+
+func (m *mockUserRepo) GrantUserCourseAccess(ctx context.Context, userID, courseID string) error {
+	if m.grantUserCourseAccess == nil {
+		panic("mockUserRepo.GrantUserCourseAccess not set")
+	}
+	return m.grantUserCourseAccess(ctx, userID, courseID)
+}
+
+func (m *mockUserRepo) GrantUserContentAccess(ctx context.Context, userID, contentItemID string) error {
+	if m.grantUserContentAccess == nil {
+		panic("mockUserRepo.GrantUserContentAccess not set")
+	}
+	return m.grantUserContentAccess(ctx, userID, contentItemID)
+}
+
+// mockCourseRepo implements admindomain.CourseRepository via a function field.
+type mockCourseRepo struct {
+	getCourseTitleByID func(ctx context.Context, courseID string) (string, error)
+}
+
+func (m *mockCourseRepo) GetCourseTitleByID(ctx context.Context, courseID string) (string, error) {
+	if m.getCourseTitleByID == nil {
+		panic("mockCourseRepo.GetCourseTitleByID not set")
+	}
+	return m.getCourseTitleByID(ctx, courseID)
+}
+
+// mockContentItemRepo implements admindomain.ContentItemRepository via a function field.
+type mockContentItemRepo struct {
+	getContentItemTitleByID func(ctx context.Context, contentItemID string) (string, error)
+}
+
+func (m *mockContentItemRepo) GetContentItemTitleByID(ctx context.Context, contentItemID string) (string, error) {
+	if m.getContentItemTitleByID == nil {
+		panic("mockContentItemRepo.GetContentItemTitleByID not set")
+	}
+	return m.getContentItemTitleByID(ctx, contentItemID)
+}
+
+func newService(
+	announ admindomain.AnnouncementRepository,
+	users admindomain.UserRepository,
+	actions admindomain.AdminActionRepository,
+	sessions admindomain.SessionRepository,
+	transactor admindomain.Transactor,
+	outbox *events.OutboxWriter,
+	blocklist admindomain.UserBlockList,
+) *Service {
+	return New(
+		Repos{
+			AnnounRepo:      announ,
+			UserRepo:        users,
+			ActionRepo:      actions,
+			SessionRepo:     sessions,
+			CourseRepo:      &mockCourseRepo{},
+			ContentItemRepo: &mockContentItemRepo{},
+		},
+		Utils{Transactor: transactor, Outbox: outbox, Blocklist: blocklist},
+	)
+}
+
+func (m *mockUserRepo) RevokeUserRole(ctx context.Context, userID string) error {
+	if m.revokeUserRole == nil {
+		panic("mockUserRepo.RevokeUserRole not set")
+	}
+	return m.revokeUserRole(ctx, userID)
+}
+
+func (m *mockUserRepo) AssignUserRole(ctx context.Context, userID string) error {
+	if m.assignUserRole == nil {
+		panic("mockUserRepo.AssignUserRole not set")
+	}
+	return m.assignUserRole(ctx, userID)
+}
+
+func (m *mockUserRepo) DeleteUser(ctx context.Context, userID string) error {
+	if m.deleteUser == nil {
+		panic("mockUserRepo.DeleteUser not set")
+	}
+	return m.deleteUser(ctx, userID)
+}
+
+func (m *mockUserRepo) RestoreUser(ctx context.Context, userID string) error {
+	if m.restoreUser == nil {
+		panic("mockUserRepo.RestoreUser not set")
+	}
+	return m.restoreUser(ctx, userID)
+}
+
+func (m *mockUserRepo) BlockUser(ctx context.Context, userID string) error {
+	if m.blockUser == nil {
+		panic("mockUserRepo.BlockUser not set")
+	}
+	return m.blockUser(ctx, userID)
+}
+
+func (m *mockUserRepo) UnBlockUser(ctx context.Context, userID string) error {
+	if m.unBlockUser == nil {
+		panic("mockUserRepo.UnBlockUser not set")
+	}
+	return m.unBlockUser(ctx, userID)
+}
+
+func (m *mockUserRepo) GetUsersData(ctx context.Context, params pagination.Params) ([]*admindomain.UserData, int, error) {
+	if m.getUsersData == nil {
+		panic("mockUserRepo.GetUsersData not set")
+	}
+	return m.getUsersData(ctx, params)
+}
+
+func (m *mockUserRepo) GetUserDataByID(ctx context.Context, userID string) (*admindomain.UserData, error) {
+	if m.getUserDataByID == nil {
+		panic("mockUserRepo.GetUserDataByID not set")
+	}
+	return m.getUserDataByID(ctx, userID)
+}
+
+// mockAdminActionRepo implements admindomain.AdminActionRepository via function fields.
+type mockAdminActionRepo struct {
+	createAdminAction       func(ctx context.Context, action *auditdomain.AdminAction) error
+	getInstanceAdminActions func(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
+	getAdminActions         func(ctx context.Context, filter auditdomain.AdminActionFilter, params pagination.Params) ([]*auditdomain.AdminAction, int, error)
+	getFailedJobs           func(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error)
+}
+
+func (m *mockAdminActionRepo) GetFailedJobs(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error) {
+	if m.getFailedJobs == nil {
+		panic("mockAdminActionRepo.GetFailedJobs not set")
+	}
+	return m.getFailedJobs(ctx, params)
+}
+
+func (m *mockAdminActionRepo) GetInstanceAdminActions(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
+	if m.getInstanceAdminActions == nil {
+		panic("mockAdminActionRepo.GetInstanceAdminActions not set")
+	}
+	return m.getInstanceAdminActions(ctx, targetType, targetID, params)
+}
+
+func (m *mockAdminActionRepo) GetAdminActions(ctx context.Context, filter auditdomain.AdminActionFilter, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
+	if m.getAdminActions == nil {
+		panic("mockAdminActionRepo.GetAdminActions not set")
+	}
+	return m.getAdminActions(ctx, filter, params)
+}
+
+func (m *mockAdminActionRepo) CreateAdminAction(ctx context.Context, action *auditdomain.AdminAction) error {
+	if m.createAdminAction == nil {
+		panic("mockAdminActionRepo.CreateAdminAction not set")
+	}
+	return m.createAdminAction(ctx, action)
+}
+
+func noopAdminActions() *mockAdminActionRepo {
+	return &mockAdminActionRepo{createAdminAction: func(_ context.Context, _ *auditdomain.AdminAction) error { return nil }}
+}
+
+func capturingAdminActions(got *[]*auditdomain.AdminAction, err error) *mockAdminActionRepo {
+	return &mockAdminActionRepo{createAdminAction: func(_ context.Context, action *auditdomain.AdminAction) error {
+		*got = append(*got, action)
+		return err
+	}}
+}
+
+func newTestUserService(users *mockUserRepo, actions *mockAdminActionRepo) *Service {
+	return newTestUserServiceWithSessions(users, actions, noopSessions())
+}
+
+func newTestUserServiceWithSessions(users *mockUserRepo, actions *mockAdminActionRepo, sessions *mockSessionRepo) *Service {
+	return newTestUserServiceFull(users, actions, sessions, noopBlocklist())
+}
+
+func newTestUserServiceFull(users *mockUserRepo, actions *mockAdminActionRepo, sessions *mockSessionRepo, blocklist *mockBlocklist) *Service {
+	return newService(&mockAnnouncementRepo{}, users, actions, sessions, &testutil.NoopTransactor{}, testutil.NewNoopOutbox(), blocklist)
+}
+
+// mockBlocklist implements admindomain.UserBlockList via function fields.
+type mockBlocklist struct {
+	blockUser            func(ctx context.Context, userID string, ttl time.Duration) error
+	unBlockUser          func(ctx context.Context, userID string) error
+	revokeUserRole       func(ctx context.Context, userID string, ttl time.Duration) error
+	clearUserRoleRevoked func(ctx context.Context, userID string) error
+}
+
+func (m *mockBlocklist) RevokeUserRole(ctx context.Context, userID string, ttl time.Duration) error {
+	if m.revokeUserRole == nil {
+		panic("mockBlocklist.RevokeUserRole not set")
+	}
+
+	return m.revokeUserRole(ctx, userID, ttl)
+}
+
+func (m *mockBlocklist) ClearUserRoleRevoked(ctx context.Context, userID string) error {
+	if m.clearUserRoleRevoked == nil {
+		panic("mockBlocklist.ClearUserRoleRevoked not set")
+	}
+
+	return m.clearUserRoleRevoked(ctx, userID)
+}
+
+func (m *mockBlocklist) BlockUser(ctx context.Context, userID string, ttl time.Duration) error {
+	if m.blockUser == nil {
+		panic("mockBlocklist.BlockUser not set")
+	}
+
+	return m.blockUser(ctx, userID, ttl)
+}
+
+func (m *mockBlocklist) UnBlockUser(ctx context.Context, userID string) error {
+	if m.unBlockUser == nil {
+		panic("mockBlocklist.UnBlockUser not set")
+	}
+
+	return m.unBlockUser(ctx, userID)
+}
+
+func noopBlocklist() *mockBlocklist {
+	return recordingBlocklist(nil, nil, nil)
+}
+
+type blocklistCall struct {
+	op     string
+	userID string
+	ttl    time.Duration
+}
+
+// recordingBlocklist appends every call to calls (when non-nil) and fails BlockUser/UnBlockUser with blockErr/unBlockErr;
+// the role-revoked calls are recorded too and never fail (override the field to inject an error).
+func recordingBlocklist(calls *[]blocklistCall, blockErr, unBlockErr error) *mockBlocklist {
+	return &mockBlocklist{
+		revokeUserRole: func(_ context.Context, userID string, ttl time.Duration) error {
+			if calls != nil {
+				*calls = append(*calls, blocklistCall{op: "revoke_role", userID: userID, ttl: ttl})
+			}
+
+			return nil
+		},
+		clearUserRoleRevoked: func(_ context.Context, userID string) error {
+			if calls != nil {
+				*calls = append(*calls, blocklistCall{op: "clear_role", userID: userID})
+			}
+
+			return nil
+		},
+		blockUser: func(_ context.Context, userID string, ttl time.Duration) error {
+			if calls != nil {
+				*calls = append(*calls, blocklistCall{op: "block", userID: userID, ttl: ttl})
+			}
+
+			return blockErr
+		},
+		unBlockUser: func(_ context.Context, userID string) error {
+			if calls != nil {
+				*calls = append(*calls, blocklistCall{op: "unblock", userID: userID})
+			}
+
+			return unBlockErr
+		},
+	}
+}
+
+// mockSessionRepo implements admindomain.SessionRepository via a function field.
+type mockSessionRepo struct {
+	revokeAllUserSessionsAdmin func(ctx context.Context, userID, adminID string) error
+}
+
+func (m *mockSessionRepo) RevokeAllUserSessionsAdmin(ctx context.Context, userID, adminID string) error {
+	if m.revokeAllUserSessionsAdmin == nil {
+		panic("mockSessionRepo.RevokeAllUserSessionsAdmin not set")
+	}
+
+	return m.revokeAllUserSessionsAdmin(ctx, userID, adminID)
+}
+
+func noopSessions() *mockSessionRepo {
+	return &mockSessionRepo{revokeAllUserSessionsAdmin: func(_ context.Context, _, _ string) error { return nil }}
+}

@@ -1,9 +1,9 @@
 {{define "subject"}}Someone tried to register with your email — LearnFlow{{end}}
 
 {{define "plainBody"}}
-Hello {{.UserName}},
+Hello {{.name}},
 
-Someone just tried to create a new LearnFlow account using your email address ({{.Email}}).
+Someone just tried to create a new LearnFlow account using your email address ({{.email}}).
 
 No changes were made to your account — this is just a heads-up.
 
@@ -62,7 +62,7 @@ If you don't recognise this activity, no action is required. Your account remain
                     <table role="presentation" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
                       <tr>
                         <td style="background-color:#fffbeb;border-radius:50%;width:56px;height:56px;text-align:center;vertical-align:middle;">
-                          <span style="font-size:28px;line-height:56px;">🔔</span>
+                          <span aria-hidden="true" style="font-size:28px;line-height:56px;">🔔</span>
                         </td>
                       </tr>
                     </table>
@@ -71,9 +71,9 @@ If you don't recognise this activity, no action is required. Your account remain
                       Registration attempt detected
                     </h1>
                     <p style="margin:0 0 24px;font-size:15px;color:#6b7280;line-height:1.6;">
-                      Hi <strong style="color:#111827;">{{.UserName}}</strong>,<br/>
+                      Hi <strong style="color:#111827;">{{.name}}</strong>,<br/>
                       Someone tried to create a new LearnFlow account using your email address
-                      <strong style="color:#111827;">{{.Email}}</strong>.<br/>
+                      <strong style="color:#111827;">{{.email}}</strong>.<br/>
                       No changes were made to your account.
                     </p>
 

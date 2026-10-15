@@ -2,11 +2,24 @@ package authdomain
 
 import (
 	"context"
+	"time"
 )
 
 // Transactor executes a function within a database transaction.
 type Transactor interface {
 	InTransaction(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
+// TokenBlocklist revokes access tokens that are still valid: one token by jti, or every token issued to a user so far.
+type TokenBlocklist interface {
+	BlockToken(ctx context.Context, jti string, ttl time.Duration) error
+	RevokeUserTokens(ctx context.Context, userID string, ttl time.Duration) error
+	UnBlockUser(ctx context.Context, userID string) error
+}
+
+// Audit reads the admin audit trail.
+type Audit interface {
+	WasDeletedByAdmin(ctx context.Context, targetID string) (bool, error)
 }
 
 // Service defines all authentication use cases.
@@ -31,9 +44,7 @@ type SessionRepository interface {
 	GetUserSessionByRefreshToken(ctx context.Context, refreshTokenHash string) (*UserSession, error)
 	RevokeUserSession(ctx context.Context, sessionID, revokedByUserID string, revokeReason RevokeReason) error
 	RevokeAllUserSessions(ctx context.Context, userID string, revokedByUserID *string, revokeReason RevokeReason) error
-	GetActiveSessionsByUserID(ctx context.Context, userID string) ([]*UserSession, error)
 	UpdateSessionToken(ctx context.Context, sessionID, tokenHash, userAgent, ipAddress string) error
-	UpdateFailedLoginAttempts(ctx context.Context, sessionID, lockInterval string, loginCountLimit int) error
 	GetSessionByPrevHash(ctx context.Context, prevRefreshTokenHash string) (*UserSession, error)
 }
 
@@ -58,19 +69,18 @@ type TokenRepository interface {
 type UserRepository interface {
 	CreateUser(ctx context.Context, user *User) (string, error)
 	CreateUserProfile(ctx context.Context, user *UserProfile) error
+	CreateNotificationPreferences(ctx context.Context, userID string) error
 	GetUserByID(ctx context.Context, userID string) (*User, error)
 	GetUserByEmail(ctx context.Context, email string) (*User, error)
-	UpdateStatus(ctx context.Context, userID string, status UserStatus) error
-	UpdateRole(ctx context.Context, userID string, role UserRole) error
 	UpdateLastLoginAt(ctx context.Context, userID string) error
 	UpdatePasswordHash(ctx context.Context, userID, passwordHash string) error
 	UpdateEmail(ctx context.Context, userID, newEmail string) error
 	UpdateEmailVerifiedAt(ctx context.Context, userID string) error
-	DeleteUser(ctx context.Context, userID string) error
 	IncrementFailedLogin(ctx context.Context, userID, lockInterval string, loginCountLimit int) error
 	ResetFailedLogin(ctx context.Context, userID string) error
 	GetUserProfileByUserID(ctx context.Context, userID string) (*UserProfile, error)
 	GetDeletedUserByID(ctx context.Context, userID string) (*User, error)
-	RestoreUser(ctx context.Context, userID string) error
 	GetDeletedUserByEmail(ctx context.Context, email string) (*User, error)
+	UpdateStatus(ctx context.Context, userID string, status UserStatus) error
+	RestoreUser(ctx context.Context, userID string) error
 }

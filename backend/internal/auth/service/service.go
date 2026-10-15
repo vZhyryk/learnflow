@@ -1,7 +1,6 @@
 package authservice
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -9,12 +8,12 @@ import (
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/shared/tokens"
 
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
+// refreshTokenTTL drives refresh-token expiry (access tokens use tokens.AccessTokenTTL); the rest bound
+// single-use action tokens (verify/reset/change/recover) emailed to the user before they expire.
 const (
-	accessTokenTTL            = 15 * time.Minute
 	refreshTokenTTL           = 7 * 24 * time.Hour
 	emailVerificationTokenTTL = 24 * time.Hour
 	passwordResetTokenTTL     = 1 * time.Hour
@@ -32,9 +31,12 @@ type Service struct {
 	transactor        authdomain.Transactor
 	outbox            *events.OutboxWriter
 	dummyPasswordHash []byte
-	cost              int
-	token             *tokens.Tokens
-	redisClient       NXSetter
+	// compareHash is bcrypt.CompareHashAndPassword; a field so tests can spy on it without touching package state.
+	compareHash func(hashedPassword, password []byte) error
+	cost        int
+	token       *tokens.Tokens
+	blocklist   authdomain.TokenBlocklist
+	audit       authdomain.Audit
 }
 
 // Repos groups the repository dependencies required by the auth Service.
@@ -47,9 +49,10 @@ type Repos struct {
 
 // Utils groups the infrastructure utilities required by the auth Service.
 type Utils struct {
-	Outbox      *events.OutboxWriter
-	Token       *tokens.Tokens
-	RedisClient NXSetter
+	Outbox    *events.OutboxWriter
+	Token     *tokens.Tokens
+	Blocklist authdomain.TokenBlocklist
+	Audit     authdomain.Audit
 }
 
 // New returns a new auth Service with the given repositories and configuration.
@@ -62,10 +65,8 @@ func New(
 	if cost == 0 {
 		cost = hashDefaultCost
 	}
-	// "dummy" is a fixed placeholder password, not a credential: it only exists so
-	// Login always runs a real bcrypt comparison (against dummyPasswordHash) on the
-	// user-not-found path, keeping response timing indistinguishable from a wrong-password
-	// failure and preventing user-enumeration via timing (see TestLoginConstantTimeUserEnumeration).
+	// "dummy" is a placeholder, not a credential — only used so Login's user-not-found
+	// path still runs a real bcrypt comparison, keeping timing indistinguishable.
 	dummyPasswordHash, err := bcrypt.GenerateFromPassword([]byte("dummy"), cost)
 	if err != nil {
 		return nil, fmt.Errorf("authservice.New: generate dummy hash: %w", err)
@@ -78,9 +79,11 @@ func New(
 		transactor:        repos.Transactor,
 		outbox:            utils.Outbox,
 		token:             utils.Token,
-		redisClient:       utils.RedisClient,
+		blocklist:         utils.Blocklist,
 		cost:              cost,
 		dummyPasswordHash: dummyPasswordHash,
+		compareHash:       bcrypt.CompareHashAndPassword,
+		audit:             utils.Audit,
 	}
 
 	return service, nil
@@ -89,9 +92,4 @@ func New(
 // Options configures optional parameters for the auth Service.
 type Options struct {
 	BcryptCost int // default hashDefaultCost (12), bcrypt.MinCost (4) in tests
-}
-
-// NXSetter is the subset of redis.Client methods used by the auth Service.
-type NXSetter interface {
-	SetNX(ctx context.Context, key string, value any, expiration time.Duration) *redis.BoolCmd
 }

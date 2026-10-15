@@ -6,9 +6,8 @@ import (
 	"errors"
 )
 
-// ErrDBUnexpected is a stand-in for an unexpected persistence-layer failure.
-// Use it wherever the test asserts on a wrapped context message (or nothing at
-// all), not on this error's own text.
+// ErrDBUnexpected stands in for an unexpected persistence failure; use where the test
+// asserts on a wrapped context message, not on this error's own text.
 var ErrDBUnexpected = errors.New("db connection lost")
 
 // ErrDB is a stand-in for an unexpected persistence-layer failure whose literal

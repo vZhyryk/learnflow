@@ -96,35 +96,6 @@ func TestSanitizeString(t *testing.T) {
 	})
 }
 
-// --- SanitizeURL ---
-
-func TestSanitizeURL(t *testing.T) {
-	s := newS()
-
-	Convey("SanitizeURL", t, func() {
-		Convey("URL with sensitive query param: original value is removed", func() {
-			raw := "https://api.example.com/v1?token=abc123&page=2"
-			result := s.SanitizeURL(raw)
-			So(result, ShouldNotContainSubstring, "abc123")
-			So(result, ShouldContainSubstring, "page=2")
-			So(result, ShouldContainSubstring, "token=")
-		})
-
-		Convey("URL without sensitive params is unchanged (except possible reordering)", func() {
-			raw := "https://api.example.com/v1?page=1&sort=asc"
-			result := s.SanitizeURL(raw)
-			So(result, ShouldContainSubstring, "page=1")
-			So(result, ShouldContainSubstring, "sort=asc")
-		})
-
-		Convey("string with invalid URL escape falls back to string sanitization", func() {
-			// "%zz" is an invalid percent-encoded sequence that url.Parse rejects
-			result := s.SanitizeURL("https://host/%zz?token=leak")
-			So(result, ShouldNotContainSubstring, "leak")
-		})
-	})
-}
-
 // --- Sanitize (type dispatch) ---
 
 func TestSanitize(t *testing.T) {
@@ -335,5 +306,101 @@ func TestSanitizePath(t *testing.T) {
 		Convey("Empty path is left untouched", func() {
 			So(s.SanitizePath(""), ShouldEqual, "")
 		})
+	})
+}
+
+func TestSanitizeReflectContainers(t *testing.T) {
+	s := newS()
+
+	Convey("Sanitize on containers outside the fast paths", t, func() {
+		Convey("map with non-any values: sensitive key is redacted, others kept", func() {
+			out, ok := s.Sanitize(map[string]int{"password": 1234, "attempts": 3}).(map[string]any)
+
+			So(ok, ShouldBeTrue)
+			So(out["password"], ShouldEqual, "***")
+			So(out["attempts"], ShouldEqual, 3)
+		})
+
+		Convey("map with non-string keys: keys are stringified", func() {
+			out, ok := s.Sanitize(map[int]string{7: "seven"}).(map[string]any)
+
+			So(ok, ShouldBeTrue)
+			So(out["7"], ShouldEqual, "seven")
+		})
+
+		Convey("map whose value is a slice under a sensitive key: the whole value is redacted", func() {
+			out, ok := s.Sanitize(map[string][]string{"token": {"a", "b"}, "tags": {"x"}}).(map[string]any)
+
+			So(ok, ShouldBeTrue)
+			So(out["token"], ShouldEqual, "***")
+			So(out["tags"], ShouldResemble, []any{"x"})
+		})
+
+		Convey("slice of non-string values: elements pass through", func() {
+			out, ok := s.Sanitize([]int{1, 2, 3}).([]any)
+
+			So(ok, ShouldBeTrue)
+			So(out, ShouldResemble, []any{1, 2, 3})
+		})
+
+		Convey("array: each element is sanitized", func() {
+			out, ok := s.Sanitize([2]string{"ok", "password=leak"}).([]any)
+
+			So(ok, ShouldBeTrue)
+			So(out[0], ShouldEqual, "ok")
+			So(out[1], ShouldNotContainSubstring, "leak")
+		})
+
+		Convey("slice of structs: sensitive fields inside each struct are redacted", func() {
+			type login struct {
+				User     string
+				Password string
+			}
+			out, ok := s.Sanitize([]login{{"alice", "s3cr3t"}, {"bob", "hunter2"}}).([]any)
+
+			So(ok, ShouldBeTrue)
+			So(out, ShouldHaveLength, 2)
+			first, isMap := out[0].(map[string]any)
+			So(isMap, ShouldBeTrue)
+			So(first["User"], ShouldEqual, "alice")
+			So(first["Password"], ShouldEqual, "***")
+		})
+
+		Convey("map of structs: nested sensitive fields are redacted", func() {
+			type login struct{ Token string }
+			out, ok := s.Sanitize(map[string]login{"session": {Token: "abc"}}).(map[string]any)
+
+			So(ok, ShouldBeTrue)
+			inner, isMap := out["session"].(map[string]any)
+			So(isMap, ShouldBeTrue)
+			So(inner["Token"], ShouldEqual, "***")
+		})
+
+		Convey("empty containers stay empty", func() {
+			So(s.Sanitize(map[string]int{}), ShouldResemble, map[string]any{})
+			So(s.Sanitize([]int{}), ShouldResemble, []any{})
+		})
+	})
+}
+
+// --- IsSensitiveKey suffix matching ---
+
+func TestIsSensitiveKeySuffix(t *testing.T) {
+	s := newS()
+
+	Convey("IsSensitiveKey", t, func() {
+		for _, key := range []string{"raw_token", "old_password", "new_password", "refresh_hash", "X-Csrf-Token", "stripe_secret"} {
+			k := key
+			Convey(k+" is sensitive", func() {
+				So(s.IsSensitiveKey(k), ShouldBeTrue)
+			})
+		}
+
+		for _, key := range []string{"user_id", "email", "token_version", "path", "method"} {
+			k := key
+			Convey(k+" is not sensitive", func() {
+				So(s.IsSensitiveKey(k), ShouldBeFalse)
+			})
+		}
 	})
 }

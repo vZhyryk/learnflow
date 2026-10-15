@@ -61,18 +61,6 @@ const (
 		WHERE id = $1 AND revoked_at IS NULL AND expires_at > now()
 	`
 
-	updateFailedLoginAttemptsSQL = `
-		UPDATE user_sessions
-		SET failed_attempt_count = failed_attempt_count + 1,
-		last_attempt_at = now(),
-		locked_until = CASE
-			WHEN failed_attempt_count + 1 >= $2
-			THEN now() + $3::interval
-			ELSE locked_until
-		END
-		WHERE id = $1
-	`
-
 	/* Token */
 	tokenColumns = ` id, user_id, token_hash, expires_at, created_at, used_at, invalidated_at, invalidated_by_user_id `
 
@@ -156,6 +144,11 @@ const (
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 	`
 
+	createNotificationPreferencesSQL = `
+		INSERT INTO notification_preferences (user_id)
+		VALUES ($1)
+	`
+
 	getUserProfileByUserIDSQL = `
 		SELECT
 			user_id,
@@ -173,14 +166,6 @@ const (
 			created_at,
 			updated_at
 		FROM user_profiles WHERE user_id = $1
-	`
-
-	deleteUserSQL = `
-		UPDATE users
-		SET status = 'deleted',
-		deleted_at = now(),
-		updated_at = now()
-		WHERE id = $1
 	`
 
 	userColumns = `
@@ -218,12 +203,7 @@ const (
 		updated_at = now()
 		WHERE id = $2
 	`
-	updateUserRoleSQL = `
-		UPDATE users
-		SET role  = $1,
-		updated_at = now()
-		WHERE id = $2
-	`
+
 	updateUserStatusSQL = `
 		UPDATE users
 		SET status  = $1,

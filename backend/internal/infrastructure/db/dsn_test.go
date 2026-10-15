@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"learnflow_backend/internal/infrastructure/db"
+	"learnflow_backend/internal/shared/testutil"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
@@ -28,10 +29,7 @@ const (
 // this package for real-Postgres integration tests).
 func setRequiredEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv(envDBName, "testdb")
-	t.Setenv(envDBUser, "testuser")
-	t.Setenv(envDBHost, "localhost")
-	t.Setenv(envDBPassword, "testpass")
+	testutil.SetRequiredDBEnv(t)
 	unsetEnv(t, envDBPort)
 	unsetEnv(t, envDBSSLMode)
 }
@@ -47,7 +45,7 @@ func unsetEnv(t *testing.T, key string) {
 	}
 	t.Cleanup(func() {
 		if wasSet {
-			os.Setenv(key, orig) //nolint:errcheck // best-effort env restore in test cleanup
+			os.Setenv(key, orig) //nolint:errcheck,gosec // best-effort env restore in test cleanup
 		}
 	})
 }
@@ -62,7 +60,7 @@ func TestBuildDSNFromEnv(t *testing.T) {
 			So(dsn, ShouldContainSubstring, "testuser")
 			So(dsn, ShouldContainSubstring, "testdb")
 			So(dsn, ShouldContainSubstring, "localhost")
-			So(dsn, ShouldContainSubstring, "sslmode=disable")
+			So(dsn, ShouldContainSubstring, "sslmode=require")
 		})
 
 		Convey("When DB_PORT is overridden", func() {
@@ -75,10 +73,10 @@ func TestBuildDSNFromEnv(t *testing.T) {
 
 		Convey("When DB_SSLMODE is overridden", func() {
 			setRequiredEnv(t)
-			t.Setenv(envDBSSLMode, "require")
+			t.Setenv(envDBSSLMode, "disable")
 			dsn, err := db.BuildDSNFromEnv()
 			So(err, ShouldBeNil)
-			So(dsn, ShouldContainSubstring, "sslmode=require")
+			So(dsn, ShouldContainSubstring, "sslmode=disable")
 		})
 
 		missing := []struct {

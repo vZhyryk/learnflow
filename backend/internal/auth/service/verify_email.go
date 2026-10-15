@@ -21,6 +21,15 @@ func (s *Service) VerifyEmail(ctx context.Context, req authdomain.VerifyEmailReq
 			return authdomain.ErrTokenExpired
 		}
 
+		user, err := s.userRepo.GetUserByID(ctx, token.UserID)
+		if err != nil {
+			return fmt.Errorf("verify_email.GetUserByID: %w", err)
+		}
+
+		if user.Status != authdomain.StatusPendingVerification {
+			return authdomain.ErrInvalidAccountState
+		}
+
 		err = s.userRepo.UpdateEmailVerifiedAt(ctx, token.UserID)
 		if err != nil {
 			return fmt.Errorf("verify_email.UpdateEmailVerifiedAt: %w", err)

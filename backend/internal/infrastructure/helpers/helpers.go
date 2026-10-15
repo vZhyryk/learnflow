@@ -14,11 +14,6 @@ import (
 // Envelope is the standard HTTP response wrapper.
 type Envelope map[string]any
 
-// NewEnvelope wraps a map into an Envelope response.
-func NewEnvelope(uEnvelopeData map[string]any) Envelope {
-	return uEnvelopeData
-}
-
 // WriteJSON marshals data to JSON and writes it to the response with the given status and headers.
 func WriteJSON(w http.ResponseWriter, status int, data Envelope, headers http.Header) error {
 	js, err := json.MarshalIndent(data, "", "\t")
@@ -59,11 +54,8 @@ func ReadJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	return nil
 }
 
-// LogRespondError runs fn (a response-writing call) and logs a failure to write the
-// response itself. The write error is only logged, never returned — by this point the
-// caller has already decided what to respond with, and has nothing left to do. props is
-// merged into the logged properties alongside case/path, letting callers keep request
-// context (method, ip, request_id, ...) that doesn't fit the base shape; it may be nil.
+// LogRespondError runs fn and logs (never returns) a write failure; props (may be nil) is
+// merged into the logged properties alongside case/path for extra request context.
 func LogRespondError(jsonLogger *logger.Logger, r *http.Request, caseName string, props map[string]any, fn func() error) {
 	if err := fn(); err != nil {
 		merged := map[string]any{"case": caseName, "path": r.URL.Path}
@@ -104,9 +96,13 @@ func parseJSONError(err error) error {
 		return fmt.Errorf("body must not be larger than %d bytes", maxBytesError.Limit)
 
 	case errors.As(err, &invalidUnmarshalError):
-		return fmt.Errorf("invalid unmarshal target: %w", err)
+		// err.Error() here embeds the Go destination type name (json.InvalidUnmarshalError) —
+		// never expose that to the client; log server-side, return a generic message.
+		return errors.New("invalid request body")
 
 	default:
-		return fmt.Errorf("error parsing JSON: %w", err)
+		// Catch-all: don't forward an unrecognized decoder error verbatim to the client —
+		// a future custom UnmarshalJSON could leak internal detail through this branch.
+		return errors.New("invalid request body")
 	}
 }

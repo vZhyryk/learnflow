@@ -82,18 +82,24 @@ func TestLogoutServiceOutcomes(t *testing.T) {
 			So(w.Code, ShouldEqual, http.StatusForbidden)
 		})
 
+		Convey("Blocklist unavailable returns 503", func() {
+			f.svcErr = authdomain.ErrBlocklistUnavailable
+			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token": "ref"}`))
+			So(w.Code, ShouldEqual, http.StatusServiceUnavailable)
+		})
+
 		Convey("Unexpected service error returns 500", func() {
 			f.svcErr = testutil.ErrDBUnexpected
 			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token": "ref"}`))
 			So(w.Code, ShouldEqual, http.StatusInternalServerError)
 		})
 
-		Convey("Valid request returns 200 with ok body", func() {
+		Convey("Valid request returns 200 with message body", func() {
 			f.svcResult = "user-123"
 			w := testutil.ServeHTTP(f.mux, f.newReq(`{"refresh_token": "ref"}`))
 			So(w.Code, ShouldEqual, http.StatusOK)
 			body := decodeBody(t, w.Body.Bytes())
-			So(body["ok"], ShouldEqual, true)
+			So(body["message"], ShouldNotBeEmpty)
 		})
 
 		Convey("Valid request and the success response write fails → does not panic", func() {

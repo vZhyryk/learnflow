@@ -1,6 +1,6 @@
 Project LearnFlowDatabase {
   database_type: "PostgreSQL"
-  Note: 'Synchronized with infrastructure/postgres/init/init.sql through migration 000005. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
+  Note: 'Synchronized with backend/migrations through migration 000017. UUID PKs by default, timestamptz for timestamps, jsonb for metadata fields, and text plus CHECK constraints for statuses and enum-like values.'
 }
 
 Table users {
@@ -21,7 +21,8 @@ Table users {
   login_locked_until timestamptz [note: 'Account-level brute-force lock; NULL = not locked']
 
   indexes {
-    email [name: 'users_email_active_unique', unique, note: 'Implemented in SQL as partial unique index on LOWER(email) WHERE deleted_at IS NULL']
+    email [name: 'idx_users_email_active_unique', unique, note: 'Implemented in SQL as partial unique index on LOWER(email) WHERE deleted_at IS NULL']
+    email [name: 'idx_users_email_deleted', note: 'Implemented in SQL as partial index on LOWER(email) WHERE deleted_at IS NOT NULL — account recovery lookup']
   }
 }
 
@@ -53,7 +54,8 @@ Table email_verification_tokens {
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    user_id [name: 'email_verification_tokens_user_unused_idx', note: 'Partial index WHERE used_at IS NULL']
+    user_id [name: 'idx_email_verification_tokens_user_id_unused', note: 'Partial index WHERE used_at IS NULL']
+    expires_at [name: 'idx_email_verification_tokens_expires_at_unused', note: 'Partial index WHERE used_at IS NULL — cleanup job']
   }
 }
 
@@ -68,7 +70,8 @@ Table password_reset_tokens {
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    user_id [name: 'password_reset_tokens_user_unused_idx', note: 'Partial index WHERE used_at IS NULL']
+    user_id [name: 'idx_password_reset_tokens_user_id_unused', note: 'Partial index WHERE used_at IS NULL']
+    expires_at [name: 'idx_password_reset_tokens_expires_at_unused', note: 'Partial index WHERE used_at IS NULL — cleanup job']
   }
 }
 
@@ -84,7 +87,8 @@ Table email_change_tokens {
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    user_id [name: 'email_change_tokens_user_unused_idx', note: 'Partial index WHERE used_at IS NULL']
+    user_id [name: 'idx_email_change_tokens_user_id_unused', note: 'Partial index WHERE used_at IS NULL']
+    expires_at [name: 'idx_email_change_tokens_expires_at_unused', note: 'Partial index WHERE used_at IS NULL — cleanup job']
   }
 }
 
@@ -119,10 +123,10 @@ Table courses {
   id uuid [pk]
   slug text [not null, unique]
   title text [not null]
-  description text
+  description text [note: 'CHECK (added in 000011): NULL or nonempty']
   thumbnail_url text
   preview_video_url text
-  status text [not null, note: 'CHECK: draft | published | archived']
+  status text [not null, default: 'draft', note: 'CHECK: draft | published | archived; DEFAULT since migration 000007']
   estimated_minutes integer
   seo_title text
   seo_description text
@@ -131,12 +135,17 @@ Table courses {
   is_indexable boolean [not null, default: true]
   created_by_user_id uuid [not null, ref: > users.id]
   created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [note: 'made nullable in 000012, DEFAULT dropped — pairs with updated_by_user_id']
+  updated_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with updated_at']
   published_at timestamptz
+  published_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with published_at']
   deleted_at timestamptz
+  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with deleted_at']
+  archived_at timestamptz [note: 'added in 000012; lifecycle transition distinct from deleted_at']
+  archived_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with archived_at']
 
   indexes {
-    status [name: 'courses_status_idx']
+    status [name: 'idx_courses_status']
   }
 }
 
@@ -145,7 +154,7 @@ Table content_items {
   slug text [not null, unique]
   title text [not null]
   content_type text [not null, note: 'CHECK: video | book | presentation']
-  description text
+  description text [note: 'CHECK (added in 000011): NULL or nonempty']
   body text
   video_url text
   file_url text
@@ -157,15 +166,20 @@ Table content_items {
   og_image_url text
   canonical_url text
   is_indexable boolean [not null, default: true]
-  status text [not null, note: 'CHECK: draft | published | archived']
+  status text [not null, default: 'draft', note: 'CHECK: draft | published | archived; DEFAULT since migration 000009']
   created_by_user_id uuid [not null, ref: > users.id]
   created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [note: 'made nullable in 000012, DEFAULT dropped — pairs with updated_by_user_id']
+  updated_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with updated_at']
   published_at timestamptz
+  published_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with published_at']
   deleted_at timestamptz
+  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with deleted_at']
+  archived_at timestamptz [note: 'added in 000012; lifecycle transition distinct from deleted_at']
+  archived_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with archived_at']
 
   indexes {
-    (content_type, status) [name: 'content_items_type_status_idx']
+    (content_type, status) [name: 'idx_content_items_content_type_status']
   }
 }
 
@@ -180,7 +194,7 @@ Table course_content_items {
   indexes {
     (course_id, content_item_id) [name: 'course_content_items_unique_pair', unique]
     (course_id, position) [name: 'course_content_items_unique_position', unique, note: 'DEFERRABLE INITIALLY DEFERRED in SQL']
-    content_item_id [name: 'course_content_items_content_item_id_idx']
+    content_item_id [name: 'idx_course_content_items_content_item_id']
   }
 }
 
@@ -189,14 +203,15 @@ Table course_reviews {
   course_id uuid [not null, ref: > courses.id]
   user_id uuid [not null, ref: > users.id]
   rating integer [not null, note: 'CHECK: 1..5']
-  comment text
+  comment text [note: 'CHECK (added in 000010): NULL or <= 2000 chars — prevents spam comments']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   deleted_at timestamptz
+  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000011; who deleted — self or admin (REVW-03); admin deletes are also audited in admin_actions (delete_item, target review)']
 
   indexes {
-    (user_id, course_id) [name: 'course_reviews_user_course_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL — allows re-review after soft-delete']
-    course_id [name: 'course_reviews_course_id_idx', note: 'Partial index WHERE deleted_at IS NULL']
+    (user_id, course_id) [name: 'idx_course_reviews_user_id_course_id_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL — allows re-review after soft-delete']
+    course_id [name: 'idx_course_reviews_course_id_active', note: 'Partial index WHERE deleted_at IS NULL']
   }
 }
 
@@ -205,14 +220,15 @@ Table content_reviews {
   content_item_id uuid [not null, ref: > content_items.id]
   user_id uuid [not null, ref: > users.id]
   rating integer [not null, note: 'CHECK: 1..5']
-  comment text
+  comment text [note: 'CHECK (added in 000010): NULL or <= 2000 chars — prevents spam comments']
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
   deleted_at timestamptz
+  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000011; who deleted — self or admin (REVW-03); admin deletes are also audited in admin_actions (delete_item, target review)']
 
   indexes {
-    (user_id, content_item_id) [name: 'content_reviews_user_content_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL']
-    content_item_id [name: 'content_reviews_content_item_id_idx', note: 'Partial index WHERE deleted_at IS NULL']
+    (user_id, content_item_id) [name: 'idx_content_reviews_user_id_content_item_id_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL']
+    content_item_id [name: 'idx_content_reviews_content_item_id_active', note: 'Partial index WHERE deleted_at IS NULL']
   }
 }
 
@@ -234,10 +250,10 @@ Table payments {
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (user_id, created_at) [name: 'payments_user_created_at_idx', note: 'DESC on created_at in SQL']
-    (status, created_at) [name: 'payments_status_created_at_idx']
-    utm_campaign [name: 'payments_utm_campaign_idx', note: 'Partial index WHERE utm_campaign IS NOT NULL']
-    provider_reference [name: 'payments_provider_reference_idx', note: 'Partial index WHERE provider_reference IS NOT NULL']
+    (user_id, created_at) [name: 'idx_payments_user_id_created_at', note: 'DESC on created_at in SQL']
+    (status, created_at) [name: 'idx_payments_status_created_at']
+    utm_campaign [name: 'idx_payments_utm_campaign', note: 'Partial index WHERE utm_campaign IS NOT NULL']
+    provider_reference [name: 'idx_payments_provider_reference', note: 'Partial index WHERE provider_reference IS NOT NULL']
   }
 }
 
@@ -251,7 +267,8 @@ Table payment_line_items {
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    payment_id [name: 'payment_line_items_payment_id_idx']
+    payment_id [name: 'idx_payment_line_items_payment_id']
+    (resource_type, resource_id) [name: 'idx_payment_line_items_resource_type_resource_id']
   }
 }
 
@@ -265,7 +282,7 @@ Table refunds {
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    payment_id [name: 'refunds_payment_id_idx']
+    payment_id [name: 'idx_refunds_payment_id']
   }
 }
 
@@ -282,8 +299,8 @@ Table user_course_access {
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (user_id, course_id) [name: 'user_course_access_active_unique', unique, note: 'Partial unique WHERE status = active']
-    user_id [name: 'user_course_access_active_idx', note: 'SQL index is (user_id, course_id) WHERE status = active']
+    (user_id, course_id) [name: 'idx_user_course_access_user_id_course_id_active_unique', unique, note: 'Partial unique WHERE status = active']
+    user_id [name: 'idx_user_course_access_course_id_active', note: 'SQL index is (user_id, course_id) WHERE status = active']
   }
 }
 
@@ -370,7 +387,7 @@ Table user_content_access {
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (user_id, content_item_id) [name: 'user_content_access_active_unique', unique, note: 'Partial unique WHERE status = active']
+    (user_id, content_item_id) [name: 'idx_user_content_access_user_id_content_item_id_active_unique', unique, note: 'Partial unique WHERE status = active']
     content_item_id [name: 'idx_user_content_access_content_item_id_active', note: 'Partial WHERE status = active — admin query: who has access to this item?']
   }
 }
@@ -388,8 +405,8 @@ Table user_notes {
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    user_id [name: 'user_notes_user_id_idx', note: 'Partial index WHERE deleted_at IS NULL']
-    (resource_type, resource_id) [name: 'user_notes_resource_idx', note: 'Partial index WHERE resource_type IS NOT NULL AND deleted_at IS NULL']
+    user_id [name: 'idx_user_notes_user_id_active', note: 'Partial index WHERE deleted_at IS NULL']
+    (resource_type, resource_id) [name: 'idx_user_notes_resource_type_resource_id_active', note: 'Partial index WHERE resource_type IS NOT NULL AND deleted_at IS NULL']
   }
 
   Note: 'SQL check constraint requires both resource_type and resource_id to be null together or non-null together.'
@@ -407,7 +424,8 @@ Table consultation_slots {
 
   indexes {
     (date, start_time) [name: 'consultation_slots_date_time_unique', unique]
-    (date, start_time, status) [name: 'consultation_slots_available_date_idx', note: 'SQL index is partial on (date, start_time) WHERE status = available']
+    (date, start_time, status) [name: 'idx_consultation_slots_date_start_time_available', note: 'SQL index is partial on (date, start_time) WHERE status = available']
+    (date, start_time, status) [name: 'idx_consultation_slots_date_start_time_booked', note: 'SQL index is partial on (date, start_time) WHERE status = booked']
   }
 }
 
@@ -427,8 +445,8 @@ Table consultation_briefs {
   deleted_at timestamptz
 
   indexes {
-    user_id [name: 'consultation_briefs_user_id_idx']
-    status [name: 'consultation_briefs_status_idx']
+    user_id [name: 'idx_consultation_briefs_user_id']
+    status [name: 'idx_consultation_briefs_status']
   }
 }
 
@@ -451,10 +469,11 @@ Table consultation_bookings {
   deleted_at timestamptz
 
   indexes {
-    brief_id [name: 'consultation_bookings_brief_unique', unique, note: 'Partial unique WHERE rescheduled_from_booking_id IS NULL']
-    brief_id [name: 'consultation_bookings_brief_idx']
-    (user_id, status) [name: 'consultation_bookings_user_status_idx']
-    scheduled_at [name: 'consultation_bookings_scheduled_at_idx', note: 'Partial index WHERE scheduled_at IS NOT NULL']
+    brief_id [name: 'idx_consultation_bookings_brief_id_unique', unique, note: 'Partial unique WHERE rescheduled_from_booking_id IS NULL']
+    brief_id [name: 'idx_consultation_bookings_brief_id']
+    slot_id [name: 'idx_consultation_bookings_slot_id']
+    (user_id, status) [name: 'idx_consultation_bookings_user_id_status']
+    scheduled_at [name: 'idx_consultation_bookings_scheduled_at', note: 'Partial index WHERE scheduled_at IS NOT NULL']
   }
 }
 
@@ -497,10 +516,10 @@ Table expenses {
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    occurred_at [name: 'expenses_occurred_at_idx']
-    campaign_id [name: 'expenses_campaign_id_idx', note: 'Partial index WHERE campaign_id IS NOT NULL']
-    course_id [name: 'expenses_course_id_idx', note: 'Partial index WHERE course_id IS NOT NULL']
-    content_item_id [name: 'expenses_content_item_id_idx', note: 'Partial index WHERE content_item_id IS NOT NULL']
+    occurred_at [name: 'idx_expenses_occurred_at']
+    campaign_id [name: 'idx_expenses_campaign_id', note: 'Partial index WHERE campaign_id IS NOT NULL']
+    course_id [name: 'idx_expenses_course_id', note: 'Partial index WHERE course_id IS NOT NULL']
+    content_item_id [name: 'idx_expenses_content_item_id', note: 'Partial index WHERE content_item_id IS NOT NULL']
   }
 
   Note: 'SQL check constraint expenses_resource_exclusive allows at most one of course_id or content_item_id.'
@@ -535,8 +554,9 @@ Table notifications {
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (user_id, created_at) [name: 'notifications_user_created_at_idx', note: 'DESC on created_at in SQL']
-    scheduled_for [name: 'notifications_scheduled_pending_idx', note: 'Partial index WHERE delivery_status = pending AND scheduled_for IS NOT NULL']
+    (user_id, created_at) [name: 'idx_notifications_user_id_created_at', note: 'DESC on created_at in SQL']
+    scheduled_for [name: 'idx_notifications_scheduled_for_pending', note: 'Partial index WHERE delivery_status = pending AND scheduled_for IS NOT NULL']
+    user_id [name: 'idx_notifications_user_id_unread', note: 'Partial index WHERE read_at IS NULL']
   }
 }
 
@@ -547,11 +567,35 @@ Table announcements {
   created_by_user_id uuid [not null, ref: > users.id]
   expires_at timestamptz
   created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [note: 'made nullable in 000012, DEFAULT dropped — pairs with updated_by_user_id']
+  updated_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with updated_at']
+  entity_type text [note: 'added in 000012; CHECK: NULL | course | content_item | article — polymorphic link, no real FK (documented exception)']
+  entity_id uuid [note: 'added in 000012; polymorphic target id; CHECK pairs with entity_type — both NULL (platform-wide) or both set']
+  channels text[] [not null, default: `{}`, note: 'added in 000012; CHECK: subset of {email, banner, inapp}']
+  approved_at timestamptz [note: 'added in 000012; draft-until-approved — NULL means no delivery fires yet']
+  approved_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with approved_at']
 
   indexes {
-    created_at [name: 'announcements_created_at_idx', note: 'DESC index for chronological listing']
-    expires_at [name: 'announcements_expires_at_idx', note: 'Partial index WHERE expires_at IS NOT NULL — active filter applied in query, not index predicate']
+    created_at [name: 'idx_announcements_created_at', note: 'DESC index for chronological listing']
+    expires_at [name: 'idx_announcements_expires_at', note: 'Partial index WHERE expires_at IS NOT NULL — active filter applied in query, not index predicate']
+  }
+}
+
+Table announcement_email_deliveries {
+  id uuid [pk]
+  user_id uuid [not null, ref: > users.id]
+  announcement_id uuid [not null, ref: > announcements.id]
+  status text [not null, default: 'pending', note: 'CHECK: pending | sent | failed']
+  last_error text
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  attempt_count integer [not null, default: 0, note: 'CHECK: >= 0; added in 000017']
+
+  Note: 'added in 000013 — durable checkpoint between the announcement fan-out worker and the delivery worker, see NOTIFICATION_FLOW.md'
+
+  indexes {
+    status [name: 'idx_announcement_email_deliveries_pending', note: 'Partial index WHERE status = pending']
+    (user_id, announcement_id) [unique, name: 'idx_announcement_email_deliveries_user_id_announcement_id_unique', note: 'prevents duplicate delivery rows on fan-out retry']
   }
 }
 
@@ -565,8 +609,8 @@ Table activity_log {
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (user_id, created_at) [name: 'activity_log_user_created_at_idx', note: 'DESC on created_at in SQL']
-    (resource_type, resource_id) [name: 'activity_log_resource_idx']
+    (user_id, created_at) [name: 'idx_activity_log_user_id_created_at', note: 'DESC on created_at in SQL']
+    (resource_type, resource_id) [name: 'idx_activity_log_resource_type_resource_id']
   }
 }
 
@@ -579,15 +623,14 @@ Table event_outbox {
   status text [not null, default: 'pending', note: 'CHECK: pending | processing | published | failed | dead_letter']
   attempt_count integer [not null, default: 0, note: 'CHECK: >= 0']
   available_at timestamptz [not null, default: `now()`]
-  locked_until timestamptz
   published_at timestamptz
   last_error text
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (status, available_at) [name: 'event_outbox_pending_idx', note: 'Partial index WHERE status = pending']
-    locked_until [name: 'event_outbox_locked_until_idx', note: 'Partial index WHERE locked_until IS NOT NULL']
+    (status, available_at) [name: 'idx_event_outbox_status_available_at_pending', note: 'Partial index WHERE status = pending']
+    published_at [name: 'idx_event_outbox_published_at_published', note: 'Partial index WHERE status = published — backs OutboxCleanupWorker retention DELETE']
   }
 }
 
@@ -595,7 +638,7 @@ Table failed_jobs {
   id uuid [pk]
   event_type text [not null]
   queue_name text [not null]
-  payload_json jsonb
+  payload_json jsonb [not null, note: 'NOT NULL since migration 000006']
   attempt_count integer [not null, default: 0, note: 'CHECK: >= 0 AND <= 10']
   error_message text
   failed_at timestamptz [not null, default: `now()`]
@@ -605,22 +648,25 @@ Table failed_jobs {
   updated_at timestamptz [not null, default: `now()`]
 
   indexes {
-    failed_at [name: 'failed_jobs_unresolved_idx', note: 'Partial DESC index WHERE resolved_at IS NULL']
+    failed_at [name: 'idx_failed_jobs_failed_at_unresolved', note: 'Partial DESC index WHERE resolved_at IS NULL']
   }
 }
 
 Table admin_actions {
+  Note: 'Append-only: BEFORE UPDATE OR DELETE trigger admin_actions_append_only rejects changes (000015); BEFORE TRUNCATE trigger admin_actions_no_truncate (000016)'
+
   id uuid [pk]
   admin_user_id uuid [not null, ref: > users.id]
-  action_type text [not null, note: 'CHECK: confirm_booking | cancel_booking | grant_course_access | issue_refund | record_expense | block_user | reschedule_booking | close_support_chat | assign_subadmin | revoke_subadmin | deactivate_user | delete_user | create_gift_coupon | revoke_gift_coupon | publish_article | delete_article']
-  target_type text [not null, note: 'CHECK: user | booking | course | failed_job | payment | support_chat | review | announcement | article | gift_coupon']
+  action_type text [not null, note: 'CHECK: confirm_booking | cancel_booking | grant_item_access | issue_refund | record_expense | block_user | unblock_user | reschedule_booking | close_support_chat | assign_subadmin | revoke_subadmin | delete_user | create_gift_coupon | revoke_gift_coupon | publish_item | delete_item | archive_item | create_item | update_item | approve_item | restore_user']
+  target_type text [not null, note: 'CHECK: user | booking | course | failed_job | payment | support_chat | review | announcement | article | gift_coupon | content_item | expense']
   target_id uuid [not null]
   details_json jsonb
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (admin_user_id, created_at) [name: 'admin_actions_admin_user_id_idx', note: 'DESC on created_at in SQL']
-    (target_type, target_id) [name: 'admin_actions_target_idx']
+    (admin_user_id, created_at) [name: 'idx_admin_actions_admin_user_id_created_at', note: 'DESC on created_at in SQL']
+    (target_type, target_id) [name: 'idx_admin_actions_target_type_target_id']
+    (created_at, id) [name: 'idx_admin_actions_created_at_id', note: 'DESC on both in SQL; added in 000016']
   }
 }
 
@@ -633,7 +679,7 @@ Table support_chats {
 
   indexes {
     user_id [name: 'idx_support_chats_user_id_open_unique', unique, note: 'Partial unique WHERE status = open — allows multiple closed chats, one open at a time']
-    status [name: 'support_chats_status_idx', note: 'Partial index WHERE status = open']
+    status [name: 'idx_support_chats_status_open', note: 'Partial index WHERE status = open']
   }
 }
 
@@ -646,8 +692,8 @@ Table support_messages {
   created_at timestamptz [not null, default: `now()`]
 
   indexes {
-    (chat_id, created_at) [name: 'support_messages_chat_created_at_idx', note: 'ASC on created_at in SQL']
-    chat_id [name: 'support_messages_chat_unread_idx', note: 'Partial index WHERE read_at IS NULL']
+    (chat_id, created_at) [name: 'idx_support_messages_chat_id_created_at', note: 'ASC on created_at in SQL']
+    chat_id [name: 'idx_support_messages_chat_id_unread', note: 'Partial index WHERE read_at IS NULL']
   }
 }
 
@@ -683,6 +729,7 @@ Table account_recovery_tokens {
 
   indexes {
     user_id [name: 'idx_account_recovery_tokens_user_id_unused', note: 'Partial index WHERE used_at IS NULL']
+    expires_at [name: 'idx_account_recovery_tokens_expires_at_unused', note: 'Partial index WHERE used_at IS NULL — cleanup job']
   }
 }
 
@@ -690,22 +737,44 @@ Table articles {
   id uuid [pk]
   slug text [not null, unique]
   title text [not null]
-  excerpt text [note: 'Optional short preview; if provided must be non-empty']
+  description text [note: 'renamed from excerpt in 000011 (data preserved), unified with courses/content_items naming; CHECK: NULL or nonempty']
   body text [not null, note: 'CHECK: btrim(body) <> empty string']
   seo_title text
   seo_description text
   og_image_url text
   is_indexable boolean [not null, default: true]
-  status text [not null, default: 'draft', note: 'CHECK: draft | published']
+  status text [not null, default: 'draft', note: 'CHECK: draft | published | archived']
   published_at timestamptz
+  published_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with published_at']
   created_by_user_id uuid [not null, ref: > users.id]
   deleted_at timestamptz [note: 'Soft delete']
+  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with deleted_at']
+  archived_at timestamptz [note: 'added in 000012; lifecycle transition distinct from deleted_at']
+  archived_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with archived_at']
   created_at timestamptz [not null, default: `now()`]
-  updated_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [note: 'made nullable in 000012, DEFAULT dropped — pairs with updated_by_user_id']
+  updated_by_user_id uuid [ref: > users.id, note: 'added in 000012; CHECK pairs with updated_at']
 
   indexes {
     created_at [name: 'idx_articles_created_at', note: 'DESC — admin panel list']
     published_at [name: 'idx_articles_published_at', note: 'Partial DESC WHERE status = published AND deleted_at IS NULL']
+  }
+}
+
+Table article_reviews {
+  id uuid [pk]
+  article_id uuid [not null, ref: > articles.id]
+  user_id uuid [not null, ref: > users.id]
+  rating integer [not null, note: 'CHECK: 1..5']
+  comment text [note: 'CHECK: NULL or <= 2000 chars — prevents spam comments']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  deleted_by_user_id uuid [ref: > users.id, note: 'added in 000012; mirrors course_reviews/content_reviews REVW-07 audit trail — no pairing CHECK by design, consistent with those two tables']
+
+  indexes {
+    (user_id, article_id) [name: 'idx_article_reviews_user_id_article_id_active_unique', unique, note: 'Partial unique WHERE deleted_at IS NULL — allows re-review after soft-delete']
+    article_id [name: 'idx_article_reviews_article_id_active', note: 'Partial index WHERE deleted_at IS NULL']
   }
 }
 

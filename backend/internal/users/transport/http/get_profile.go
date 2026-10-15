@@ -8,14 +8,7 @@ import (
 
 func (h *Handler) getProfile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	user, ok := appcontext.UserFromContext(ctx)
-	if !ok {
-		if err := helpers.InvalidCredentialsResponse(w); err != nil {
-			h.jsonLogger.Error(err, map[string]any{"case": "invalid_credentials", "path": r.URL.Path})
-		}
-
-		return
-	}
+	user := appcontext.MustUserFromContext(ctx)
 
 	userProfile, err := h.svc.GetUserProfile(ctx, user.ID)
 	if err != nil {

@@ -1,0 +1,39 @@
+package courseservice
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	auditdomain "learnflow_backend/internal/audit/domain"
+	coursedomain "learnflow_backend/internal/courses/domain"
+)
+
+// UpdateCourse patches an existing course, checking any new slug is not already in use.
+func (s *Service) UpdateCourse(ctx context.Context, req coursedomain.UpdateCourseRequest, userID string) error {
+	return s.transactor.InTransaction(ctx, func(ctx context.Context) error {
+		course, err := s.courseRepo.GetCourseByID(ctx, req.ID)
+		if err != nil {
+			return fmt.Errorf("service.UpdateCourse: %w", err)
+		}
+
+		if req.Slug != nil && *req.Slug != course.Slug {
+			existing, err := s.courseRepo.GetCourseBySlug(ctx, *req.Slug)
+			if err != nil && !errors.Is(err, coursedomain.ErrCourseNotFound) {
+				return fmt.Errorf("service.UpdateCourse: %w", err)
+			}
+			if existing != nil && existing.ID != course.ID {
+				return coursedomain.ErrInvalidSlug
+			}
+		}
+		req.Apply(course)
+		if err := s.courseRepo.UpdateCourse(ctx, course, userID); err != nil {
+			return fmt.Errorf("service.UpdateCourse: update: %w", err)
+		}
+		return s.actionRepo.CreateAdminAction(ctx, &auditdomain.AdminAction{
+			AdminUserID: userID,
+			ActionType:  auditdomain.ActionUpdateItem,
+			TargetType:  auditdomain.TargetCourse,
+			TargetID:    req.ID,
+		})
+	})
+}

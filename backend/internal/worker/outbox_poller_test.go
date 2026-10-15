@@ -12,14 +12,14 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func newTestOutboxPoller(runner *testutil.MockQueryRunner, publisher *mockPublisher) *OutboxPoller {
+func newTestOutboxPoller(runner *testutil.MockQueryRunner, publisher *mockPublisher) *Poller[OutboxPoller] {
 	if publisher == nil {
 		publisher = &mockPublisher{}
 	}
 	return NewOutboxPoller(runner, publisher, testutil.NewTestLogger(), testutil.NoopTransactor{})
 }
 
-func fakeOutboxEntryScan(entry OutboxEntry) func(dest ...any) error {
+func fakeOutboxEntryScan(entry PollerEntry[OutboxPoller]) func(dest ...any) error {
 	return func(dest ...any) error {
 		*testutil.CastStr(dest[0], 0) = entry.ID
 		*castEventType(dest[1], 1) = entry.EventType
@@ -32,13 +32,11 @@ func TestGetOutboxList(t *testing.T) {
 	Convey("Given an OutboxPoller", t, func() {
 		Convey("When the query fails", func() {
 			runner := &testutil.MockQueryRunner{
-				QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
-					return nil, testutil.ErrDBUnexpected
-				},
+				QueryFn: testutil.AlwaysFailsQuery,
 			}
 			p := newTestOutboxPoller(runner, nil)
 
-			_, err := p.getOutboxList(context.Background())
+			_, err := p.getList(context.Background())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "query")
@@ -55,7 +53,7 @@ func TestGetOutboxList(t *testing.T) {
 			}
 			p := newTestOutboxPoller(runner, nil)
 
-			_, err := p.getOutboxList(context.Background())
+			_, err := p.getList(context.Background())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "scan")
@@ -71,15 +69,15 @@ func TestGetOutboxList(t *testing.T) {
 			}
 			p := newTestOutboxPoller(runner, nil)
 
-			_, err := p.getOutboxList(context.Background())
+			_, err := p.getList(context.Background())
 
 			So(err, ShouldNotBeNil)
 			So(err.Error(), ShouldContainSubstring, "rows")
 		})
 
 		Convey("When rows return valid entries", func() {
-			entry1 := OutboxEntry{ID: "entry-1", EventType: events.EventUserRegistered, PayloadJSON: `{"a":"b"}`}
-			entry2 := OutboxEntry{ID: "entry-2", EventType: events.EventPasswordReset, PayloadJSON: `{"c":"d"}`}
+			entry1 := PollerEntry[OutboxPoller]{ID: "entry-1", EventType: events.EventUserRegistered, PayloadJSON: `{"a":"b"}`}
+			entry2 := PollerEntry[OutboxPoller]{ID: "entry-2", EventType: events.EventPasswordReset, PayloadJSON: `{"c":"d"}`}
 
 			runner := &testutil.MockQueryRunner{
 				QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
@@ -91,7 +89,7 @@ func TestGetOutboxList(t *testing.T) {
 			}
 			p := newTestOutboxPoller(runner, nil)
 
-			entries, err := p.getOutboxList(context.Background())
+			entries, err := p.getList(context.Background())
 
 			So(err, ShouldBeNil)
 			So(entries, ShouldHaveLength, 2)
@@ -117,12 +115,29 @@ func TestHandleOutboxEntryUnknownEventType(t *testing.T) {
 			}
 			p := newTestOutboxPoller(runner, publisher)
 
-			p.handleOutboxEntry(context.Background(), OutboxEntry{ID: "entry-1", EventType: "bogus.type"})
+			p.handleEntry(context.Background(), PollerEntry[OutboxPoller]{ID: "entry-1", EventType: "bogus.type"})
 
 			So(gotQuery, ShouldEqual, queryMarkFailed)
 			So(gotArgs[0], ShouldEqual, "entry-1")
+			So(gotArgs[2], ShouldEqual, failImmediately)
 		})
 	})
+}
+
+func unAvailablePublisher() *mockPublisher {
+	return &mockPublisher{
+		publish: func(_ context.Context, _ events.EventType, _ any) error {
+			return testutil.ErrRedisUnavailable
+		},
+	}
+}
+
+func availablePublisher() *mockPublisher {
+	return &mockPublisher{
+		publish: func(_ context.Context, _ events.EventType, _ any) error {
+			return nil
+		},
+	}
 }
 
 func TestHandleOutboxEntryPublishFails(t *testing.T) {
@@ -133,17 +148,15 @@ func TestHandleOutboxEntryPublishFails(t *testing.T) {
 			runner := &testutil.MockQueryRunner{
 				ExecFn: capturingExecFn(&gotQuery, &gotArgs),
 			}
-			publisher := &mockPublisher{
-				publish: func(_ context.Context, _ events.EventType, _ any) error {
-					return testutil.ErrRedisUnavailable
-				},
-			}
+			publisher := unAvailablePublisher()
 			p := newTestOutboxPoller(runner, publisher)
 
-			p.handleOutboxEntry(context.Background(), OutboxEntry{ID: "entry-1", EventType: events.EventUserRegistered})
+			p.handleEntry(context.Background(), PollerEntry[OutboxPoller]{ID: "entry-1", EventType: events.EventUserRegistered})
 
 			So(gotQuery, ShouldEqual, queryMarkFailed)
 			So(gotArgs[0], ShouldEqual, "entry-1")
+			So(gotArgs[1], ShouldContainSubstring, testutil.ErrRedisUnavailable.Error())
+			So(gotArgs[2], ShouldEqual, p.maxAttemptsCount)
 		})
 	})
 }
@@ -152,19 +165,13 @@ func TestHandleOutboxEntryMarkFailedItselfFails(t *testing.T) {
 	Convey("Given an OutboxPoller", t, func() {
 		Convey("When the mark-failed update itself fails", func() {
 			runner := &testutil.MockQueryRunner{
-				ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-					return pgconn.CommandTag{}, testutil.ErrDBUnexpected
-				},
+				ExecFn: testutil.AlwaysFailsExec,
 			}
-			publisher := &mockPublisher{
-				publish: func(_ context.Context, _ events.EventType, _ any) error {
-					return testutil.ErrRedisUnavailable
-				},
-			}
+			publisher := unAvailablePublisher()
 			p := newTestOutboxPoller(runner, publisher)
 
 			// Nothing to assert beyond "this does not panic" — the Exec error is only logged.
-			p.handleOutboxEntry(context.Background(), OutboxEntry{ID: "entry-1", EventType: events.EventUserRegistered})
+			p.handleEntry(context.Background(), PollerEntry[OutboxPoller]{ID: "entry-1", EventType: events.EventUserRegistered})
 		})
 	})
 }
@@ -177,15 +184,11 @@ func TestHandleOutboxEntryMarkFailedNoRowsAffected(t *testing.T) {
 					return pgconn.NewCommandTag("UPDATE 0"), nil
 				},
 			}
-			publisher := &mockPublisher{
-				publish: func(_ context.Context, _ events.EventType, _ any) error {
-					return testutil.ErrRedisUnavailable
-				},
-			}
+			publisher := unAvailablePublisher()
 			p := newTestOutboxPoller(runner, publisher)
 
 			// Nothing to assert beyond "this does not panic" — a zero-rows update is only logged.
-			p.handleOutboxEntry(context.Background(), OutboxEntry{ID: "entry-1", EventType: events.EventUserRegistered})
+			p.handleEntries(context.Background(), []PollerEntry[OutboxPoller]{{ID: "entry-1", EventType: events.EventUserRegistered}})
 		})
 	})
 }
@@ -209,14 +212,14 @@ func TestHandleOutboxEntrySuccess(t *testing.T) {
 			}
 			p := newTestOutboxPoller(runner, publisher)
 
-			p.handleOutboxEntry(context.Background(), OutboxEntry{
+			p.handleEntries(context.Background(), []PollerEntry[OutboxPoller]{{
 				ID: "entry-1", EventType: events.EventUserRegistered, PayloadJSON: `{"a":"b"}`,
-			})
+			}})
 
 			So(publishedType, ShouldEqual, events.EventUserRegistered)
 			So(publishedPayload, ShouldResemble, json.RawMessage(`{"a":"b"}`))
 			So(gotQuery, ShouldEqual, queryMarkPublished)
-			So(gotArgs[0], ShouldEqual, "entry-1")
+			So(gotArgs[0], ShouldResemble, []string{"entry-1"})
 		})
 	})
 }
@@ -229,13 +232,11 @@ func TestHandleOutboxEntrySuccessNoRowsAffected(t *testing.T) {
 					return pgconn.NewCommandTag("UPDATE 0"), nil
 				},
 			}
-			publisher := &mockPublisher{
-				publish: func(_ context.Context, _ events.EventType, _ any) error { return nil },
-			}
+			publisher := availablePublisher()
 			p := newTestOutboxPoller(runner, publisher)
 
 			// Nothing to assert beyond "this does not panic" — a zero-rows update is only logged.
-			p.handleOutboxEntry(context.Background(), OutboxEntry{ID: "entry-1", EventType: events.EventUserRegistered})
+			p.handleEntry(context.Background(), PollerEntry[OutboxPoller]{ID: "entry-1", EventType: events.EventUserRegistered})
 		})
 	})
 }
@@ -244,28 +245,82 @@ func TestHandleOutboxEntryMarkPublishedExecFails(t *testing.T) {
 	Convey("Given an OutboxPoller", t, func() {
 		Convey("When mark-published Exec itself fails", func() {
 			runner := &testutil.MockQueryRunner{
-				ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-					return pgconn.CommandTag{}, testutil.ErrDBUnexpected
-				},
+				ExecFn: testutil.AlwaysFailsExec,
 			}
-			publisher := &mockPublisher{
-				publish: func(_ context.Context, _ events.EventType, _ any) error { return nil },
-			}
+			publisher := availablePublisher()
 			p := newTestOutboxPoller(runner, publisher)
 
 			// Nothing to assert beyond "this does not panic" — the Exec error is only logged.
-			p.handleOutboxEntry(context.Background(), OutboxEntry{ID: "entry-1", EventType: events.EventUserRegistered})
+			p.handleEntries(context.Background(), []PollerEntry[OutboxPoller]{{ID: "entry-1", EventType: events.EventUserRegistered}})
+		})
+	})
+}
+
+func TestHandleOutboxEntriesBatchesMarkPublished(t *testing.T) {
+	Convey("Given an OutboxPoller", t, func() {
+		Convey("When several entries are published and one fails", func() {
+			var execQueries []string
+			var markPublishedArgs []any
+			runner := &testutil.MockQueryRunner{
+				ExecFn: func(_ context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
+					execQueries = append(execQueries, sql)
+					if sql == queryMarkPublished {
+						markPublishedArgs = args
+						return pgconn.NewCommandTag("UPDATE 2"), nil
+					}
+					return pgconn.NewCommandTag("UPDATE 1"), nil
+				},
+			}
+			publishCalls := 0
+			publisher := &mockPublisher{
+				publish: func(_ context.Context, _ events.EventType, _ any) error {
+					publishCalls++
+					if publishCalls == 2 {
+						return testutil.ErrRedisUnavailable
+					}
+					return nil
+				},
+			}
+			p := newTestOutboxPoller(runner, publisher)
+
+			p.handleEntries(context.Background(), []PollerEntry[OutboxPoller]{
+				{ID: "e1", EventType: events.EventUserRegistered, PayloadJSON: `{}`},
+				{ID: "e2", EventType: events.EventUserRegistered, PayloadJSON: `{}`},
+				{ID: "e3", EventType: events.EventUserRegistered, PayloadJSON: `{}`},
+			})
+
+			So(markPublishedArgs, ShouldResemble, []any{[]string{"e1", "e3"}})
+			So(execQueries, ShouldHaveLength, 2)
+			So(execQueries[0], ShouldEqual, queryMarkFailed)
+			So(execQueries[1], ShouldEqual, queryMarkPublished)
+		})
+	})
+}
+
+func TestHandleOutboxEntriesNothingPublished(t *testing.T) {
+	Convey("Given an OutboxPoller", t, func() {
+		Convey("When nothing was published, no mark-published UPDATE runs", func() {
+			var execCalls int
+			runner := &testutil.MockQueryRunner{
+				ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+					execCalls++
+					return pgconn.CommandTag{}, nil
+				},
+			}
+			p := newTestOutboxPoller(runner, availablePublisher())
+
+			p.handleEntries(context.Background(), nil)
+
+			So(execCalls, ShouldEqual, 0)
 		})
 	})
 }
 
 func TestOutboxPollerPoll(t *testing.T) {
 	Convey("Given an OutboxPoller", t, func() {
-		Convey("When getOutboxList fails inside the transaction", func() {
+		Convey("When getList fails inside the transaction", func() {
 			runner := &testutil.MockQueryRunner{
-				QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
-					return nil, testutil.ErrDBUnexpected
-				},
+				QueryFn: testutil.AlwaysFailsQuery,
 			}
 			p := newTestOutboxPoller(runner, nil)
 
@@ -274,7 +329,7 @@ func TestOutboxPollerPoll(t *testing.T) {
 		})
 
 		Convey("When there are pending entries", func() {
-			entry := OutboxEntry{ID: "entry-1", EventType: events.EventUserRegistered, PayloadJSON: `{"a":"b"}`}
+			entry := PollerEntry[OutboxPoller]{ID: "entry-1", EventType: events.EventUserRegistered, PayloadJSON: `{"a":"b"}`}
 			queryCalls, publishCalls := 0, 0
 			runner := &testutil.MockQueryRunner{
 				QueryFn: func(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {

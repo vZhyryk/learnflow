@@ -4,17 +4,15 @@ import (
 	"learnflow_backend/internal/events"
 	"learnflow_backend/internal/infrastructure/bootstrap"
 	"learnflow_backend/internal/infrastructure/logger"
+	"learnflow_backend/internal/infrastructure/redis"
 	"learnflow_backend/internal/shared/mailer"
 	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 )
 
-// Config holds all runtime configuration for the worker process.
-//
-// Each field's doc comment names the env var it is sourced from —
-// see cmd/worker/main.go's getAppConfig/getMailerConfig for the loading logic.
+// Config holds all runtime configuration for the worker process. Each field's doc comment
+// names its source env var — see cmd/worker/main.go's getAppConfig/getMailerConfig.
 type Config struct {
 	Env      string // ENVIRONMENT
 	Database bootstrap.DatabaseConfig
@@ -34,28 +32,24 @@ type SMTP struct {
 // App is the shared application container injected into every handler and worker.
 // App must not be copied after first use — always pass as *App.
 type App struct {
-	_           noCopy
-	Config      Config
-	Logger      *logger.Logger
-	Wg          sync.WaitGroup
-	Outbox      *events.OutboxWriter
-	Publisher   *events.RedisPublisher
-	Mailer      *mailer.Mailer
-	RedisClient *redis.Client
+	_         noCopy
+	Config    Config
+	Logger    *logger.Logger
+	Wg        sync.WaitGroup
+	Outbox    *events.OutboxWriter
+	Publisher *events.RedisPublisher
+	Mailer    *mailer.Mailer
 }
 
-// NewApp wraps raw infrastructure dependencies (DB pool, Redis client) into the
-// App container, mirroring how cmd/api/router.NewRouter wraps cmd/api/app.App's
-// raw DB/Redis into repositories and services — both entrypoints gather raw
-// dependencies in main() first, then hand them to a single factory step.
-func NewApp(cfg Config, log *logger.Logger, dbInstance *pgxpool.Pool, redisClient *redis.Client) *App {
+// NewApp wraps raw infra dependencies into the App container, mirroring how
+// cmd/api/router.NewRouter wraps cmd/api/app.App's DB/Redis into services.
+func NewApp(cfg Config, log *logger.Logger, dbInstance *pgxpool.Pool, redisClient *redis.Instance) *App {
 	return &App{
-		Config:      cfg,
-		Logger:      log,
-		Outbox:      events.NewOutboxWriter(dbInstance),
-		Publisher:   events.NewRedisPublisher(redisClient),
-		RedisClient: redisClient,
-		Mailer:      mailer.New(cfg.SMTP.Port, cfg.SMTP.Host, cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.Sender),
+		Config:    cfg,
+		Logger:    log,
+		Outbox:    events.NewOutboxWriter(dbInstance),
+		Publisher: events.NewRedisPublisher(redisClient.Raw()),
+		Mailer:    mailer.New(cfg.SMTP.Port, cfg.SMTP.Host, cfg.SMTP.Username, cfg.SMTP.Password, cfg.SMTP.Sender),
 	}
 }
 

@@ -1,0 +1,92 @@
+package adminrepository
+
+const (
+	selectColumns = `
+			u.id AS user_id,
+			up.first_name,
+			up.last_name,
+			u.email,
+			up.phone_number,
+			up.country,
+			up.city,
+			up.date_of_birth,
+			up.gender,
+			up.avatar_url,
+			up.bio,
+			u.created_at,
+			u.deleted_at,
+			u.last_login_at,
+			u.status,
+			u.role
+		`
+	getUserDataSQL = `
+		SELECT ` + selectColumns + `
+		FROM users u
+		LEFT JOIN user_profiles up ON up.user_id = u.id
+		ORDER BY u.created_at DESC, u.id DESC
+		LIMIT $1 OFFSET $2
+	`
+	existsUserSQL = `
+		SELECT EXISTS (SELECT 1 FROM users WHERE id = $1)
+	`
+	countUsersSQL = `
+		SELECT COUNT(*) FROM users
+	`
+	revokeUserRoleSQL = `
+		UPDATE users
+		SET role  = 'user',
+		updated_at = now()
+		WHERE id = $1 AND role = 'subadmin'
+	`
+	assignUserRoleSQL = `
+		UPDATE users
+		SET role  = 'subadmin',
+		updated_at = now()
+		WHERE id = $1 AND role = 'user' AND status='active' AND deleted_at IS NULL
+	`
+
+	restoreUserSQL = `
+		UPDATE users
+		SET status = 'active',
+		deleted_at = NULL,
+		updated_at = now()
+		WHERE id = $1 AND status = 'deleted' AND role <> 'admin'
+	`
+	deleteUserSQL = `
+		UPDATE users
+		SET status  = 'deleted',
+		deleted_at = now(),
+		updated_at = now()
+		WHERE id = $1 AND status <> 'deleted' AND role <> 'admin'
+	`
+
+	blockUserSQL = `
+		UPDATE users
+		SET status  = 'blocked',
+		updated_at = now()
+		WHERE id = $1 AND status = 'active' AND role <> 'admin'
+	`
+	unblockUserSQL = `
+		UPDATE users
+		SET status = 'active',
+		updated_at = now()
+		WHERE id = $1 AND status = 'blocked' AND role <> 'admin'
+	`
+
+	getUserDetailsByIDSQL = `
+		SELECT ` + selectColumns + `
+		FROM users u
+		LEFT JOIN user_profiles up ON up.user_id = u.id
+		WHERE u.id = $1
+	`
+
+	grantUserCourseAccessSQL = `
+		INSERT INTO user_course_access (user_id, course_id, access_type, status, granted_at)
+		VALUES ($1, $2, 'admin_granted', 'active', now())
+	`
+
+	grantUserContentAccessSQL = `
+		INSERT INTO user_content_access (user_id, content_item_id, access_type, status, granted_at)
+		VALUES ($1, $2, 'admin_granted', 'active', now())
+	`
+)

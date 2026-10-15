@@ -18,7 +18,7 @@ func newLoginTestUser(rawPassword string, status authdomain.UserStatus) *authdom
 	if err != nil {
 		panic(err)
 	}
-	return &authdomain.User{ID: "user-123", Role: authdomain.RoleUser, PasswordHash: string(hash), Status: status}
+	return &authdomain.User{ID: TestUserID, Role: authdomain.RoleUser, PasswordHash: string(hash), Status: status}
 }
 
 func validLoginReq() authdomain.LoginRequest {
@@ -79,19 +79,16 @@ func TestLoginUserLookup(t *testing.T) {
 // TestLoginConstantTimeUserEnumeration is a regression test for the timing-attack
 // mitigation documented on Login/loginGetUser: when the email does not exist, a dummy
 // bcrypt comparison must still run so the response time matches the "wrong password"
-// path. It spies on the package-level bcryptCompareHashAndPassword hook to assert the
+// path. It spies on the service's compareHash field to assert the
 // dummy comparison actually executes, rather than asserting on wall-clock timing (flaky).
 func TestLoginConstantTimeUserEnumeration(t *testing.T) {
 	Convey("Given an auth service", t, func() {
-		original := bcryptCompareHashAndPassword
-		Reset(func() { bcryptCompareHashAndPassword = original })
-
 		var calls int
 		var lastHash []byte
-		bcryptCompareHashAndPassword = func(hashedPassword, password []byte) error {
+		spy := func(hashedPassword, password []byte) error {
 			calls++
 			lastHash = hashedPassword
-			return original(hashedPassword, password)
+			return bcrypt.CompareHashAndPassword(hashedPassword, password)
 		}
 
 		Convey("When the email does not exist, the dummy bcrypt comparison still runs", func() {
@@ -101,6 +98,7 @@ func TestLoginConstantTimeUserEnumeration(t *testing.T) {
 				},
 			}
 			srv := newTestService(uRepo, nil, nil, nil, nil)
+			srv.compareHash = spy
 
 			_, err := srv.Login(context.Background(), validLoginReq())
 
@@ -118,6 +116,7 @@ func TestLoginConstantTimeUserEnumeration(t *testing.T) {
 				incrementFailedLogin: func(context.Context, string, string, int) error { return nil },
 			}
 			srv := newTestService(uRepo, validLoginSessionRepo(), nil, nil, nil)
+			srv.compareHash = spy
 
 			_, err := srv.Login(context.Background(), validLoginReq())
 
@@ -142,9 +141,25 @@ func TestLoginAccountLocked(t *testing.T) {
 
 			_, err := srv.Login(context.Background(), validLoginReq())
 
-			var lockErr *authdomain.ErrAccountLockedError
-			So(errors.As(err, &lockErr), ShouldBeTrue)
-			So(lockErr.LockedUntil, ShouldEqual, lockedUntil)
+			So(errors.Is(err, authdomain.ErrInvalidCredentials), ShouldBeTrue)
+			So(errors.Is(err, authdomain.ErrAccountLocked), ShouldBeFalse)
+		})
+
+		Convey("When the account is locked, a dummy bcrypt keeps the timing like a wrong password and the attempt is not counted", func() {
+			var compared int
+			lockedUntil := time.Now().UTC().Add(10 * time.Minute)
+			user := newLoginTestUser(validLoginReq().Password, authdomain.StatusActive)
+			user.LoginLockedUntil = &lockedUntil
+			srv := newTestService(&mockUserRepo{getUserByEmail: loginGetUserByEmail(user)}, nil, nil, nil, nil)
+			srv.compareHash = func(hashedPassword, password []byte) error {
+				compared++
+				return bcrypt.CompareHashAndPassword(hashedPassword, password)
+			}
+
+			_, err := srv.Login(context.Background(), validLoginReq())
+
+			So(errors.Is(err, authdomain.ErrInvalidCredentials), ShouldBeTrue)
+			So(compared, ShouldEqual, 1)
 		})
 
 		Convey("When the lock has already expired", func() {
@@ -183,7 +198,7 @@ func TestLoginWrongPassword(t *testing.T) {
 			_, err := srv.Login(context.Background(), validLoginReq())
 
 			So(errors.Is(err, authdomain.ErrInvalidCredentials), ShouldBeTrue)
-			So(gotUserID, ShouldEqual, "user-123")
+			So(gotUserID, ShouldEqual, TestUserID)
 		})
 
 		Convey("When incrementing the failed-attempt counter fails unexpectedly", func() {
@@ -347,9 +362,9 @@ func TestLoginSuccess(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(got.AccessToken, ShouldNotBeEmpty)
 			So(got.RefreshToken, ShouldNotBeEmpty)
-			So(got.UserID, ShouldEqual, "user-123")
+			So(got.UserID, ShouldEqual, TestUserID)
 			So(got.ExpiresAt, ShouldEqual, expiresAt)
-			So(gotSessionInput.UserID, ShouldEqual, "user-123")
+			So(gotSessionInput.UserID, ShouldEqual, TestUserID)
 			So(*gotSessionInput.UserAgent, ShouldEqual, validLoginReq().UserAgent)
 			So(*gotSessionInput.IPAddress, ShouldEqual, validLoginReq().IPAddress)
 		})

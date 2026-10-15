@@ -45,6 +45,7 @@ type DLQWriter struct {
 	jsonLogger *logger.Logger
 }
 
+// Write persists failed events to the dead-letter queue.
 func (d *DLQWriter) Write(ctx context.Context, eventName, queueName string, payload any, processErr error, attempts int) {
 	if processErr == nil {
 		d.jsonLogger.Error(fmt.Errorf("DLQ Write: Process error is empty"), nil)

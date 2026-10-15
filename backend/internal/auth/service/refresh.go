@@ -6,7 +6,13 @@ import (
 	"fmt"
 	authdomain "learnflow_backend/internal/auth/domain"
 	"learnflow_backend/internal/shared/tokens"
+	"time"
 )
+
+// refreshReuseGrace is how long after a rotation the previous refresh token is still accepted. A client
+// that lost the rotation response (or a second tab) retries with the old token; inside the window that is
+// treated as a retry and rotated again instead of being read as token theft.
+const refreshReuseGrace = 20 * time.Second
 
 // Refresh rotates the refresh token and returns new access/refresh tokens.
 func (s *Service) Refresh(ctx context.Context, req authdomain.RefreshRequest) (*authdomain.AuthTokens, error) {
@@ -16,31 +22,23 @@ func (s *Service) Refresh(ctx context.Context, req authdomain.RefreshRequest) (*
 	var rawToken string
 	session := &authdomain.UserSession{}
 
+	graceSession, reuseErr := s.checkRefreshSessionPrevHash(ctx, refreshHashHex)
+	if reuseErr != nil {
+		return nil, reuseErr
+	}
+
 	err := s.transactor.InTransaction(ctx, func(ctx context.Context) error {
 		uSession, err := s.sessionRepo.GetUserSessionByRefreshToken(ctx, refreshHashHex)
 		if err != nil {
-			// Token not found as current — check if it was already rotated (exists as previous_refresh_hash).
-			// If yes: someone is replaying a rotated-out token, which indicates theft or a replay attack.
-			// Revoke all sessions for that user as a precaution.
-			checkErr := s.checkRefreshSessionPrevHash(ctx, refreshHashHex)
-			if checkErr != nil {
-				return checkErr
+			if graceSession == nil || !errors.Is(err, authdomain.ErrSessionNotFound) {
+				return err
 			}
-			return err
+			uSession = graceSession
 		}
 
 		user, err = s.getRefreshUserAndCheckStatusByID(ctx, uSession.UserID)
 		if err != nil {
 			return err
-		}
-
-		// Second check — different scenario from the one above.
-		// Token IS valid as current, but also appears as previous_refresh_hash in another session.
-		// This means the same token was used to rotate a different session, which should not happen.
-		// Indicates a race condition or token duplication attack — revoke all sessions.
-		checkErr := s.checkRefreshSessionPrevHash(ctx, refreshHashHex)
-		if checkErr != nil {
-			return checkErr
 		}
 
 		rToken, tokenHash, err := tokens.GenerateSecureToken()
@@ -63,7 +61,7 @@ func (s *Service) Refresh(ctx context.Context, req authdomain.RefreshRequest) (*
 		return nil, fmt.Errorf("refresh: transaction: %w", err)
 	}
 
-	accessToken, err := s.token.GenerateAccessToken(user, accessTokenTTL)
+	accessToken, err := s.token.GenerateAccessToken(user, tokens.AccessTokenTTL)
 	if err != nil {
 		return nil, fmt.Errorf("refresh: generate access token: %w", err)
 	}
@@ -76,21 +74,38 @@ func (s *Service) Refresh(ctx context.Context, req authdomain.RefreshRequest) (*
 	}, nil
 }
 
-func (s *Service) checkRefreshSessionPrevHash(ctx context.Context, refreshHashHex string) error {
+// checkRefreshSessionPrevHash detects reuse of a rotated refresh token. Inside refreshReuseGrace of the
+// rotation it returns the session so the caller can rotate it again; outside, it revokes every session of
+// the user and fails.
+func (s *Service) checkRefreshSessionPrevHash(ctx context.Context, refreshHashHex string) (*authdomain.UserSession, error) {
 	prevSession, err := s.sessionRepo.GetSessionByPrevHash(ctx, refreshHashHex)
 	if err != nil && !errors.Is(err, authdomain.ErrSessionNotFound) {
-		return fmt.Errorf("refresh: get prev session (reuse check): %w", err)
+		return nil, fmt.Errorf("refresh: get prev session (reuse check): %w", err)
 	}
 
-	if prevSession != nil {
-		revokeErr := s.sessionRepo.RevokeAllUserSessions(ctx, prevSession.UserID, nil, authdomain.RevokeReasonSuspiciousActivity)
-		if revokeErr != nil {
-			return fmt.Errorf("refresh: revoke all sessions (reuse): %w", revokeErr)
-		}
-		return authdomain.ErrSessionRevoked
+	if prevSession == nil {
+		return nil, nil
 	}
 
-	return nil
+	if withinRefreshGrace(prevSession) {
+		return prevSession, nil
+	}
+
+	// Tokens first: a Redis failure then fails the request before any session is touched.
+	if tokensErr := s.revokeAllUserTokens(ctx, "refresh", prevSession.UserID); tokensErr != nil {
+		return nil, tokensErr
+	}
+
+	revokeErr := s.sessionRepo.RevokeAllUserSessions(ctx, prevSession.UserID, nil, authdomain.RevokeReasonSuspiciousActivity)
+	if revokeErr != nil {
+		return nil, fmt.Errorf("refresh: revoke all sessions (reuse): %w", revokeErr)
+	}
+
+	return nil, authdomain.ErrSessionRevoked
+}
+
+func withinRefreshGrace(session *authdomain.UserSession) bool {
+	return session.RevokedAt == nil && session.LastSeenAt != nil && time.Since(*session.LastSeenAt) <= refreshReuseGrace
 }
 
 func (s *Service) getRefreshUserAndCheckStatusByID(ctx context.Context, userID string) (*authdomain.User, error) {

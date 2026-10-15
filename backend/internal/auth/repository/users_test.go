@@ -13,9 +13,9 @@ import (
 	. "github.com/smartystreets/goconvey/convey"
 )
 
-func TestCreateUser(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
+var TestUserID string = "user-123"
 
+func TestCreateUser(t *testing.T) {
 	Convey("Given a users repository", t, func() {
 		var row *testutil.MockRow
 		repo := newTestRepo(&testutil.MockQueryRunner{
@@ -26,14 +26,14 @@ func TestCreateUser(t *testing.T) {
 
 		Convey("When creation succeeds", func() {
 			row = &testutil.MockRow{ScanFn: func(dest ...any) error {
-				*testutil.CastStr(dest[0], 0) = "user-123"
+				*testutil.CastStr(dest[0], 0) = TestUserID
 				return nil
 			}}
 			id, err := repo.CreateUser(context.Background(), &authdomain.User{
 				Email: "john@gmail.com", PasswordHash: "hash", Role: authdomain.RoleUser,
 			})
 			So(err, ShouldBeNil)
-			So(id, ShouldEqual, "user-123")
+			So(id, ShouldEqual, TestUserID)
 		})
 
 		Convey("When email already exists (pg 23505)", func() {
@@ -47,10 +47,8 @@ func TestCreateUser(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.CreateUser(context.Background(), &authdomain.User{})
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
-
-		_ = now
 	})
 }
 
@@ -66,7 +64,7 @@ func TestCreateUserProfile(t *testing.T) {
 		Convey("When creation succeeds", func() {
 			firstName, lastName := "John", "Doe"
 			err := repo.CreateUserProfile(context.Background(), &authdomain.UserProfile{
-				UserID: "user-123", FirstName: &firstName, LastName: &lastName,
+				UserID: TestUserID, FirstName: &firstName, LastName: &lastName,
 			})
 			So(err, ShouldBeNil)
 		})
@@ -74,7 +72,29 @@ func TestCreateUserProfile(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
 			err := repo.CreateUserProfile(context.Background(), &authdomain.UserProfile{})
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
+		})
+	})
+}
+
+func TestCreateNotificationPreferences(t *testing.T) {
+	Convey("Given a users repository", t, func() {
+		var fakeErr error
+		repo := newTestRepo(&testutil.MockQueryRunner{
+			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+				return pgconn.NewCommandTag("INSERT 1"), fakeErr
+			},
+		})
+
+		Convey("When creation succeeds", func() {
+			err := repo.CreateNotificationPreferences(context.Background(), TestUserID)
+			So(err, ShouldBeNil)
+		})
+
+		Convey("When the database returns an unexpected error", func() {
+			fakeErr = testutil.ErrDB
+			err := repo.CreateNotificationPreferences(context.Background(), TestUserID)
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -92,9 +112,9 @@ func TestGetUserByID(t *testing.T) {
 
 		Convey("When user exists", func() {
 			row = &testutil.MockRow{ScanFn: fakeScanUser(now)}
-			got, err := repo.GetUserByID(context.Background(), "user-123")
+			got, err := repo.GetUserByID(context.Background(), TestUserID)
 			So(err, ShouldBeNil)
-			So(got.ID, ShouldEqual, "user-123")
+			So(got.ID, ShouldEqual, TestUserID)
 			So(got.Email, ShouldEqual, "john@gmail.com")
 			So(got.Role, ShouldEqual, authdomain.UserRole("admin"))
 		})
@@ -107,8 +127,8 @@ func TestGetUserByID(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
-			_, err := repo.GetUserByID(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			_, err := repo.GetUserByID(context.Background(), TestUserID)
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -140,7 +160,7 @@ func TestGetUserByEmail(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetUserByEmail(context.Background(), "john@gmail.com")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -158,9 +178,9 @@ func TestGetDeletedUserByID(t *testing.T) {
 
 		Convey("When deleted user exists", func() {
 			row = &testutil.MockRow{ScanFn: fakeScanUser(now)}
-			got, err := repo.GetDeletedUserByID(context.Background(), "user-123")
+			got, err := repo.GetDeletedUserByID(context.Background(), TestUserID)
 			So(err, ShouldBeNil)
-			So(got.ID, ShouldEqual, "user-123")
+			So(got.ID, ShouldEqual, TestUserID)
 		})
 
 		Convey("When user not found", func() {
@@ -171,8 +191,8 @@ func TestGetDeletedUserByID(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
-			_, err := repo.GetDeletedUserByID(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			_, err := repo.GetDeletedUserByID(context.Background(), TestUserID)
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -204,7 +224,7 @@ func TestGetDeletedUserByEmail(t *testing.T) {
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
 			_, err := repo.GetDeletedUserByEmail(context.Background(), "john@gmail.com")
-			assertUnexpectedDBError(err, "db error")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -222,9 +242,9 @@ func TestGetUserProfileByUserID(t *testing.T) {
 
 		Convey("When profile exists", func() {
 			row = &testutil.MockRow{ScanFn: fakeScanProfile(now)}
-			got, err := repo.GetUserProfileByUserID(context.Background(), "user-123")
+			got, err := repo.GetUserProfileByUserID(context.Background(), TestUserID)
 			So(err, ShouldBeNil)
-			So(got.UserID, ShouldEqual, "user-123")
+			So(got.UserID, ShouldEqual, TestUserID)
 			So(*got.FirstName, ShouldEqual, "John")
 			So(*got.LastName, ShouldEqual, "Doe")
 		})
@@ -237,8 +257,8 @@ func TestGetUserProfileByUserID(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			row = &testutil.MockRow{ScanFn: func(_ ...any) error { return testutil.ErrDB }}
-			_, err := repo.GetUserProfileByUserID(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			_, err := repo.GetUserProfileByUserID(context.Background(), TestUserID)
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 	})
 }
@@ -255,8 +275,8 @@ func TestRestoreUser(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
-			err := repo.RestoreUser(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			err := repo.RestoreUser(context.Background(), TestUserID)
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found (0 rows affected)", func() {
@@ -266,7 +286,7 @@ func TestRestoreUser(t *testing.T) {
 
 		Convey("When restore succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.RestoreUser(context.Background(), "user-123")
+			err := repo.RestoreUser(context.Background(), TestUserID)
 			So(err, ShouldBeNil)
 		})
 	})
@@ -284,8 +304,8 @@ func TestUpdateStatus(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
-			err := repo.UpdateStatus(context.Background(), "user-123", authdomain.StatusBlocked)
-			assertUnexpectedDBError(err, "db error")
+			err := repo.UpdateStatus(context.Background(), TestUserID, authdomain.StatusBlocked)
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -295,36 +315,7 @@ func TestUpdateStatus(t *testing.T) {
 
 		Convey("When update succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.UpdateStatus(context.Background(), "user-123", authdomain.StatusActive)
-			So(err, ShouldBeNil)
-		})
-	})
-}
-
-func TestUpdateRole(t *testing.T) {
-	Convey("Given a users repository", t, func() {
-		var fakeErr error
-		var execTag pgconn.CommandTag
-		repo := newTestRepo(&testutil.MockQueryRunner{
-			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-				return execTag, fakeErr
-			},
-		})
-
-		Convey("When the database returns an unexpected error", func() {
-			fakeErr = testutil.ErrDB
-			err := repo.UpdateRole(context.Background(), "user-123", authdomain.RoleAdmin)
-			assertUnexpectedDBError(err, "db error")
-		})
-
-		Convey("When user not found", func() {
-			err := repo.UpdateRole(context.Background(), "unknown", authdomain.RoleAdmin)
-			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
-		})
-
-		Convey("When update succeeds", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.UpdateRole(context.Background(), "user-123", authdomain.RoleAdmin)
+			err := repo.UpdateStatus(context.Background(), TestUserID, authdomain.StatusActive)
 			So(err, ShouldBeNil)
 		})
 	})
@@ -342,8 +333,8 @@ func TestUpdateLastLoginAt(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
-			err := repo.UpdateLastLoginAt(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			err := repo.UpdateLastLoginAt(context.Background(), TestUserID)
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -353,7 +344,7 @@ func TestUpdateLastLoginAt(t *testing.T) {
 
 		Convey("When update succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.UpdateLastLoginAt(context.Background(), "user-123")
+			err := repo.UpdateLastLoginAt(context.Background(), TestUserID)
 			So(err, ShouldBeNil)
 		})
 	})
@@ -371,8 +362,8 @@ func TestUpdatePasswordHash(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
-			err := repo.UpdatePasswordHash(context.Background(), "user-123", "new-hash")
-			assertUnexpectedDBError(err, "db error")
+			err := repo.UpdatePasswordHash(context.Background(), TestUserID, "new-hash")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -382,7 +373,7 @@ func TestUpdatePasswordHash(t *testing.T) {
 
 		Convey("When update succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.UpdatePasswordHash(context.Background(), "user-123", "new-hash")
+			err := repo.UpdatePasswordHash(context.Background(), TestUserID, "new-hash")
 			So(err, ShouldBeNil)
 		})
 	})
@@ -400,8 +391,8 @@ func TestUpdateEmail(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
-			err := repo.UpdateEmail(context.Background(), "user-123", "new@example.com")
-			assertUnexpectedDBError(err, "db error")
+			err := repo.UpdateEmail(context.Background(), TestUserID, "new@example.com")
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -411,7 +402,7 @@ func TestUpdateEmail(t *testing.T) {
 
 		Convey("When update succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.UpdateEmail(context.Background(), "user-123", "new@example.com")
+			err := repo.UpdateEmail(context.Background(), TestUserID, "new@example.com")
 			So(err, ShouldBeNil)
 		})
 	})
@@ -429,8 +420,8 @@ func TestUpdateEmailVerifiedAt(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
-			err := repo.UpdateEmailVerifiedAt(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			err := repo.UpdateEmailVerifiedAt(context.Background(), TestUserID)
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -440,36 +431,7 @@ func TestUpdateEmailVerifiedAt(t *testing.T) {
 
 		Convey("When update succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.UpdateEmailVerifiedAt(context.Background(), "user-123")
-			So(err, ShouldBeNil)
-		})
-	})
-}
-
-func TestDeleteUser(t *testing.T) {
-	Convey("Given a users repository", t, func() {
-		var fakeErr error
-		var execTag pgconn.CommandTag
-		repo := newTestRepo(&testutil.MockQueryRunner{
-			ExecFn: func(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-				return execTag, fakeErr
-			},
-		})
-
-		Convey("When the database returns an unexpected error", func() {
-			fakeErr = testutil.ErrDB
-			err := repo.DeleteUser(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
-		})
-
-		Convey("When user not found", func() {
-			err := repo.DeleteUser(context.Background(), "unknown")
-			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
-		})
-
-		Convey("When delete succeeds", func() {
-			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.DeleteUser(context.Background(), "user-123")
+			err := repo.UpdateEmailVerifiedAt(context.Background(), TestUserID)
 			So(err, ShouldBeNil)
 		})
 	})
@@ -487,8 +449,8 @@ func TestIncrementFailedLogin(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
-			err := repo.IncrementFailedLogin(context.Background(), "user-123", "15 minutes", 5)
-			assertUnexpectedDBError(err, "db error")
+			err := repo.IncrementFailedLogin(context.Background(), TestUserID, "15 minutes", 5)
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -498,7 +460,7 @@ func TestIncrementFailedLogin(t *testing.T) {
 
 		Convey("When increment succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.IncrementFailedLogin(context.Background(), "user-123", "15 minutes", 5)
+			err := repo.IncrementFailedLogin(context.Background(), TestUserID, "15 minutes", 5)
 			So(err, ShouldBeNil)
 		})
 	})
@@ -515,7 +477,7 @@ func TestUserFetchQueriesFilterSoftDeleted(t *testing.T) {
 		})
 
 		Convey("GetUserByID excludes soft-deleted users", func() {
-			_, err := repo.GetUserByID(context.Background(), "user-123")
+			_, err := repo.GetUserByID(context.Background(), TestUserID)
 			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
 			So(gotQuery, ShouldContainSubstring, "deleted_at IS NULL")
 		})
@@ -527,7 +489,7 @@ func TestUserFetchQueriesFilterSoftDeleted(t *testing.T) {
 		})
 
 		Convey("GetDeletedUserByID targets only soft-deleted users", func() {
-			_, err := repo.GetDeletedUserByID(context.Background(), "user-123")
+			_, err := repo.GetDeletedUserByID(context.Background(), TestUserID)
 			So(errors.Is(err, authdomain.ErrUserNotFound), ShouldBeTrue)
 			So(gotQuery, ShouldContainSubstring, "deleted_at IS NOT NULL")
 		})
@@ -552,8 +514,8 @@ func TestResetFailedLogin(t *testing.T) {
 
 		Convey("When the database returns an unexpected error", func() {
 			fakeErr = testutil.ErrDB
-			err := repo.ResetFailedLogin(context.Background(), "user-123")
-			assertUnexpectedDBError(err, "db error")
+			err := repo.ResetFailedLogin(context.Background(), TestUserID)
+			testutil.AssertUnexpectedDBError(err, "db error")
 		})
 
 		Convey("When user not found", func() {
@@ -563,7 +525,7 @@ func TestResetFailedLogin(t *testing.T) {
 
 		Convey("When reset succeeds", func() {
 			execTag = pgconn.NewCommandTag("UPDATE 1")
-			err := repo.ResetFailedLogin(context.Background(), "user-123")
+			err := repo.ResetFailedLogin(context.Background(), TestUserID)
 			So(err, ShouldBeNil)
 		})
 	})
