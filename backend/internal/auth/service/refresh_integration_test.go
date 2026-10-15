@@ -72,6 +72,15 @@ func activeSessionCount(t *testing.T, pool *pgxpool.Pool, userID string) int {
 	return count
 }
 
+func ageSessionsPastReuseGrace(t *testing.T, pool *pgxpool.Pool, userID string) {
+	t.Helper()
+
+	_, err := pool.Exec(context.Background(), `UPDATE user_sessions SET last_seen_at = now() - interval '1 minute' WHERE user_id = $1`, userID)
+	if err != nil {
+		t.Fatalf("age sessions: %v", err)
+	}
+}
+
 func TestRefreshReplayRevokesAllSessions_Integration(t *testing.T) {
 	pool := testutil.NewTestPool(t)
 
@@ -95,9 +104,21 @@ func TestRefreshReplayRevokesAllSessions_Integration(t *testing.T) {
 			So(activeSessionCount(t, pool, userID), ShouldEqual, 2)
 		})
 
-		Convey("When the rotated-out token is replayed every session of the user is revoked and stays revoked", func() {
+		Convey("When the rotated-out token is replayed within the grace window it rotates again and nothing is revoked", func() {
 			_, err := srv.Refresh(ctx, req)
 			So(err, ShouldBeNil)
+
+			got, err := srv.Refresh(ctx, authdomain.RefreshRequest{RefreshToken: rotatedRaw, UserAgent: "second-tab", IPAddress: "127.0.0.1"})
+
+			So(err, ShouldBeNil)
+			So(got.RefreshToken, ShouldNotEqual, rotatedRaw)
+			So(activeSessionCount(t, pool, userID), ShouldEqual, 2)
+		})
+
+		Convey("When the rotated-out token is replayed after the grace window every session of the user is revoked and stays revoked", func() {
+			_, err := srv.Refresh(ctx, req)
+			So(err, ShouldBeNil)
+			ageSessionsPastReuseGrace(t, pool, userID)
 
 			_, err = srv.Refresh(ctx, authdomain.RefreshRequest{RefreshToken: rotatedRaw, UserAgent: "attacker", IPAddress: "203.0.113.9"})
 
@@ -109,9 +130,10 @@ func TestRefreshReplayRevokesAllSessions_Integration(t *testing.T) {
 			So(reason, ShouldEqual, string(authdomain.RevokeReasonSuspiciousActivity))
 		})
 
-		Convey("When the rotated-out token is replayed, the user's already issued access tokens are revoked too", func() {
+		Convey("When the rotated-out token is replayed after the grace window, the user's already issued access tokens are revoked too", func() {
 			_, err := srv.Refresh(ctx, req)
 			So(err, ShouldBeNil)
+			ageSessionsPastReuseGrace(t, pool, userID)
 
 			_, err = srv.Refresh(ctx, authdomain.RefreshRequest{RefreshToken: rotatedRaw, UserAgent: "attacker", IPAddress: "203.0.113.9"})
 			So(errors.Is(err, authdomain.ErrSessionRevoked), ShouldBeTrue)

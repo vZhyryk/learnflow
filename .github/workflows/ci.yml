@@ -48,7 +48,7 @@ jobs:
                   cd backend && go test ./... -race -count=1 -coverpkg=./... -coverprofile=../tests/coverage.out
 
             - name: Install Sonar
-              run: npm install -g @sonar/scan
+              run: npm install -g @sonar/scan@4.3.8
 
             - name: SonarQube Scan
               working-directory: backend
@@ -112,7 +112,7 @@ jobs:
 
             - name: Install dependencies
               working-directory: frontend
-              run: npm ci
+              run: npm install
 
             - name: Lint
               working-directory: frontend
@@ -123,7 +123,7 @@ jobs:
               run: npm run type-check
 
             - name: Install Sonar
-              run: npm install -g @sonar/scan
+              run: npm install -g @sonar/scan@4.3.8
 
             - name: SonarQube Scan
               working-directory: frontend

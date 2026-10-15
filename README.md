@@ -1,6 +1,6 @@
 # LearnFlow
 
-![Go](https://img.shields.io/badge/Go-1.26.3-00ADD8?style=flat&logo=go&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.26.9-00ADD8?style=flat&logo=go&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=flat&logo=typescript&logoColor=white)
 ![Vue 3](https://img.shields.io/badge/Vue-3.5-4FC08D?style=flat&logo=vue.js&logoColor=white)
 ![Nuxt](https://img.shields.io/badge/Nuxt-4.4-00DC82?style=flat&logo=nuxt.js&logoColor=white)
@@ -23,11 +23,11 @@ The platform covers the full lifecycle of a learning product: course catalog, vi
 
 - Practicing clean architecture and strict dependency rules in Go
 - Building event-driven workflows with a transactional outbox pattern
-- Working with a real relational schema (32 tables) designed for production constraints
-- Integrating real external services (Stripe, Resend, Cloudflare R2, Prometheus/Grafana)
-- SSR frontend with Nuxt 4, Pinia, and a strict layered architecture
+- Working with a real relational schema (41 tables) designed for production constraints
+- Integrating external services (SMTP email and Prometheus/Grafana today; Stripe, Przelewy24 and Cloudflare R2 planned)
+- SSR frontend with Nuxt 4, Pinia, and a strict layered architecture (frontend work starts in Phase 5)
 
-**Current status:** Phase 3 of 9 in progress — Courses, Content, Admin & Observability. Phase 2 (Auth & Users) complete: JWT sessions, email flows, event-driven workers, full unit + real-Postgres integration test coverage.
+**Current status:** Phase 3 of 9 is wrapping up — Courses, Content & Admin are implemented (courses, content, articles, reviews, notes, admin users/announcements/audit trail); leftover items were moved to later phases. **Phase 4 — Consultation Event Flow — is next.** Phase 2 (Auth & Users) is complete: JWT sessions, email flows, event-driven workers, unit + real-Postgres integration test coverage.
 
 ---
 
@@ -53,7 +53,7 @@ HTTP Request
                          ▼
 ┌─────────────────────────────────────────────────┐
 │  Repository Layer                                │
-│  Raw SQL (database/sql) · No ORM                │
+│  Raw SQL (pgx/v5) · No ORM                      │
 └────────────────────────┬────────────────────────┘
                          │  reads/writes
                          ▼
@@ -67,7 +67,7 @@ HTTP Request
         PostgreSQL 17           Redis 7
 ```
 
-**Dependency rule:** each layer only imports inward. `domain/` imports nothing from the project. `repository/` imports only `domain/`. `service/` imports `domain/` + `repository/`. `transport/` imports `service/`.
+**Dependency rule:** each layer only imports inward. `domain/` imports nothing from the project except dependency-free leaf packages (`shared/validator`, `shared/pagination`, `shared/ptr`, `audit/domain`). `repository/` imports only `domain/` + infrastructure. `service/` imports `domain/` + `repository/` + `events/`. `transport/` imports `service/` + `infrastructure/`.
 
 **Entrypoints:**
 
@@ -83,27 +83,51 @@ HTTP Request
 
 | Layer                | Technology                                    | Notes                                                 |
 | -------------------- | --------------------------------------------- | ----------------------------------------------------- |
-| **Language**         | Go 1.26.3                                     | Stdlib only — `net/http`, `database/sql`, `context`   |
+| **Language**         | Go 1.26.9                                     | `net/http`, `context`, `pgx/v5` — no frameworks       |
 | **Frontend**         | Nuxt 4 + Vue 3.5 + TypeScript 6               | SSR, Pinia, Tailwind CSS 4                            |
 | **Database**         | PostgreSQL 17                                 | UUID PKs, soft deletes, bigint cents, partial indexes |
 | **Cache / Queue**    | Redis 7                                       | Event queue (BLPop), outbox relay                     |
 | **Migrations**       | golang-migrate                                | Sequential `.up.sql` / `.down.sql`                    |
-| **Object Storage**   | Cloudflare R2 (prod) · MinIO (local)          | S3-compatible, swappable via env                      |
-| **Email**            | Resend (prod) · stub (local)                  | Interface-driven, no lock-in                          |
-| **Payments**         | Stripe + Przelewy24                           | Card + BLIK/bank transfer (PL market)                 |
-| **Observability**    | Prometheus + Grafana                          | `pg_stat_statements`, custom metrics                  |
+| **Object Storage**   | Cloudflare R2 (prod) · MinIO (local)          | S3-compatible, swappable via env (client planned)     |
+| **Email**            | SMTP (`gopkg.in/mail.v2`)                     | Worker-side mailer, HTML templates; Resend planned (ADR-002) |
+| **Payments**         | Stripe + Przelewy24 (planned, Phase 7)        | Card + BLIK/bank transfer (PL market)                 |
+| **Observability**    | Prometheus + Grafana                          | DB pool metrics on `/metrics`; dashboards not yet provisioned |
 | **Testing**          | GoConvey · Vitest · Playwright                | Unit + real-Postgres/Redis integration + e2e          |
-| **Linting**          | golangci-lint (15+ linters) · oxlint + ESLint | Strict configs, CI-enforced                           |
+| **Linting**          | golangci-lint (24 linters) · oxlint + ESLint  | Strict configs, CI-enforced                           |
 | **Containerization** | Docker Compose                                | Dev, observability, and full-stack profiles           |
 
 ---
 
 ## Domain Modules
 
-The backend is organized into 16 bounded contexts under `backend/internal/`:
+The backend lives under `backend/internal/`. Status as of 2026-10-15:
 
-| Module            | Responsibility                                                                                    |
-| ----------------- | ------------------------------------------------------------------------------------------------- |
+| Module            | Status      | Responsibility                                                                                    |
+| ----------------- | ----------- | ------------------------------------------------------------------------------------------------- |
+| `auth/`           | ✅ done     | JWT sessions (refresh rotation with 20 s reuse grace, replay detection, brute-force lock), email verification, password reset, email change, account recovery |
+| `users/`          | ✅ done     | User accounts, profiles (avatar, phone), notification preferences                                 |
+| `courses/`        | ✅ done     | Course catalog (draft/published/archived), SEO metadata, landing pages                            |
+| `content/`        | ✅ done     | Learning content items (video, book, presentation), completion tracking, individual access grants |
+| `review/`         | ✅ done     | Course/content/article reviews & ratings — CRUD (own + admin), aggregate stats, access-checked    |
+| `article/`        | ✅ done     | Admin-managed articles (draft/published), SEO metadata, soft delete, public SSR pages             |
+| `notes/`          | ✅ done     | Personal notes, optionally linked to a course or content item; CRUD, search by title/body         |
+| `admin/`          | 🔄 partial  | User management (block/delete/role), announcements, audit trail, DLQ list; consultations pending  |
+| `audit/`          | ✅ done     | Append-only admin audit trail written in the same transaction as the domain change                |
+| `access/`         | ✅ done     | Course/content access predicates shared by review, notes and content modules                      |
+| `events/`         | ✅ done     | Event types and payloads, outbox publisher                                                        |
+| `worker/`         | ✅ done     | Outbox/DLQ pollers, email workers, announcement fan-out, token/session/outbox cleanup             |
+| `shared/`         | ✅ done     | Cross-cutting: context helpers, error types (`ErrNotFound`, `ErrForbidden`), pagination, validator, tokens, mailer, testutil |
+| `infrastructure/` | ✅ done     | DB (pgx), Redis, logger, env config, sanitizer, metrics, bootstrap, retry                         |
+| `consultations/`  | ⬜ scaffold | 1:1 session booking, availability slots, rescheduling — Phase 4                                   |
+| `notifications/`  | ⬜ scaffold | Delivery pipeline, reminders (24h + 3h), re-engagement — emails currently run through `worker/`   |
+| `history/`        | ⬜ scaffold | Activity log (`activity_log` table)                                                               |
+| `progress/`       | ⬜ scaffold | Standalone completion tracking (currently inline in `content/`)                                   |
+| `app/`            | ⬜ scaffold | App-level shared logic                                                                            |
+| `payments/`       | 📋 planned  | Stripe + Przelewy24, course/content access, gift coupons, admin refunds — no directory yet        |
+| `analytics/`      | 📋 planned  | UTM attribution, user activity tracking — no directory yet                                        |
+| `pnl/`            | 📋 planned  | P&L reporting — monthly + per-course, expenses, campaign costs, ROAS — no directory yet           |
+
+----------------- | ------------------------------------------------------------------------------------------------- |
 | `auth/`           | JWT sessions (refresh rotation, reuse detection, brute-force lock), email verification, password reset, email change, account recovery |
 | `users/`          | User accounts, profiles (avatar, phone), notification preferences                                 |
 | `courses/`        | Course catalog (draft/published/archived), SEO metadata, landing pages, reviews & ratings         |
@@ -127,7 +151,7 @@ The backend is organized into 16 bounded contexts under `backend/internal/`:
 
 ### No ORM — Raw SQL Only
 
-All database access uses `database/sql` with prepared statements and named query constants. This is a deliberate constraint: it forces explicit understanding of query plans, index usage, and transaction boundaries — skills that ORM abstractions obscure.
+All database access uses `pgx/v5` (native pgx interfaces behind `db.QueryRunner`) with named query constants; statement caching is handled by pgx. This is a deliberate constraint: it forces explicit understanding of query plans, index usage, and transaction boundaries — skills that ORM abstractions obscure.
 
 ### No HTTP Framework
 
@@ -167,7 +191,7 @@ Beyond the ADRs above, a few deliberate, non-obvious decisions worth calling out
 LearnFlow uses the **Transactional Outbox Pattern** to guarantee reliable event delivery even if Redis is temporarily unavailable.
 
 ```
-Business Operation (e.g. POST /briefs)
+Business Operation (e.g. a course grant, or POST /briefs in Phase 4)
         │
         ▼
   Database Transaction
@@ -188,7 +212,7 @@ Business Operation (e.g. POST /briefs)
          (e.g. booking)        (e.g. confirmation email)
 ```
 
-**Worker resilience:** 3× retry with exponential backoff → Dead Letter Queue (`failed_jobs` table) on exhaustion. Unresolved entries tracked with `resolved_at IS NULL` and visible in the admin panel.
+**Worker resilience:** outbox entries stay `pending` and are retried with exponential backoff, and only become `failed` after 3 attempts. Email workers retry 3× with exponential backoff and jitter, then write to the Dead Letter Queue (`failed_jobs` table); the DLQ retry worker re-drives unresolved entries (`resolved_at IS NULL`, up to 6 attempts), and they are listed via the admin API (`GET /api/v1/admin/dlq`).
 
 Event type constants live in `internal/events/types.go`; payload structs in `internal/events/payloads.go`.
 
@@ -196,7 +220,7 @@ Event type constants live in `internal/events/types.go`; payload structs in `int
 
 ## Database Design
 
-The schema spans 39 tables across six domains, designed for PostgreSQL 17+ with production-grade constraints.
+The schema spans 41 tables, designed for PostgreSQL 17+ with production-grade constraints.
 
 **Design principles applied throughout:**
 
@@ -204,7 +228,7 @@ The schema spans 39 tables across six domains, designed for PostgreSQL 17+ with 
 | -------------------- | ------------------------------------------------------------------------------------------- |
 | UUID primary keys    | `DEFAULT gen_random_uuid()` — generated in DB, not application                              |
 | Immutable money      | `bigint` in cents everywhere — no `float64` for financial amounts                           |
-| Soft deletes         | `deleted_at timestamptz` on 8 tables; every query filters `WHERE deleted_at IS NULL`        |
+| Soft deletes         | `deleted_at timestamptz` on 10 tables; every query filters `WHERE deleted_at IS NULL`        |
 | Enum-like fields     | `text NOT NULL` + named `CHECK` constraint — readable without an enum type                  |
 | Partial indexes      | Sparse columns, pending-status queues, active-record lookups — avoids scanning deleted rows |
 | Deferred constraints | `DEFERRABLE INITIALLY DEFERRED` on position UNIQUE — allows in-transaction position swaps   |
@@ -218,11 +242,12 @@ The annotated schema is in [`infrastructure/postgres/init/explain_init.sql`](inf
 
 The observability stack runs as a separate Docker Compose profile:
 
-- **Prometheus** — scrapes Go runtime metrics + custom application metrics + `pg_stat_statements` via `postgres_exporter`
-- **Grafana** — pre-configured dashboards for API latency, DB query performance, worker throughput, and error rates
+- **Prometheus** — scrapes the API's `/metrics` (`api:8080`): Go runtime and DB connection-pool metrics; worker/queue metrics are not exported yet
+- **Grafana** — container and provisioning folders are in place; dashboards are not added yet
+- `pg_stat_statements` is loaded in Postgres, but `postgres_exporter` is not wired up yet
 
 ```bash
-make run_obs      # start observability stack only
+make run_obs      # start observability stack only (Prometheus + Grafana)
 make run_full     # full dev stack + observability
 ```
 
@@ -233,7 +258,7 @@ make run_full     # full dev stack + observability
 ### Prerequisites
 
 - Docker + Docker Compose
-- Go 1.26.2+
+- Go 1.26.9+
 - Node.js 22+
 - Make
 
@@ -247,10 +272,10 @@ cd learnflow
 # Copy environment config
 cp .env.example .env
 
-# Start the full stack (PostgreSQL, Redis, MinIO, backend, frontend)
+# Start the full stack (PostgreSQL, Redis, MinIO, backend, frontend) — runs in the foreground
 make run
 
-# Apply database migrations
+# In a second terminal: apply database migrations
 make migrate
 ```
 
@@ -262,16 +287,18 @@ Key variables from `.env.example`:
 
 | Variable            | Default          | Description                       |
 | ------------------- | ---------------- | --------------------------------- |
-| `API_PORT`          | `8080`           | Backend HTTP port                 |
+| `PORT`              | `8080`           | Backend HTTP port (host mapping)  |
 | `FRONTEND_PORT`     | `3000`           | Nuxt SSR port                     |
-| `DATABASE_DSN`      | `postgres://...` | PostgreSQL connection string      |
+| `DB_HOST` / `DB_NAME` / `DB_USER` | `postgres` / `learnflow` / `postgres` | PostgreSQL connection (DSN is built from these) |
 | `DB_PASSWORD`       | `postgres`       | **Must be set explicitly outside local dev** — `docker-compose.dev.yml` falls back to the well-known `postgres` if unset |
-| `REDIS_ADDR`        | `localhost:6379` | Redis address                     |
-| `JWT_SECRET`        | `dev-secret`     | Change in production              |
-| `EMAIL_PROVIDER`    | `stub`           | `stub` (local) or `resend` (prod) |
-| `STORAGE_PROVIDER`  | `minio`          | `minio` (local) or `r2` (prod)    |
-| `STRIPE_SECRET_KEY` | —                | Stripe secret API key             |
-| `P24_MERCHANT_ID`   | —                | Przelewy24 merchant ID            |
+| `REDIS_ADDR`        | `redis:6379`     | Redis address                     |
+| `REDIS_PASSWORD`    | —                | Required by `docker-compose.dev.yml`; production also requires an explicit `REDIS_TLS` |
+| `JWT_SECRET`        | — (empty)        | Must be set; no built-in default  |
+| `CORS_TRUSTED_ORIGINS` | `http://localhost:3000` outside production | Required and https-only in production |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` | — | Email delivery (worker) |
+| `STORAGE_ENDPOINT`  | `http://localhost:9000` | MinIO (local) / R2 (prod); client not implemented yet |
+| `STRIPE_SECRET_KEY` | —                | Stripe secret API key (Phase 7)   |
+| `P24_MERCHANT_ID`   | —                | Przelewy24 merchant ID (Phase 7)  |
 
 ---
 
@@ -280,7 +307,8 @@ Key variables from `.env.example`:
 ```bash
 # Dev stack
 make run                      # full stack via Docker Compose
-make run_air                  # backend with Air hot-reload
+make stop                     # stop the dev stack
+make logs                     # tail container logs
 make run_no_docker            # infra in Docker, backend locally
 
 # Database
@@ -290,12 +318,12 @@ make migrate_down             # roll back last migration batch
 # Testing
 make run_test_coverage_backend   # Go tests with coverage report
 make run_test_coverage_frontend  # Vue/TS tests with coverage report
-make run_test_goconvey        # Go tests with GoConvey UI
 make test_integration         # real-Postgres/Redis integration tests (-tags=integration)
+make test_integration_coverage  # integration tests + merged coverage gate (min 92%)
 make test_integration_down    # stop the integration test stack
 
 # Linting
-make lint_backend             # golangci-lint (15+ linters)
+make lint_backend             # golangci-lint (24 linters)
 make lint_frontend            # oxlint + ESLint
 
 # Observability
@@ -304,7 +332,8 @@ make run_full                 # dev + observability
 
 # Database backup
 make backup                   # create timestamped backup
-make restore FILE=learnflow_YYYYMMDD_HHMMSS.sql.gz  # drop public schema + restore from MinIO backup
+make backup_list              # list backups in MinIO
+make restore FILE=learnflow_YYYYMMDD_HHMMSS.sql.gz  # restore from MinIO backup into an empty database
 ```
 
 **Single package test:**
@@ -323,8 +352,23 @@ cd frontend && npm run type-check
 
 ## Project Roadmap
 
-| Phase | Focus                                                           | Status         |
-| ----- | --------------------------------------------------------------- | -------------- |
+| Phase | Focus                                                                        | Status         |
+| ----- | ---------------------------------------------------------------------------- | -------------- |
+| 1     | Backend foundation — project structure, infrastructure, CI                   | ✅ Complete    |
+| 1.1   | Spike — physical data model and database schema                              | ✅ Complete    |
+| 2     | Auth & Users — JWT, registration, verification, profiles                     | ✅ Complete    |
+| 2.2   | 2FA / TOTP (future)                                                          | ⬜ Planned     |
+| 3     | Courses, Content & Admin — catalog, content, reviews, notes, announcements   | 🔄 Wrapping up — leftovers moved to later phases |
+| **4** | **Consultation Event Flow — brief → workers → booking → rescheduling → notifications** | **🔜 Next**    |
+| 4.1   | Support Chat — WebSocket server, real-time messaging, subadmin role          | ⬜ Planned     |
+| 5     | Frontend Auth & Shell — Nuxt SSR auth forms, JWT state, protected routing    | ⬜ Planned     |
+| 6     | Frontend Content, Consultations & Admin — views, brief form, admin panel     | ⬜ Planned     |
+| 6.1   | Spike — course discounts and coupons                                         | ⬜ Planned     |
+| 7     | Payments & Course Access — Stripe, Przelewy24, webhooks, UTM attribution     | ⬜ Planned     |
+| 8     | Frontend SEO & Course Pages — landing pages, SEO meta, GA4, Cookiebot        | ⬜ Planned     |
+| 9     | P&L & Analytics — expenses, Google Ads import, P&L views, ROAS               | ⬜ Planned     |
+
+----- | --------------------------------------------------------------- | -------------- |
 | 1     | Backend foundation — project structure, infrastructure, CI      | ✅ Complete    |
 | 1.1   | Spike — physical data model and database schema                 | ✅ Complete    |
 | 2     | Auth & Users — JWT, registration, verification, profiles        | ✅ Complete    |
@@ -355,25 +399,22 @@ learnflow/
 │   │   ├── courses/        # } (transport → service → repository → domain)
 │   │   ├── ...             # }
 │   │   ├── shared/         # Cross-cutting concerns
-│   │   ├── infrastructure/ # DB, Redis, logger, config, storage, email
+│   │   ├── infrastructure/ # DB, Redis, logger, env config, sanitizer, metrics
 │   │   ├── events/         # Event types and payloads
-│   │   ├── queue/          # Redis BLPop worker infrastructure
-│   │   └── worker/         # Domain workers
+│   │   └── worker/         # Pollers, email workers, cleanup, BLPop consumers
 │   └── migrations/         # Sequential .up.sql / .down.sql files
 ├── frontend/
-│   └── app/
-│       ├── pages/          # Nuxt file-based routing
-│       ├── components/     # Vue 3 SFC components
-│       ├── composables/    # Data-fetching bridge layer
-│       └── stores/         # Pinia state management
+│   └── app/                # Nuxt 4 app — only app.vue so far; pages, components,
+│                           # composables and stores arrive in Phase 5
 ├── infrastructure/
-│   ├── docker/             # Docker Compose configs (dev, obs, full)
+│   ├── docker/             # Docker Compose configs (dev, no_docker, observability, tests)
+│   ├── backup/             # pg_dump backup + restore container
+│   ├── grafana/            # Provisioning folders (no dashboards yet)
 │   └── postgres/init/      # Annotated reference schema
 ├── docs/
 │   ├── adr/                # Architecture Decision Records
 │   └── DATABASE_SCHEMA.dbml
 ├── prometheus/             # Prometheus scrape config
-├── scripts/                # Utility scripts
 └── makefile
 ```
 
@@ -384,11 +425,11 @@ learnflow/
 - **Clean Architecture** in Go — strict layer boundaries, interface-driven design, no global state
 - **Event-driven systems** — transactional outbox, Redis-backed async workers, DLQ handling
 - **Relational database design** — normalization, constraint design, partial indexes, soft deletes at scale
-- **Full-stack SSR** — Nuxt 4 server-side rendering, composable data-fetching layer, Pinia
-- **Payment integration** — Stripe webhooks, Przelewy24, idempotency via outbox pattern
-- **Observability** — Prometheus instrumentation, Grafana dashboards, structured JSON logging
-- **Production hygiene** — golangci-lint (15+ linters), oxlint + ESLint strict, migration safety rules, ADRs
-- **Test discipline** — GoConvey unit suite (97.6%+ service coverage) plus real-Postgres/Redis integration tests exercising full BLPop → process → retry → DLQ worker flows
+- **Full-stack SSR** — Nuxt 4 server-side rendering, composable data-fetching layer, Pinia (planned, Phases 5–8)
+- **Payment integration** — Stripe webhooks, Przelewy24, idempotency via outbox pattern (planned, Phase 7)
+- **Observability** — Prometheus instrumentation, Grafana stack, structured JSON logging
+- **Production hygiene** — golangci-lint (24 linters), oxlint + ESLint strict, migration safety rules, ADRs
+- **Test discipline** — GoConvey unit suite plus real-Postgres/Redis integration tests exercising full BLPop → process → retry → DLQ worker flows; merged unit + integration coverage ~94%, CI-gated at 92%
 
 ---
 
