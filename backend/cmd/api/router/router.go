@@ -24,6 +24,10 @@ import (
 	authrepository "learnflow_backend/internal/auth/repository"
 	authservice "learnflow_backend/internal/auth/service"
 	authhttp "learnflow_backend/internal/auth/transport/http"
+	"learnflow_backend/internal/consultations"
+	consultationsdomain "learnflow_backend/internal/consultations/domain"
+	consultationsrepository "learnflow_backend/internal/consultations/repository"
+	consultationservice "learnflow_backend/internal/consultations/service"
 	"learnflow_backend/internal/content"
 	contentrepository "learnflow_backend/internal/content/repository"
 	contentservice "learnflow_backend/internal/content/service"
@@ -103,20 +107,7 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 	userSvc := usersservice.New(usersrepo)
 	users.RegisterUsersRoutes(router, userSvc, chains.StaticWithAuth, a.Logger)
 
-	// Course Routes
-	courseRepo := courserepository.NewRepository(a.DB)
-	courseSvc := courseservice.New(courseRepo, adminAction, transactor)
-	courses.RegisterCourseRoutes(router, courseSvc, chains.Static, adminStaticWithAuth, a.Logger)
-
-	// Content Routes
-	contentRepo := contentrepository.NewRepository(a.DB)
-	contentSvc := contentservice.New(contentRepo, adminAction, transactor)
-	content.RegisterContentRoutes(router, contentSvc, chains.Static, adminStaticWithAuth, a.Logger)
-
-	// Article Routes
-	articleRepo := articlerepository.NewRepository(a.DB)
-	articleSvc := articleservice.New(articleRepo, adminAction, transactor)
-	article.RegisterArticleRoutes(router, articleSvc, chains.Static, adminStaticWithAuth, a.Logger)
+	courseRepo, contentRepo := route.registerCatalogRoutes(router, chains, adminStaticWithAuth, adminAction, transactor)
 
 	// Review Routes
 	reviewRepo := reviewrepository.NewRepository(a.DB)
@@ -146,9 +137,44 @@ func NewRouter(a *app.App) (*RouteHandler, error) {
 		})
 	admin.RegisterAdminRoutes(router, adminSvc, adminStaticWithAuth, chains.StaticWithAuth, a.Logger)
 
+	if err = route.registerConsultationRoutes(router, adminAction, transactor, chains.StaticWithAuth, adminStaticWithAuth); err != nil {
+		return nil, fmt.Errorf("router: NewRouter: %w", err)
+	}
+
 	route.registerHelperRoutes(router)
 
 	return route, nil
+}
+
+// registerCatalogRoutes wires the courses, content and articles modules and returns the repositories other modules reuse.
+func (route *RouteHandler) registerCatalogRoutes(router *http.ServeMux, chains authhttp.AuthRouteChains, adminChain alice.Chain, adminAction *auditrepository.Audit, transactor *db.PgxTransactor) (courseRepo *courserepository.Repository, contentRepo *contentrepository.Repository) {
+	courseRepo = courserepository.NewRepository(route.App.DB)
+	courseSvc := courseservice.New(courseRepo, adminAction, transactor)
+	courses.RegisterCourseRoutes(router, courseSvc, chains.Static, adminChain, route.App.Logger)
+
+	contentRepo = contentrepository.NewRepository(route.App.DB)
+	contentSvc := contentservice.New(contentRepo, adminAction, transactor)
+	content.RegisterContentRoutes(router, contentSvc, chains.Static, adminChain, route.App.Logger)
+
+	articleRepo := articlerepository.NewRepository(route.App.DB)
+	articleSvc := articleservice.New(articleRepo, adminAction, transactor)
+	article.RegisterArticleRoutes(router, articleSvc, chains.Static, adminChain, route.App.Logger)
+
+	return courseRepo, contentRepo
+}
+
+// registerConsultationRoutes wires the consultations module: userChain for clients, adminChain for admins.
+func (route *RouteHandler) registerConsultationRoutes(router *http.ServeMux, adminAction consultationsdomain.AdminActionRepository, transactor consultationsdomain.Transactor, userChain, adminChain alice.Chain) error {
+	slotSchedule, err := consultations.LoadSlotSchedule()
+	if err != nil {
+		return fmt.Errorf("registerConsultationRoutes: %w", err)
+	}
+
+	repo := consultationsrepository.NewRepository(route.App.DB)
+	svc := consultationservice.New(repo, adminAction, transactor, slotSchedule)
+	consultations.RegisterConsultationsRoutes(router, svc, userChain, adminChain, route.App.Logger)
+
+	return nil
 }
 
 // registerHelperRoutes registers the JSON 404 fallback and the unauthenticated health, readiness and metrics endpoints.

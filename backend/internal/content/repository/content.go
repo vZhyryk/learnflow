@@ -63,22 +63,22 @@ func (rep *Repository) UpdateContentItem(ctx context.Context, contentItem *conte
 
 // GetAllPublishedContentItems returns every non-deleted published ContentItem.
 func (rep *Repository) GetAllPublishedContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllPublishedContentItemsSQL, countPublishedContentItemsSQL, "GetAllPublishedContentItems", params, scanContentItem, nil)
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllPublishedContentItemsSQL, countPublishedContentItemsSQL, "GetAllPublishedContentItems", &params, scanContentItem, nil)
 }
 
 // GetAllDraftContentItems returns every non-deleted draft ContentItem.
 func (rep *Repository) GetAllDraftContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllDraftContentItemsSQL, countDraftContentItemsSQL, "GetAllDraftContentItems", params, scanContentItem, nil)
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllDraftContentItemsSQL, countDraftContentItemsSQL, "GetAllDraftContentItems", &params, scanContentItem, nil)
 }
 
 // GetAllArchivedContentItems returns every archived ContentItem, including soft-deleted ones.
 func (rep *Repository) GetAllArchivedContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllArchivedContentItemsSQL, countArchivedContentItemsSQL, "GetAllArchivedContentItems", params, scanContentItem, nil)
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllArchivedContentItemsSQL, countArchivedContentItemsSQL, "GetAllArchivedContentItems", &params, scanContentItem, nil)
 }
 
 // GetAllContentItems returns every ContentItem regardless of status, including soft-deleted ones.
 func (rep *Repository) GetAllContentItems(ctx context.Context, params pagination.Params) ([]*contentdomain.ContentItem, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllContentItemsSQL, countAllContentItemsSQL, "GetAllContentItems", params, scanContentItem, nil)
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllContentItemsSQL, countAllContentItemsSQL, "GetAllContentItems", &params, scanContentItem, nil)
 }
 
 // GetContentItemByID retrieves a non-deleted ContentItem by ID.

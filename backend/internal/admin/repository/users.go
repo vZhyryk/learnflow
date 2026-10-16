@@ -14,7 +14,7 @@ import (
 
 // GetUsersData returns a page of users including soft-deleted ones (deliberate: admin view) and the total user count.
 func (rep *Repository) GetUsersData(ctx context.Context, params pagination.Params) ([]*admindomain.UserData, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getUserDataSQL, countUsersSQL, "GetUsersData", params, scanUserData, nil)
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getUserDataSQL, countUsersSQL, "GetUsersData", &params, scanUserData, nil)
 }
 
 // GetUserDataByID returns one user's admin view, including soft-deleted ones (deliberate: admin view).

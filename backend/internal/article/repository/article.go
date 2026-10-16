@@ -62,22 +62,22 @@ func (rep *Repository) UpdateArticle(ctx context.Context, article *articledomain
 
 // GetAllPublishedArticles returns every non-deleted published Article.
 func (rep *Repository) GetAllPublishedArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllPublishedArticlesSQL, countPublishedArticlesSQL, "GetAllPublishedArticles", params, scanArticle, nil)
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllPublishedArticlesSQL, countPublishedArticlesSQL, "GetAllPublishedArticles", &params, scanArticle, nil)
 }
 
 // GetAllDraftArticles returns every non-deleted draft Article.
 func (rep *Repository) GetAllDraftArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllDraftArticlesSQL, countDraftArticlesSQL, "GetAllDraftArticles", params, scanArticle, nil)
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllDraftArticlesSQL, countDraftArticlesSQL, "GetAllDraftArticles", &params, scanArticle, nil)
 }
 
 // GetAllArchivedArticles returns every archived Article, including soft-deleted ones.
 func (rep *Repository) GetAllArchivedArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllArchivedArticlesSQL, countArchivedArticlesSQL, "GetAllArchivedArticles", params, scanArticle, nil)
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllArchivedArticlesSQL, countArchivedArticlesSQL, "GetAllArchivedArticles", &params, scanArticle, nil)
 }
 
 // GetAllArticles returns every Article regardless of status, including soft-deleted ones.
 func (rep *Repository) GetAllArticles(ctx context.Context, params pagination.Params) ([]*articledomain.Article, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllArticlesSQL, countAllArticlesSQL, "GetAllArticles", params, scanArticle, nil)
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, getAllArticlesSQL, countAllArticlesSQL, "GetAllArticles", &params, scanArticle, nil)
 }
 
 // GetArticleByID retrieves a non-deleted Article by ID.

@@ -57,7 +57,7 @@ func (rep *Repository) DeleteCourseReview(ctx context.Context, reviewID, userID 
 func (rep *Repository) GetCourseReviewList(ctx context.Context, params pagination.Params, courseID string, filter reviewdomain.ReviewFilter) ([]*reviewdomain.CourseReview, int, error) {
 	query, countQuery, args := rep.applyFilter(getCourseReviewByCourseIDSQL, countCourseReviewsByCourseIDSQL, courseID, filter)
 
-	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, query, countQuery, "GetCourseReviewList", params, scanCourseReview, args)
+	return repository.GetCountAndParseListWithArgs(ctx, &rep.BaseRepository, query, countQuery, "GetCourseReviewList", &params, scanCourseReview, args)
 }
 
 // GetCourseReviewByID retrieves a non-deleted course review by ID.

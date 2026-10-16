@@ -126,13 +126,13 @@ func detailsArg(details map[string]any) any {
 
 // GetInstanceAdminActions returns one page of the audit trail for a target, newest first, and the total count.
 func (r *Audit) GetInstanceAdminActions(ctx context.Context, targetType auditdomain.AdminTargetType, targetID string, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &r.BaseRepository, getInstanceAdminActionsSQL, getInstanceAdminActionsCountSQL, "GetInstanceAdminActions", params, scanAdminAction, []any{targetType, targetID})
+	return repository.GetCountAndParseListWithArgs(ctx, &r.BaseRepository, getInstanceAdminActionsSQL, getInstanceAdminActionsCountSQL, "GetInstanceAdminActions", &params, scanAdminAction, []any{targetType, targetID})
 }
 
 // GetAdminActions returns one page of the general audit journal, newest first, and the total count of the filter.
 func (r *Audit) GetAdminActions(ctx context.Context, filter auditdomain.AdminActionFilter, params pagination.Params) ([]*auditdomain.AdminAction, int, error) {
 	filterArgs := []any{nilIfEmpty(filter.AdminUserID), nilIfEmpty(string(filter.ActionType)), filter.From, filter.To}
-	return repository.GetCountAndParseListWithArgs(ctx, &r.BaseRepository, getAdminActionsSQL, getAdminActionsCountSQL, "GetAdminActions", params, scanAdminAction, filterArgs)
+	return repository.GetCountAndParseListWithArgs(ctx, &r.BaseRepository, getAdminActionsSQL, getAdminActionsCountSQL, "GetAdminActions", &params, scanAdminAction, filterArgs)
 }
 
 // nilIfEmpty passes an unset filter value as SQL NULL so its condition is skipped.
@@ -146,5 +146,5 @@ func nilIfEmpty(value string) any {
 
 // GetFailedJobs returns one page of dead-lettered jobs, newest first, and the total count.
 func (r *Audit) GetFailedJobs(ctx context.Context, params pagination.Params) ([]*auditdomain.FailedJob, int, error) {
-	return repository.GetCountAndParseListWithArgs(ctx, &r.BaseRepository, getFailedJobsSQL, getFailedJobsCountSQL, "GetFailedJobs", params, scanFailedJob, []any{})
+	return repository.GetCountAndParseListWithArgs(ctx, &r.BaseRepository, getFailedJobsSQL, getFailedJobsCountSQL, "GetFailedJobs", &params, scanFailedJob, []any{})
 }

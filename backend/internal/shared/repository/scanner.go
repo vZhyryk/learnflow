@@ -52,7 +52,7 @@ func GetAndParseListWithArgs[T any](ctx context.Context,
 func GetCountAndParseListWithArgs[T any](ctx context.Context,
 	rep *BaseRepository,
 	query, countQuery, methodName string,
-	params pagination.Params,
+	params *pagination.Params,
 	scan func(RowScanner) (T, error),
 	args []any,
 ) (items []T, total int, err error) {
@@ -60,7 +60,7 @@ func GetCountAndParseListWithArgs[T any](ctx context.Context,
 		return nil, 0, fmt.Errorf("repository.%s count: %w", methodName, err)
 	}
 
-	if items, err = GetAndParseListWithArgs(ctx, rep, query, methodName, &params, scan, args); err != nil {
+	if items, err = GetAndParseListWithArgs(ctx, rep, query, methodName, params, scan, args); err != nil {
 		return nil, 0, err
 	}
 

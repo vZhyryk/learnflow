@@ -19,7 +19,7 @@ func scanFakeListItem(row repository.RowScanner) (fakeListItem, error) {
 func fakeCountList(runner *MockQueryRunner) func(context.Context, pagination.Params) ([]fakeListItem, int, error) {
 	repo := &repository.BaseRepository{DB: runner}
 	return func(ctx context.Context, params pagination.Params) ([]fakeListItem, int, error) {
-		return repository.GetCountAndParseListWithArgs(ctx, repo, "list", "count", "GetItems", params, scanFakeListItem, nil)
+		return repository.GetCountAndParseListWithArgs(ctx, repo, "list", "count", "GetItems", &params, scanFakeListItem, nil)
 	}
 }
 

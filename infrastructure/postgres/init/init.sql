@@ -11,7 +11,7 @@
 --         notifications, announcements, activity_log, event_outbox, failed_jobs,
 --         admin_actions, support_chats, support_messages,
 --         account_recovery_tokens, articles, gift_coupons, user_sessions
--- Synced through: migration 000015
+-- Synced through: migration 000018
 
 -- Index naming convention: idx_{table}_{col1}_{col2}[_{qualifier}]
 --   qualifier = domain condition key: active, available, booked, pending, open, unread, unresolved, unused
@@ -510,14 +510,15 @@ CREATE INDEX idx_user_notes_resource_type_resource_id_active
 -- Application layer is responsible for timezone-aware display and DST handling.
 CREATE TABLE consultation_slots (
     id                 uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    consultant_id      uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     date               date        NOT NULL,
     start_time         time        NOT NULL,
     duration_minutes   integer     NOT NULL CONSTRAINT consultation_slots_duration_positive CHECK (duration_minutes > 0),
     status             text        NOT NULL DEFAULT 'available' CONSTRAINT consultation_slots_status_check CHECK (status IN ('available', 'booked', 'blocked')),
-    created_by_user_id uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    updated_by         uuid        REFERENCES users(id) ON DELETE RESTRICT,
     created_at         timestamptz NOT NULL DEFAULT now(),
     updated_at         timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT consultation_slots_date_time_unique UNIQUE (date, start_time)
+    CONSTRAINT consultation_slots_consultant_date_time_unique UNIQUE (consultant_id, date, start_time)
 );
 
 CREATE INDEX idx_consultation_slots_date_start_time_available
@@ -545,6 +546,8 @@ CREATE TABLE consultation_briefs (
 
 CREATE INDEX idx_consultation_briefs_user_id ON consultation_briefs(user_id);
 CREATE INDEX idx_consultation_briefs_status  ON consultation_briefs(status) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX idx_consultation_briefs_slot_id_active_unique
+    ON consultation_briefs(slot_id) WHERE deleted_at IS NULL AND status <> 'failed';
 
 CREATE TABLE consultation_bookings (
     id                          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -787,7 +790,7 @@ CREATE TABLE admin_actions (
     id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     admin_user_id   uuid        NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     action_type     text        NOT NULL CONSTRAINT admin_actions_action_type_check CHECK (action_type IN ('confirm_booking', 'cancel_booking', 'grant_item_access', 'issue_refund', 'record_expense', 'block_user', 'unblock_user', 'reschedule_booking', 'close_support_chat', 'assign_subadmin', 'revoke_subadmin', 'delete_user', 'create_gift_coupon', 'revoke_gift_coupon', 'publish_item', 'delete_item', 'archive_item', 'create_item', 'update_item', 'approve_item', 'restore_user')),
-    target_type     text        NOT NULL CONSTRAINT admin_actions_target_type_check CHECK (target_type IN ('user', 'booking', 'course', 'failed_job', 'payment', 'support_chat', 'review', 'announcement', 'article', 'gift_coupon', 'content_item', 'expense')),
+    target_type     text        NOT NULL CONSTRAINT admin_actions_target_type_check CHECK (target_type IN ('user', 'booking', 'course', 'failed_job', 'payment', 'support_chat', 'review', 'announcement', 'article', 'gift_coupon', 'content_item', 'expense', 'consultation_slot')),
     target_id       uuid        NOT NULL,
     details_json    jsonb,
     created_at      timestamptz NOT NULL DEFAULT now()
